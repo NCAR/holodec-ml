@@ -4,7 +4,7 @@
 op = Fraunhofer();
 
 %Make any changes to defaults here
-op.nHolograms = 100;  %Number of holograms to make
+op.nHolograms = 10000;  %Number of holograms to make
 op.NParticles = 1;  %Particles per hologram
 op.Nx = 600;        %Image dimensions
 op.Ny = 400;
@@ -35,6 +35,10 @@ for i = 1:length(ncdfprops)
 end
 varid = netcdf.defVar(ncid, 'image', 'NC_UBYTE', [hologram_dimid, xsize_dimid, ysize_dimid]);
 netcdf.putAtt(ncid, varid, 'longname', 'Hologram image');
+%Turn on compression for the image, saves about 50% file size
+netcdf.defVarDeflate(ncid, varid, true, true, 5); 
+%Specify chunking in 2D only, speeds up the process
+netcdf.defVarChunking(ncid, varid, 'CHUNKED', [1, op.Nx/10, op.Ny/10]);
 
 %Write options to global attributes
 tags = fieldnames(op);
@@ -49,6 +53,14 @@ for i = 1:length(tags)
 end
 
 netcdf.endDef(ncid);  %Enter data mode
+
+%Save variable ids for use when writing
+xvarid = netcdf.inqVarID(ncid, 'x');
+yvarid = netcdf.inqVarID(ncid, 'y');
+zvarid = netcdf.inqVarID(ncid, 'z');
+dvarid = netcdf.inqVarID(ncid, 'd');
+hvarid = netcdf.inqVarID(ncid, 'hid');
+ivarid = netcdf.inqVarID(ncid, 'image');
 
 %% Make the holograms
 for i = 1:op.nHolograms
@@ -66,18 +78,14 @@ for i = 1:op.nHolograms
     
     %ifn = 'last_hologram.png'
     %imwrite(uint8(img),ifn);
-    varid = netcdf.inqVarID(ncid, 'x');
-    netcdf.putVar(ncid, varid, (i-1)*op.NParticles, op.NParticles, op.particles.x*1e6) 
-    varid = netcdf.inqVarID(ncid, 'y');
-    netcdf.putVar(ncid, varid, (i-1)*op.NParticles, op.NParticles, op.particles.y*1e6) 
-    varid = netcdf.inqVarID(ncid, 'z');
-    netcdf.putVar(ncid, varid, (i-1)*op.NParticles, op.NParticles, op.particles.z*1e6) 
-    varid = netcdf.inqVarID(ncid, 'd');
-    netcdf.putVar(ncid, varid, (i-1)*op.NParticles, op.NParticles, op.particles.Dp*1e6) 
-    varid = netcdf.inqVarID(ncid, 'hid');
-    netcdf.putVar(ncid, varid, (i-1)*op.NParticles, op.NParticles, i) 
-    varid = netcdf.inqVarID(ncid, 'image');
-    netcdf.putVar(ncid, varid, [(i-1), 0, 0], [1, op.Nx, op.Ny], img2write) 
+    
+    %Write data to netCDF.  This breaks in parallel mode, fixable?    
+    netcdf.putVar(ncid, xvarid, (i-1)*op.NParticles, op.NParticles, op.particles.x*1e6) 
+    netcdf.putVar(ncid, yvarid, (i-1)*op.NParticles, op.NParticles, op.particles.y*1e6) 
+    netcdf.putVar(ncid, zvarid, (i-1)*op.NParticles, op.NParticles, op.particles.z*1e6) 
+    netcdf.putVar(ncid, dvarid, (i-1)*op.NParticles, op.NParticles, op.particles.Dp*1e6) 
+    netcdf.putVar(ncid, hvarid, (i-1)*op.NParticles, op.NParticles, i) 
+    netcdf.putVar(ncid, ivarid, [(i-1), 0, 0], [1, op.Nx, op.Ny], img2write) 
 
     if mod(i,10) == 0
         disp([i,op.nHolograms])
