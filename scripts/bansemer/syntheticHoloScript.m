@@ -14,7 +14,7 @@ op.Dpmax = 70e-6;
 %% Set up the netCDF file
 cmode = netcdf.getConstant('NETCDF4');
 cmode = bitor(cmode,netcdf.getConstant('CLOBBER'));
-ncid = netcdf.create('temp.nc', cmode);
+ncid = netcdf.create('synthetic_holograms_v01.nc', cmode);
 
 %Dimensions
 hologram_dimid = netcdf.defDim(ncid, 'hologram_number', op.nHolograms);
@@ -33,12 +33,12 @@ for i = 1:length(ncdfprops)
     netcdf.putAtt(ncid, varid, 'longname', ncdfprops{i,2});
     netcdf.putAtt(ncid, varid, 'units', ncdfprops{i,3});
 end
-varid = netcdf.defVar(ncid, 'image', 'NC_UBYTE', [hologram_dimid, xsize_dimid, ysize_dimid]);
+varid = netcdf.defVar(ncid, 'image', 'NC_UBYTE', [ysize_dimid, xsize_dimid, hologram_dimid]);
 netcdf.putAtt(ncid, varid, 'longname', 'Hologram image');
 %Turn on compression for the image, saves about 50% file size
 netcdf.defVarDeflate(ncid, varid, true, true, 5); 
 %Specify chunking in 2D only, speeds up the process
-netcdf.defVarChunking(ncid, varid, 'CHUNKED', [1, op.Nx/10, op.Ny/10]);
+netcdf.defVarChunking(ncid, varid, 'CHUNKED', [op.Ny/10, op.Nx/10, 1]);
 
 %Write options to global attributes
 tags = fieldnames(op);
@@ -73,7 +73,7 @@ for i = 1:op.nHolograms
 
     % Make the hologram image as seen by the camera
     img = syntheticHolo(op);
-    img2write = uint8(transpose(img));  %reshape for netCDF
+    img2write = uint8(img);  %reshape for netCDF
     clearCache(op);    %Need to clear, otherwise Fraunhofer.m keeps
     
     %ifn = 'last_hologram.png'
@@ -85,7 +85,7 @@ for i = 1:op.nHolograms
     netcdf.putVar(ncid, zvarid, (i-1)*op.NParticles, op.NParticles, op.particles.z*1e6) 
     netcdf.putVar(ncid, dvarid, (i-1)*op.NParticles, op.NParticles, op.particles.Dp*1e6) 
     netcdf.putVar(ncid, hvarid, (i-1)*op.NParticles, op.NParticles, i) 
-    netcdf.putVar(ncid, ivarid, [(i-1), 0, 0], [1, op.Nx, op.Ny], img2write) 
+    netcdf.putVar(ncid, ivarid, [0, 0, (i-1)], [op.Ny, op.Nx, 1], img2write) 
 
     if mod(i,10) == 0
         disp([i,op.nHolograms])
