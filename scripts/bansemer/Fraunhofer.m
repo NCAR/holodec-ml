@@ -324,7 +324,7 @@ methods
         pEngine.config_handle = this.config_handle;        
         
         %Add a particles one at a time to the hologram
-        uS = etd(clock, 1, length(particles),60);
+        % uS = etd(clock, 1, length(particles),60);
 
         for cnt = 1:length(particles);
             FHCheck = 2*Dp(cnt)^2/(this.lambda*z(cnt));
@@ -452,7 +452,7 @@ methods
             end
             SignalStrength(ind(cnt)) = sum(sum(signalIntensity));  
             end
-            uS = etd(uS, cnt);
+            % uS = etd(uS, cnt);
             
         end
 
