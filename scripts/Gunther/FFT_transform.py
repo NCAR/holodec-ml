@@ -23,4 +23,5 @@ out_data = []
 for i in range(10000):
     out_data.append(np.abs(np.fft.fftshift(np.fft.fft2(scaled_in_data[i]))))
 dnew = xr.DataArray(out_data,coords=ds.coords, dims=("hologram_number","xsize","ysize") , attrs=ds.attrs, name="synthetic_hologram_FFT")
-dnew.to_netcdf("sythetic_hologram_FFT-Transform_v0.nc",'w','NETCDF4')
+#dnew.to_netcdf("sythetic_hologram_FFT-Transform_v0.nc",'w','NETCDF4')
+dnew.to_netcdf("synthetic_hologram_FFT-Transform_v0.nc",'w','NETCDF4',encoding = {'xsize':{'dtype': 'float16','zlib': True},'ysize':{'dtype': 'float16','zlib': True}})
