@@ -41,4 +41,4 @@ if not 'float' in encoded_dtype:
                             'add_offset':image_ft.mean().values}}
 
 # write out the FT DataSet
-ds_ft.to_netcdf(ds_path+ds_base+"_ft_ac_"+"_".join(ft_func.keys())+encoded_dtype+".nc",**nckwargs)
+ds_ft.to_netcdf(ds_path+ds_base+"_ft_ac_"+"_".join(ft_func.keys())+"_"+encoded_dtype+".nc",**nckwargs)
