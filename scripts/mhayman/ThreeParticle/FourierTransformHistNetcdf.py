@@ -9,7 +9,8 @@ import datetime
 import FourierOpticsLib as FO
 
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/"
-ds_name = "synthetic_holograms_v02.nc"
+#ds_name = "synthetic_holograms_v02.nc"  # 3 particle data
+ds_name = "synthethic_holograms_v0.nc"  # 1 particle data
 ds_base = ds_name.replace(".nc","")
 
 # define the functions to be applied to the fourier transformed data
