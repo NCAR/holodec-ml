@@ -15,7 +15,9 @@ ds_base = ds_name.replace(".nc","")
 
 # define the functions to be applied to the fourier transformed data
 # this sets the out channels
-ft_func = {'real':np.real,'imag':np.imag}
+# typical names:
+# 'real':np.real, 'imag':np.imag, 'amplitude':np.abs, 'phase':np.angle
+ft_func = {'amplitude':np.abs}
 encoded_dtype = "float32"
 
 # define the data products desired and the number of histogram bins
@@ -50,7 +52,7 @@ with xr.open_dataset(ds_path+ds_name) as ds:
     # initialize the image Fourier Transform channels
     image_ft = {}
     for func in ft_func.keys():
-        image_ft[func] = xr.DataArray(np.zeros(ds['image'].shape,dtype='float32'),
+        image_ft[func] = xr.DataArray(np.zeros(ds['image'].transpose("hologram_number", "xsize", "ysize").shape,dtype='float32'),
                             dims=['hologram_number','xsize','ysize'])
         print(func,end=", ")
     print()
@@ -59,7 +61,7 @@ with xr.open_dataset(ds_path+ds_name) as ds:
     print("      "+hist_bin_count.__str__())
 
     # initialize the histograms
-    particle_histogram = xr.DataArray(np.zeros([ds['image'].shape[0]]+histogram_shape),
+    particle_histogram = xr.DataArray(np.zeros([ds['hologram_number'].size]+histogram_shape),
                                 coords=[ds['hologram_number']]+list(hist_bin_centers.values()),
                                 dims=['hologram_number']+list(hist_bin_centers.keys()))
 
@@ -84,7 +86,7 @@ with xr.open_dataset(ds_path+ds_name) as ds:
         ds_ft['particle_histogram'][im,...] = hist0[0]
         
         # FT the image and store the desired operations
-        image0 = ds['image'].sel(hologram_number=im)  # select the hologram image
+        image0 = ds['image'].sel(hologram_number=im).transpose("xsize", "ysize")  # select the hologram image
         image_ft0 = FO.OpticsFFT(image0-np.mean(image0))  # FFT the image
         # perform requested operations for storage
         for func in ft_func.keys():
@@ -113,4 +115,4 @@ print("Writing to netcdf")
 ds_ft.to_netcdf(ds_path+ds_base+"_ft_ac_"+
     "".join(hist_bin_count.keys())+"_"+
     "_".join(ft_func.keys())+"_"+
-    encoded_dtype+".nc",**nckwargs)
+    encoded_dtype+"_histogram.nc",**nckwargs)
