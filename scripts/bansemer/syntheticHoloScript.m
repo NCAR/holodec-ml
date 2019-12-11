@@ -1,5 +1,7 @@
 %% Generate holograms of random particles
 
+RandomizeNParticles = 1;  %Set to generate random number of particles per hologram
+
 %Get the default settings, mostly consistent with HOLODEC
 op = Fraunhofer();
 
@@ -10,17 +12,23 @@ op.Nx = 600;        %Image dimensions
 op.Ny = 400;
 op.Dpmin = 20e-6;   %Particle size min/max
 op.Dpmax = 70e-6;
+RandomParticleCount = randi(5,1,op.nHolograms);  %Randomize the number of holograms 1-5
+if RandomizeNParticles == 1 
+    TotalNParticles = sum(RandomParticleCount);
+else
+    TotalNParticles = op.nHolograms * op.NParticles;
+end
 
 %% Set up the netCDF file
 cmode = netcdf.getConstant('NETCDF4');
 cmode = bitor(cmode,netcdf.getConstant('CLOBBER'));
-ncid = netcdf.create('synthetic_holograms_v02.nc', cmode);
+ncid = netcdf.create('synthetic_holograms_v03.nc', cmode);
 
 %Dimensions
 hologram_dimid = netcdf.defDim(ncid, 'hologram_number', op.nHolograms);
 xsize_dimid = netcdf.defDim(ncid, 'xsize', op.Nx);
 ysize_dimid = netcdf.defDim(ncid, 'ysize', op.Ny);
-particle_dimid = netcdf.defDim(ncid, 'particle', op.nHolograms * op.NParticles);
+particle_dimid = netcdf.defDim(ncid, 'particle', TotalNParticles);
 
 %Variables and attributes
 ncdfprops = {'hid', 'Hologram index (1-based, first hologram index = 1)', 'unitless';
@@ -64,7 +72,11 @@ ivarid = netcdf.inqVarID(ncid, 'image');
 
 %% Make the holograms
 for i = 1:op.nHolograms
-    % Generate random particles
+    if RandomizeNParticles == 1
+        op.NParticles = RandomParticleCount(i);  %Set particles per hologram
+    end
+    
+    % Generate random particle sizes and positions
     op.particles = randomParticles(op);
     %particleData = op.particles;
 
@@ -79,12 +91,17 @@ for i = 1:op.nHolograms
     %ifn = 'last_hologram.png'
     %imwrite(uint8(img),ifn);
     
-    %Write data to netCDF.  This breaks in parallel mode, fixable?    
-    netcdf.putVar(ncid, xvarid, (i-1)*op.NParticles, op.NParticles, [op.particles.x]*1e6) 
-    netcdf.putVar(ncid, yvarid, (i-1)*op.NParticles, op.NParticles, [op.particles.y]*1e6) 
-    netcdf.putVar(ncid, zvarid, (i-1)*op.NParticles, op.NParticles, [op.particles.z]*1e6) 
-    netcdf.putVar(ncid, dvarid, (i-1)*op.NParticles, op.NParticles, [op.particles.Dp]*1e6) 
-    netcdf.putVar(ncid, hvarid, (i-1)*op.NParticles, op.NParticles, zeros(1,op.NParticles)+i) 
+    %Write data to netCDF.  This breaks in parallel mode, fixable?
+    if RandomizeNParticles == 1
+        offset = sum(RandomParticleCount(1:(i-1))); %This works even when i-1 = 0
+    else
+        offset = (i-1)*op.NParticles;
+    end
+    netcdf.putVar(ncid, xvarid, offset, op.NParticles, [op.particles.x]*1e6) 
+    netcdf.putVar(ncid, yvarid, offset, op.NParticles, [op.particles.y]*1e6) 
+    netcdf.putVar(ncid, zvarid, offset, op.NParticles, [op.particles.z]*1e6) 
+    netcdf.putVar(ncid, dvarid, offset, op.NParticles, [op.particles.Dp]*1e6) 
+    netcdf.putVar(ncid, hvarid, offset, op.NParticles, zeros(1,op.NParticles)+i) 
     netcdf.putVar(ncid, ivarid, [0, 0, (i-1)], [op.Ny, op.Nx, 1], img2write) 
 
     if mod(i,10) == 0
