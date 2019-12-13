@@ -17,12 +17,15 @@ ds_base = ds_name.replace(".nc","")
 # this sets the out channels
 # typical names:
 # 'real':np.real, 'imag':np.imag, 'amplitude':np.abs, 'phase':np.angle
-ft_func = {'amplitude':np.abs}
+ft_func = {'amplitude':np.abs,'real':np.real,'imag':np.imag}
 encoded_dtype = "float32"
 
 # define the data products desired and the number of histogram bins
 # this defines the output histogram dimensions
-hist_bin_count = {"d":25}
+hist_bin_count = {"d":21,
+                  "z":21,
+                  "x":101,
+                  "y":101}
 
 # general definitions for rescaling factors
 ft_scale = {'real':255,'imag':255,'amplitude':255,'phase':2*np.pi}  # rescaling factors
@@ -61,7 +64,7 @@ with xr.open_dataset(ds_path+ds_name) as ds:
     print("      "+hist_bin_count.__str__())
 
     # initialize the histograms
-    particle_histogram = xr.DataArray(np.zeros([ds['hologram_number'].size]+histogram_shape),
+    particle_histogram = xr.DataArray(np.zeros([ds['hologram_number'].size]+histogram_shape,dtype=np.int8),
                                 coords=[ds['hologram_number']]+list(hist_bin_centers.values()),
                                 dims=['hologram_number']+list(hist_bin_centers.keys()))
 
@@ -108,7 +111,13 @@ if not 'float' in encoded_dtype:
                             'scale_factor':(image_ft.max()-image_ft.min()).values/
                                 (np.iinfo(encoded_dtype).max-np.iinfo(encoded_dtype).min),
                             'add_offset':image_ft.mean().values,
-                            '_FillValue':np.iinfo(encoded_dtype).min}}
+                            '_FillValue':np.iinfo(encoded_dtype).min,
+                            'zlib':True,
+                            'complevel':1}}
+else:
+    nckwargs['encoding'] = {'image_ft':{'zlib':True,'complevel':1}}
+# histogram encoding level    
+nckwargs['encoding']['particle_histogram'] = {'zlib':True,'complevel':1}
 
 # write out the FT DataSet
 print("Writing to netcdf")
