@@ -9,8 +9,8 @@ import datetime
 import FourierOpticsLib as FO
 
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/"
-#ds_name = "synthetic_holograms_v02.nc"  # 3 particle data
-ds_name = "synthethic_holograms_v0.nc"  # 1 particle data
+ds_name = "synthetic_holograms_v02.nc"  # 3 particle data
+#ds_name = "synthethic_holograms_v0.nc"  # 1 particle data
 ds_base = ds_name.replace(".nc","")
 
 # define the functions to be applied to the fourier transformed data
@@ -24,8 +24,8 @@ encoded_dtype = "float32"
 # this defines the output histogram dimensions
 hist_bin_count = {"d":21,
                   "z":21,
-                  "x":101,
-                  "y":101}
+                  "x":21,
+                  "y":21}
 
 # general definitions for rescaling factors
 ft_scale = {'real':255,'imag':255,'amplitude':255,'phase':2*np.pi}  # rescaling factors
