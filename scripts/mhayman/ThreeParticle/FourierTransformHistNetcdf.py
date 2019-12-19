@@ -17,15 +17,13 @@ ds_base = ds_name.replace(".nc","")
 # this sets the out channels
 # typical names:
 # 'real':np.real, 'imag':np.imag, 'amplitude':np.abs, 'phase':np.angle
-ft_func = {'amplitude':np.abs,'real':np.real,'imag':np.imag}
+ft_func = {'real':np.real,'imag':np.imag,'amplitude':np.abs}
 encoded_dtype = "float32"
 
 # define the data products desired and the number of histogram bins
 # this defines the output histogram dimensions
-hist_bin_count = {"d":21,
-                  "z":21,
-                  "x":21,
-                  "y":21}
+hist_bin_count = {"z":3,
+                  }
 
 # general definitions for rescaling factors
 ft_scale = {'real':255,'imag':255,'amplitude':255,'phase':2*np.pi}  # rescaling factors
