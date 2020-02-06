@@ -28,6 +28,14 @@ with xr.open_dataset(ds_path+ds_name) as ds:
                                 dims=('particle_property','particle_number','hologram_number'),
                                 coords={'particle_property':['x','y','z','d']})
 
+    # use a sub-dataset for the particle data where
+    # its sorted by particle size
+    # hopefully this will help NN figure out what order to
+    # place its outputs
+    # perform in decending so missing data treated as zeros still 
+    # makes sense in the sorting paradigm
+    part_ds = ds[['hid','x','y','z','d']].sortby('d',ascending=False)
+
     # initialize the image Fourier Transform channels
     image_ft = {}
     for func in ft_func.keys():
@@ -40,8 +48,9 @@ with xr.open_dataset(ds_path+ds_name) as ds:
     # create a variable with for each Fourier Transform operation of each image
     for im in range(ds['image'].sizes['hologram_number']):
         # sort the particle data by hologram number
-        particle_index = np.nonzero(ds['hid'].values==im+1)[0]  # find particles associated with this hologram
-        particle_data.loc[{'hologram_number':im}]=ds[particle_data.coords['particle_property']].isel(particle=particle_index).to_array()
+        particle_index = np.nonzero(part_ds['hid'].values==im+1)[0]  # find particles associated with this hologram
+        particle_data.loc[{'hologram_number':im,'particle_number':slice(None,len(particle_index))}]= \
+                        part_ds[particle_data.coords['particle_property']].isel(particle=particle_index).to_array()
 
         image0 = ds['image'].isel(hologram_number=im) #.transpose('xsize','ysize')
         image_ft0 = FO.OpticsFFT(image0.values - np.mean(image0.values))
