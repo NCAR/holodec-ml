@@ -8,8 +8,8 @@ import MieLibrary as mie
 
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/"
 # ds_name = "synthethic_holograms_v0.nc"  # 1 particle data
-ds_name = "synthetic_holograms_v02.nc"  # 3 particle data
-# ds_name = "synthetic_holograms_v03.nc"  # 1-5 particle data
+# ds_name = "synthetic_holograms_v02.nc"  # 3 particle data
+ds_name = "synthetic_holograms_v03.nc"  # 1-5 particle data
 ds_base = ds_name.replace(".nc","")
 
 # define the functions to be applied to the fourier transformed data
@@ -17,7 +17,7 @@ ft_func = {'amplitude':np.abs}
 ft_scale = {'real':255,'imag':255,'amplitude':255}  # rescaling factors
 encoded_dtype = "float"
 
-particle_count = 3  # number of particle outputs expected for NN
+particle_count = 5  # number of particle outputs expected for NN
 part_components = ['d',] # particle parameters to train on
 
 # define data needed for SVD
