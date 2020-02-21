@@ -61,6 +61,6 @@ def next_pt(point:Union[Tuple,List],grid:np.ndarray,pgrow:np.int,decay:np.int=1.
     grid[point[0],point[1]] = 1
     pts_new = [[point[0]+1,point[1]],[point[0]-1,point[1]],[point[0],point[1]+1],[point[0],point[1]-1]]
     for pt in pts_new:
-        if np.all(np.array(pt) >= 0) and np.all(np.array(pt) < np.array([Nx,Ny])):
+        if np.all(np.array(pt) >= 0) and np.all(np.array(pt) < np.array(grid.shape)):
             if np.random.rand() < pgrow and grid[pt[0],pt[1]] == 0:
                 next_pt(pt,grid,pgrow*decay,decay=decay)
