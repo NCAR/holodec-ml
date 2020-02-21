@@ -11,7 +11,7 @@ import numpy as np
 import xarray as xr
 
 
-from typing import Tuple
+from typing import Tuple, List, Union
 
 class MinMaxScalerX:
     """
@@ -48,3 +48,19 @@ class MinMaxScalerX:
         Invert rescaling to obtain original data
         """
         return out_array*self.delta+self.min
+
+def next_pt(point:Union[Tuple,List],grid:np.ndarray,pgrow:np.int,decay:np.int=1.0):
+    """
+    recursively generates a random shape on a grid of zeros.
+    inputs:
+        point - current centroid of the shape (row,column) index
+        grid - the grid of data to have the shape imposed on it
+        pgrow - the probability that the shape grows
+        decay - the decay in the growth with each recursive step
+    """
+    grid[point[0],point[1]] = 1
+    pts_new = [[point[0]+1,point[1]],[point[0]-1,point[1]],[point[0],point[1]+1],[point[0],point[1]-1]]
+    for pt in pts_new:
+        if np.all(np.array(pt) >= 0) and np.all(np.array(pt) < np.array([Nx,Ny])):
+            if np.random.rand() < pgrow and grid[pt[0],pt[1]] == 0:
+                next_pt(pt,grid,pgrow*decay,decay=decay)
