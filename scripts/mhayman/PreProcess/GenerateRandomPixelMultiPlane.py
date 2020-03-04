@@ -32,7 +32,10 @@ rspot = 1e-6  # resolvable spot size set by the aperture stop
 
 # set the randomized space limits
 param_lim = {'z':[0,1e-1],
-             'amplitude':[0.2,1]}
+             'amplitude':[0.2,1],
+             'Nrange':4}
+
+depth_array = np.linspace(param_lim['z'][0],param_lim['z'][1],param_lim['Nrange'])
 
 zedges = np.linspace(*param_lim['z'],zbins)
 
@@ -41,10 +44,14 @@ image_dim = {'x':64,
              'y':64,
              'pixel_width':10e-6}
 
-nc_name = f"random_image_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count_v03.nc"
+nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count.nc"
 
 # initialize plane wave definition
 grid = FO.Coordinate_Grid(((image_dim['y']*2,image_dim['x']*2,),
+                           (image_dim['pixel_width'],image_dim['pixel_width'],))
+                           ,inputType='ccd')
+# reconstruction grid
+grid2 = FO.Coordinate_Grid(((image_dim['y'],image_dim['x'],),
                            (image_dim['pixel_width'],image_dim['pixel_width'],))
                            ,inputType='ccd')
 E0 = FO.Efield(wavelength,grid,z=np.min(param_lim['z']))
@@ -69,13 +76,18 @@ xsize = xr.DataArray(np.arange(image_dim['x']),
                                 dims=('xsize'))
 ysize = xr.DataArray(np.arange(image_dim['y']),
                                 dims=('ysize'))
-image = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y']),dtype=float),
-                dims=('hologram_number','xsize','ysize'),
-                coords={'xsize':xsize,'ysize':ysize})
+# depth is actually a combination of real and imaginary components along
+# the z axis
+channel = xr.DataArray(np.arange(depth_array.size*2),
+                                dims=('channel'))
 
-image_ft = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],2),dtype=float),
+image = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],channel.size),dtype=float),
                 dims=('hologram_number','xsize','ysize','channel'),
-                coords={'xsize':xsize,'ysize':ysize,'channel':['real','imag']})
+                coords={'xsize':xsize,'ysize':ysize,'channel':channel})
+
+# image_ft = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],2),dtype=float),
+#                 dims=('hologram_number','xsize','ysize','channel'),
+#                 coords={'xsize':xsize,'ysize':ysize,'channel':['real','imag']})
 
 labels = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],2),dtype=float),
                 dims=('hologram_number','xsize','ysize','type'),
@@ -152,19 +164,27 @@ for iholo in range(Nsets):
 
     E1.propagate_to(np.max(param_lim['z']))
     image0 = np.abs(E1.field[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4])**2
-    imageft0 = FO.OpticsFFT(image0)
+    
+    # initialize the reconstruction
+    E2 = FO.Efield(wavelength,grid2,z=E1.z,fielddef=image0)
+    for idepth,depthr in enumerate(depth_array):
+        E2.propagate_to(depthr)
+        image.loc[{'hologram_number':iholo,'channel':2*idepth}] = np.real(E2.field)
+        image.loc[{'hologram_number':iholo,'channel':2*idepth+1}] = np.imag(E2.field)
+
+    # imageft0 = FO.OpticsFFT(image0)
 
     labels.loc[{'hologram_number':iholo,'type':'z'}] = zdata
     labels.loc[{'hologram_number':iholo,'type':'amplitude'}] = adata0
-    image.loc[{'hologram_number':iholo}] = image0.copy()
-    image_ft.loc[{'hologram_number':iholo,'channel':'real'}] = np.real(imageft0)
-    image_ft.loc[{'hologram_number':iholo,'channel':'imag'}] = np.imag(imageft0)
+    # image.loc[{'hologram_number':iholo}] = image0.copy()
+    # image_ft.loc[{'hologram_number':iholo,'channel':'real'}] = np.real(imageft0)
+    # image_ft.loc[{'hologram_number':iholo,'channel':'imag'}] = np.imag(imageft0)
 
     # report progress
     print(f"\r{iholo+1} of {Nsets} holograms completed",end='')
 
 
-ds = xr.Dataset({'xsize':xsize,'ysize':ysize,'image':image,'labels':labels,'image_ft':image_ft},
+ds = xr.Dataset({'xsize':xsize,'ysize':ysize,'image':image,'labels':labels,'channel':channel},
                 attrs=ds_attr)
 
 print("saving data to")
