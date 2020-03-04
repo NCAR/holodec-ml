@@ -27,11 +27,12 @@ binary_amplitude = True  # amplitude is binary
 
 zmiss = 0  # value for when amplitude is zero
 rspot = 1e-6  # resolvable spot size set by the aperture stop
+Nparticles = 1  # number of particles per hologram
 
 
 
 # set the randomized space limits
-param_lim = {'z':[0,1e-1],
+param_lim = {'z':[0,1e-2],
              'amplitude':[0.2,1],
              'Nrange':4}
 
@@ -44,9 +45,9 @@ image_dim = {'x':64,
              'y':64,
              'pixel_width':10e-6}
 
-nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count.nc"
+nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count_{Nparticles}particles.nc"
 
-# initialize plane wave definition
+# initialize simulation grid
 grid = FO.Coordinate_Grid(((image_dim['y']*2,image_dim['x']*2,),
                            (image_dim['pixel_width'],image_dim['pixel_width'],))
                            ,inputType='ccd')
@@ -54,6 +55,7 @@ grid = FO.Coordinate_Grid(((image_dim['y']*2,image_dim['x']*2,),
 grid2 = FO.Coordinate_Grid(((image_dim['y'],image_dim['x'],),
                            (image_dim['pixel_width'],image_dim['pixel_width'],))
                            ,inputType='ccd')
+# initialize plane wave definition
 E0 = FO.Efield(wavelength,grid,z=np.min(param_lim['z']))
 OpticalTF = E0.grid.fr < 1/rspot
 
@@ -67,6 +69,7 @@ ds_attr['zmax'] = max(param_lim['z'])
 ds_attr['zmin'] = min(param_lim['z'])
 ds_attr['z_invalid'] = zmiss
 ds_attr['rspot'] = rspot
+ds_attr['Nparticles'] = Nparticles
 
 for var in ds_attr:
     print(var+f":{ds_attr[var]}")
@@ -105,65 +108,54 @@ Generate pixel input data
 loop
 """
 for iholo in range(Nsets):
-    pix_x = np.int(np.random.rand()*image_dim['x'])
-    pix_y = np.int(np.random.rand()*image_dim['y'])
-    adata = np.zeros((image_dim['x']*2,image_dim['y']*2))
-    adata0 = np.zeros((image_dim['x'],image_dim['y']))
-    zposition = np.random.rand()*(param_lim['z'][1]-param_lim['z'][0])+param_lim['z'][0]
     
-    ml.next_pt((pix_x,pix_y),adata0,0.8,decay=0.9)
 
-    if not binary_amplitude:
-        # let amplitude be any number between 0 and 1
-        # otherwise the object is binary
-        ipix = np.nonzero(adata0)
-        adata0[ipix] = np.random.rand(len(ipix[0]))*(max(param_lim['amplitude'])-min(param_lim['amplitude']))+min(param_lim['amplitude'])
-
-    adata[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4] = adata0
-    # # eliminate points outside of the 
-    # # actual image
-    # adata[:grid.Nx//4,:] = 0
-    # adata[-grid.Nx//4:,:] = 0
-    # adata[:,:grid.Ny//4] = 0
-    # adata[:,-grid.Ny//4:] = 0
-
-    zdata = np.ones((image_dim['x'],image_dim['y']))*zmiss
-    ipix = np.nonzero(adata0)
-    zdata[ipix] = zposition
-
-    """
-    Two choices - include multiple scattering by numerically
-    propagating the wave in order of z for each pixel
-    OR
-    analytically calculate the resulting hologram considering
-    only 
-
-    """
-
-    # # sort pixels by z position
-    # ipix = np.argsort(zdata.flatten())
-    # ipix = np.delete(ipix,np.nonzero(adata.flatten()<=0))
-    # ix,iy = np.meshgrid(np.arange(2*image_dim['x']),np.arange(2*image_dim['y']))
-    # ix = ix.ravel()
-    # iy = iy.ravel()
-
-    # E1 = E0.copy()
-
-    # for i in ipix:
-    #     if adata[ix[i],iy[i]] > 0:
-    #         E1.propagate_to(zdata[ix[i],iy[i]])
-    #         # E1.propagate_Fresnel(zdata[ix[i],iy[i]]-E1.z)  # use Fresnel propagation
-    #         E1.field[ix[i],iy[i]] *= (1-adata[ix[i],iy[i]])
-    #         # E1.spatial_filter(OpticalTF)
-
+    zposition = sorted(np.random.rand(Nparticles)*(param_lim['z'][1]-param_lim['z'][0])+param_lim['z'][0])
     E1 = E0.copy()
+    adata = np.ones((image_dim['x']*2,image_dim['y']*2))
+    zdata = np.ones((image_dim['x']*2,image_dim['y']*2))*zmiss
+    
+    for npart in range(Nparticles):
+        # create the particle position
+        pix_x = np.int(np.random.rand()*image_dim['x'])
+        pix_y = np.int(np.random.rand()*image_dim['y'])
 
-    E1.propagate_to(zposition)
-    E1.field *= (1-adata)
-    E1.spatial_filter(OpticalTF)
+        # set up the particle amplitudegrid
+        adatap = np.zeros((image_dim['x']*2,image_dim['y']*2))
+        # adata0 = np.zeros((image_dim['x'],image_dim['y']))
+        
+        # create the random particle
+        ml.next_pt((pix_x+grid.Nx//4,pix_y+grid.Nx//4),adatap,0.8,decay=0.9)
+
+        if not binary_amplitude:
+            # let amplitude be any number between 0 and 1
+            # otherwise the object is binary
+            ipix = np.nonzero(adatap)
+            adatap[ipix] = np.random.rand(len(ipix[0]))*(max(param_lim['amplitude'])-min(param_lim['amplitude']))+min(param_lim['amplitude'])
+
+        # adata[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4] = adata0
+
+        # zdata = np.ones((image_dim['x'],image_dim['y']))*zmiss
+        
+        # create the z position array for training
+        ipix = np.nonzero(adatap)
+        zdata[ipix] = zposition[npart]
+
+        # propagate the electric field to the new particle
+        # and apply the particle amplitude mask
+        E1.propagate_to(zposition[npart])
+        E1.field *= (1-adatap)
+        # E1.spatial_filter(OpticalTF)
+
+        adata *= (1-adatap)
 
     E1.propagate_to(np.max(param_lim['z']))
+    E1.spatial_filter(OpticalTF)
+
     image0 = np.abs(E1.field[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4])**2
+
+    adata0 = 1-adata[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4]
+    zdata0 = zdata[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4]
     
     # initialize the reconstruction
     E2 = FO.Efield(wavelength,grid2,z=E1.z,fielddef=image0)
@@ -174,7 +166,7 @@ for iholo in range(Nsets):
 
     # imageft0 = FO.OpticsFFT(image0)
 
-    labels.loc[{'hologram_number':iholo,'type':'z'}] = zdata
+    labels.loc[{'hologram_number':iholo,'type':'z'}] = zdata0
     labels.loc[{'hologram_number':iholo,'type':'amplitude'}] = adata0
     # image.loc[{'hologram_number':iholo}] = image0.copy()
     # image_ft.loc[{'hologram_number':iholo,'channel':'real'}] = np.real(imageft0)
