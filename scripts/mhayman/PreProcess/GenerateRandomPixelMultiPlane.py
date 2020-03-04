@@ -21,34 +21,35 @@ import ml_utils as ml
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/"
 
 Nsets = 5000  # number of training images to generate
-wavelength = 660e-9
+wavelength = 355e-9
 zbins = 5 # number of histogram bins in z
 binary_amplitude = True  # amplitude is binary
 
 zmiss = 0  # value for when amplitude is zero
-rspot = 1e-6  # resolvable spot size set by the aperture stop
+rspot = 5e-6  # resolvable spot size set by the aperture stop
 Nparticles = 1  # number of particles per hologram
+Prop_Scale = 4  # factor of times bigger propagation grid than detector
 
 
 
 # set the randomized space limits
-param_lim = {'z':[0,1e-2],
+param_lim = {'z':[0,1e-1],
              'amplitude':[0.2,1],
-             'Nrange':4}
+             'Nrange':10}
 
 depth_array = np.linspace(param_lim['z'][0],param_lim['z'][1],param_lim['Nrange'])
 
 zedges = np.linspace(*param_lim['z'],zbins)
 
 # set the size of the image
-image_dim = {'x':64,
-             'y':64,
-             'pixel_width':10e-6}
+image_dim = {'x':256,
+             'y':256,
+             'pixel_width':3e-6}
 
 nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count_{Nparticles}particles.nc"
 
 # initialize simulation grid
-grid = FO.Coordinate_Grid(((image_dim['y']*2,image_dim['x']*2,),
+grid = FO.Coordinate_Grid(((image_dim['y']*Prop_Scale,image_dim['x']*Prop_Scale,),
                            (image_dim['pixel_width'],image_dim['pixel_width'],))
                            ,inputType='ccd')
 # reconstruction grid
@@ -112,8 +113,8 @@ for iholo in range(Nsets):
 
     zposition = sorted(np.random.rand(Nparticles)*(param_lim['z'][1]-param_lim['z'][0])+param_lim['z'][0])
     E1 = E0.copy()
-    adata = np.ones((image_dim['x']*2,image_dim['y']*2))
-    zdata = np.ones((image_dim['x']*2,image_dim['y']*2))*zmiss
+    adata = np.ones((image_dim['x']*Prop_Scale,image_dim['y']*Prop_Scale))
+    zdata = np.ones((image_dim['x']*Prop_Scale,image_dim['y']*Prop_Scale))*zmiss
     
     for npart in range(Nparticles):
         # create the particle position
@@ -121,11 +122,13 @@ for iholo in range(Nsets):
         pix_y = np.int(np.random.rand()*image_dim['y'])
 
         # set up the particle amplitudegrid
-        adatap = np.zeros((image_dim['x']*2,image_dim['y']*2))
+        adatap = np.zeros((image_dim['x']*Prop_Scale,image_dim['y']*Prop_Scale))
         # adata0 = np.zeros((image_dim['x'],image_dim['y']))
         
         # create the random particle
-        ml.next_pt((pix_x+grid.Nx//4,pix_y+grid.Nx//4),adatap,0.8,decay=0.9)
+        ml.next_pt((pix_x+grid.Nx*(Prop_Scale-1)//(Prop_Scale*2), \
+            pix_y+grid.Nx*(Prop_Scale-1)//(Prop_Scale*2)), \
+                adatap,0.8,decay=0.9)
 
         if not binary_amplitude:
             # let amplitude be any number between 0 and 1
@@ -152,10 +155,13 @@ for iholo in range(Nsets):
     E1.propagate_to(np.max(param_lim['z']))
     E1.spatial_filter(OpticalTF)
 
-    image0 = np.abs(E1.field[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4])**2
+    image0 = np.abs(E1.field[grid.Nx*(Prop_Scale-1)//(Prop_Scale*2):-grid.Nx*(Prop_Scale-1)//(Prop_Scale*2), \
+        grid.Ny*(Prop_Scale-1)//(Prop_Scale*2):-grid.Ny*(Prop_Scale-1)//(Prop_Scale*2)])**2
 
-    adata0 = 1-adata[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4]
-    zdata0 = zdata[grid.Nx//4:-grid.Nx//4,grid.Ny//4:-grid.Ny//4]
+    adata0 = 1-adata[grid.Nx*(Prop_Scale-1)//(Prop_Scale*2):-grid.Nx*(Prop_Scale-1)//(Prop_Scale*2), \
+        grid.Ny*(Prop_Scale-1)//(Prop_Scale*2):-grid.Ny*(Prop_Scale-1)//(Prop_Scale*2)]
+    zdata0 = zdata[grid.Nx*(Prop_Scale-1)//(Prop_Scale*2):-grid.Nx*(Prop_Scale-1)//(Prop_Scale*2), \
+        grid.Ny*(Prop_Scale-1)//(Prop_Scale*2):-grid.Ny*(Prop_Scale-1)//(Prop_Scale*2)]
     
     # initialize the reconstruction
     E2 = FO.Efield(wavelength,grid2,z=E1.z,fielddef=image0)
