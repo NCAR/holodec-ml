@@ -26,14 +26,14 @@ zbins = 5 # number of histogram bins in z
 binary_amplitude = True  # amplitude is binary
 
 zmiss = 0  # value for when amplitude is zero
-rspot = 5e-6  # resolvable spot size set by the aperture stop
-Nparticles = 1  # number of particles per hologram
+dspot = 5e-6  # resolvable spot size set by the aperture stop
+Nparticles = 3  # number of particles per hologram
 Prop_Scale = 4  # factor of times bigger propagation grid than detector
 
 
 
 # set the randomized space limits
-param_lim = {'z':[0,1e-1],
+param_lim = {'z':[0,2e-2],
              'amplitude':[0.2,1],
              'Nrange':10}
 
@@ -41,12 +41,14 @@ depth_array = np.linspace(param_lim['z'][0],param_lim['z'][1],param_lim['Nrange'
 
 zedges = np.linspace(*param_lim['z'],zbins)
 
+rspot = dspot/2
+
 # set the size of the image
 image_dim = {'x':256,
              'y':256,
              'pixel_width':3e-6}
 
-nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count_{Nparticles}particles.nc"
+nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count_{Nparticles}particles_v04.nc"
 
 # initialize simulation grid
 grid = FO.Coordinate_Grid(((image_dim['y']*Prop_Scale,image_dim['x']*Prop_Scale,),
@@ -58,6 +60,7 @@ grid2 = FO.Coordinate_Grid(((image_dim['y'],image_dim['x'],),
                            ,inputType='ccd')
 # initialize plane wave definition
 E0 = FO.Efield(wavelength,grid,z=np.min(param_lim['z']))
+E0.field = E0.field*0.25
 OpticalTF = E0.grid.fr < 1/rspot
 
 
@@ -70,6 +73,7 @@ ds_attr['zmax'] = max(param_lim['z'])
 ds_attr['zmin'] = min(param_lim['z'])
 ds_attr['z_invalid'] = zmiss
 ds_attr['rspot'] = rspot
+ds_attr['dspot'] = dspot
 ds_attr['Nparticles'] = Nparticles
 
 for var in ds_attr:
