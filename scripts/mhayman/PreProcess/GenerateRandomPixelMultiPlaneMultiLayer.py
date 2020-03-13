@@ -29,7 +29,7 @@ binary_amplitude = True  # amplitude is binary
 
 zmiss = 0  # value for when amplitude is zero
 dspot = 5e-6  # resolvable spot size set by the aperture stop
-Nparticles = 3  # number of particles per hologram
+Nparticles = 1  # number of particles per hologram
 Prop_Scale = 4  # factor of times bigger propagation grid than detector
 
 
@@ -57,7 +57,7 @@ image_dim = {'x':256,
              'y':256,
              'pixel_width':3e-6}
 
-nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count_{Nparticles}particles_v04.nc"
+nc_name = f"random_image_multiplane_data_{image_dim['x']}x{image_dim['x']}_{Nsets}count_{Nparticles}particles_v05.nc"
 
 # initialize simulation grid
 grid = FO.Coordinate_Grid(((image_dim['y']*Prop_Scale,image_dim['x']*Prop_Scale,),
