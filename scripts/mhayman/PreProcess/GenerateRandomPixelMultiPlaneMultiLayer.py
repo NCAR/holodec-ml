@@ -22,7 +22,7 @@ import ml_utils as ml
 
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/"
 
-Nsets = 5000  # number of training images to generate
+Nsets = 1000  # number of training images to generate
 wavelength = 355e-9
 zbins = 5 # number of histogram bins in z
 binary_amplitude = True  # amplitude is binary
@@ -31,6 +31,8 @@ zmiss = 0  # value for when amplitude is zero
 dspot = 5e-6  # resolvable spot size set by the aperture stop
 Nparticles = 1  # number of particles per hologram
 Prop_Scale = 4  # factor of times bigger propagation grid than detector
+
+h_chunk = 128  # number of holograms in a dask chunk
 
 
 
@@ -102,9 +104,9 @@ channel = xr.DataArray(np.arange(depth_array.size*2),
 layer_depth = xr.DataArray(0.5*(layer_bins[:-1]+layer_bins[1:]),
                                 dims=('layer_depth'))
 
-image = xr.DataArray(da.zeros((Nsets,image_dim['x'],image_dim['y'],channel.size),dtype=float),
-                dims=('hologram_number','xsize','ysize','channel'),
-                coords={'xsize':xsize,'ysize':ysize,'channel':channel})
+# image = xr.DataArray(da.zeros((Nsets,image_dim['x'],image_dim['y'],channel.size),dtype=float),
+#                 dims=('hologram_number','xsize','ysize','channel'),
+#                 coords={'xsize':xsize,'ysize':ysize,'channel':channel})
 
 # image_ft = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],2),dtype=float),
 #                 dims=('hologram_number','xsize','ysize','channel'),
@@ -116,10 +118,10 @@ image = xr.DataArray(da.zeros((Nsets,image_dim['x'],image_dim['y'],channel.size)
 #                         'layer':np.arange(param_lim['Nlayer'])},
 #                 attrs={'description':'pixel properties for training'})
 
-labels = xr.DataArray(zmiss*da.ones((Nsets,image_dim['x'],image_dim['y'],2*param_lim['Nlayer']),dtype=float),
-                dims=('hologram_number','xsize','ysize','layer'),
-                coords={'xsize':xsize,'ysize':ysize,'layer':layer_list},
-                attrs={'description':'pixel properties for training'})
+# labels = xr.DataArray(zmiss*da.ones((Nsets,image_dim['x'],image_dim['y'],2*param_lim['Nlayer']),dtype=float),
+#                 dims=('hologram_number','xsize','ysize','layer'),
+#                 coords={'xsize':xsize,'ysize':ysize,'layer':layer_list},
+#                 attrs={'description':'pixel properties for training'})
 
 # labels_a = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y']),dtype=float),
 #                 dims=('hologram_number','xsize','ysize'),
@@ -135,6 +137,10 @@ loop
 """
 for iholo in range(Nsets):
     
+    labels1 = xr.DataArray(np.zeros((1,image_dim['x'],image_dim['y'],2*param_lim['Nlayer']),dtype=float),
+                dims=('hologram_number','xsize','ysize','layer'),
+                coords={'hologram_number':[iholo],'xsize':xsize,'ysize':ysize,'layer':layer_list},
+                attrs={'description':'pixel properties for training'})
 
     zposition = sorted(np.random.rand(Nparticles)*(param_lim['z'][1]-param_lim['z'][0])+param_lim['z'][0])
     E1 = E0.copy()
@@ -170,13 +176,13 @@ for iholo in range(Nsets):
         # ipix = zdata[ipix]
         # find the layer the particle belongs in
         ilayer = np.nonzero(zposition[npart]<layer_bins[1:])[0][0]
-        zdata = labels.sel({'hologram_number':iholo,'layer':'z%d'%ilayer}).values
+        zdata = labels1.sel({'hologram_number':iholo,'layer':'z%d'%ilayer}).values
         zdata[ipix] = zposition[npart]-layer_bins[ilayer]
-        labels.sel({'hologram_number':iholo,'layer':'z%d'%ilayer}).values[:,:] = zdata
-        # labels.loc[{'hologram_number':iholo,'layer':'z%d'%ilayer}] = zdata
-        atemp = labels.sel({'hologram_number':iholo,'layer':'amplitude%d'%ilayer}).values
-        labels.sel({'hologram_number':iholo,'layer':'amplitude%d'%ilayer}).values[:,:] = 1-(1-atemp)*(1-adatap[xslice,yslice])
-        # labels.loc[{'hologram_number':iholo,'layer':'amplitude%d'%ilayer}] = 1-(1-atemp[xslice,yslice])*(1-adatap)
+        # labels.sel({'hologram_number':iholo,'layer':'z%d'%ilayer}).values[:,:] = zdata
+        labels1.loc[{'hologram_number':iholo,'layer':'z%d'%ilayer}] = zdata
+        atemp = labels1.sel({'hologram_number':iholo,'layer':'amplitude%d'%ilayer}).values
+        # labels.sel({'hologram_number':iholo,'layer':'amplitude%d'%ilayer}).values[:,:] = 1-(1-atemp)*(1-adatap[xslice,yslice])
+        labels1.loc[{'hologram_number':iholo,'layer':'amplitude%d'%ilayer}] = 1-(1-atemp)*(1-adatap[xslice,yslice])
 
         # propagate the electric field to the new particle
         # and apply the particle amplitude mask
@@ -191,6 +197,10 @@ for iholo in range(Nsets):
 
     image0 = np.abs(E1.field[xslice,yslice])**2
 
+    image1 = xr.DataArray(np.zeros((1,image_dim['x'],image_dim['y'],channel.size),dtype=float),
+                dims=('hologram_number','xsize','ysize','channel'),
+                coords={'hologram_number':[iholo],'xsize':xsize,'ysize':ysize,'channel':channel})
+
     # adata0 = 1-adata[grid.Nx*(Prop_Scale-1)//(Prop_Scale*2):-grid.Nx*(Prop_Scale-1)//(Prop_Scale*2), \
     #     grid.Ny*(Prop_Scale-1)//(Prop_Scale*2):-grid.Ny*(Prop_Scale-1)//(Prop_Scale*2)]
     # zdata0 = zdata[grid.Nx*(Prop_Scale-1)//(Prop_Scale*2):-grid.Nx*(Prop_Scale-1)//(Prop_Scale*2), \
@@ -200,10 +210,21 @@ for iholo in range(Nsets):
     E2 = FO.Efield(wavelength,grid2,z=E1.z,fielddef=image0)
     for idepth,depthr in enumerate(depth_array):
         E2.propagate_to(depthr)
-        image.sel({'hologram_number':iholo,'channel':2*idepth}).values[:,:] = np.real(E2.field)
-        image.sel({'hologram_number':iholo,'channel':2*idepth+1}).values[:,:] = np.imag(E2.field)
+        image1.sel({'hologram_number':iholo,'channel':2*idepth}).values[:,:] = np.real(E2.field)
+        image1.sel({'hologram_number':iholo,'channel':2*idepth+1}).values[:,:] = np.imag(E2.field)
         # image.loc[{'hologram_number':iholo,'channel':2*idepth}] = np.real(E2.field)
         # image.loc[{'hologram_number':iholo,'channel':2*idepth+1}] = np.imag(E2.field)
+    
+    # store the holograms as dask arrays
+    if iholo == 0:
+        image = xr.DataArray(da.from_array(image1.values,chunks=(h_chunk,image_dim['x'],image_dim['y'],channel.size)),
+                    dims=image1.dims,coords=image1.coords)
+        labels = xr.DataArray(da.from_array(labels1.values,chunks=(h_chunk,image_dim['x'],image_dim['y'],2*param_lim['Nlayer'])),
+                    dims=labels1.dims,coords=labels1.coords,attrs=labels1.attrs)
+    else:
+        image = xr.concat([image,image1],dim=('hologram_number'))
+        labels = xr.concat([labels,labels1],dim=('hologram_number'))
+
 
     # imageft0 = FO.OpticsFFT(image0)
 
@@ -223,4 +244,8 @@ ds = xr.Dataset({'xsize':xsize,'ysize':ysize,'image':image, \
 
 print("saving data to")
 print(ds_path+nc_name)
+print()
+print("writing...")
 ds.to_netcdf(ds_path+nc_name)
+
+print("write complete")
