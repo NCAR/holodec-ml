@@ -24,7 +24,7 @@ ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/"
 
 Nsets = 1000  # number of training images to generate
 wavelength = 355e-9
-zbins = 5 # number of histogram bins in z
+zbins = 1 # number of histogram bins in z
 binary_amplitude = True  # amplitude is binary
 
 zmiss = 0  # value for when amplitude is zero
@@ -40,7 +40,7 @@ h_chunk = 128  # number of holograms in a dask chunk
 param_lim = {'z':[0,2e-2],
              'amplitude':[0.2,1],
              'Nrange':10,
-             'Nlayer':4}
+             'Nlayer':zbins}
 
 depth_array = np.linspace(param_lim['z'][0],param_lim['z'][1],param_lim['Nrange'])
 
