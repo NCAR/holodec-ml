@@ -36,11 +36,11 @@ analyze_results = False
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
 
 # Training data file
-ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
-figure_path = 'results/'
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
+# figure_path = 'results/'
 
-# ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
-# figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
+ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
+figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
 
 # ds_file = 'image_data_256x256_50count.nc'
 # ds_file = 'image_data_256x256_5000count.nc'
