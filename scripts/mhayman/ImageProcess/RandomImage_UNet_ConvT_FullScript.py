@@ -36,11 +36,11 @@ analyze_results = False
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
 
 # Training data file
-ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
-figure_path = 'results/'
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
+# figure_path = 'results/'
 
-# ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
-# figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
+ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
+figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
 
 # ds_file = 'image_data_256x256_50count.nc'
 # ds_file = 'image_data_256x256_5000count.nc'
@@ -100,7 +100,7 @@ cnn_input = Input(shape=scaled_in_data.shape[1:])
 unet_out = mldef.add_unet_layers(cnn_input,nLayers,nFilters,nConv=nConv,nPool=nPool,activation="relu")
 
 # add the output layer
-out = Conv2D(scaled_train_labels.sizes['layer'],(1,1),padding="same",activation=out_act)(unet_out)
+out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
 
 # build and compile the model
 mod = Model(cnn_input, out)
