@@ -27,11 +27,13 @@ if dirP_str not in sys.path:
     sys.path.append(dirP_str)
 
 import ml_utils as ml
+import ml_defs as mldef
 
 # if the data files are large, performing analysis on the results
 # may cause a memory overrun.  Turn the analysis off by setting to
 # False.
 analyze_results = False
+h_chunk = 256 # size of dask array chunks along hologram_number dimension
 
 # Training data file
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
@@ -51,7 +53,7 @@ figure_path = 'results/'
 # ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v03.nc' # 10 um PSF with 1 cm depth
 ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v04.nc' # 5 um PSF with 2 cm depth
 
-ds = xr.open_dataset(ds_path+ds_file)
+ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
 
 run_num = 0
 num_epochs = 150
@@ -83,63 +85,24 @@ scaled_in_data = in_data
 
 ### Define and build the UNET ###
 
-n_filters = 16
+nFilters = 16
 nPool = 4
 nConv = 5
+nLayers = 4
 loss_fun = "mse" #,"mae" #"binary_crossentropy"
 out_act = "linear" # "sigmoid"
-nn_descript = f'UNET_{n_filters}Filt_{nConv}Conv_{nPool}Pool_'+loss_fun+'_'+out_act
-cnn_input = Input(shape=scaled_in_data.shape[1:])  # input
+nn_descript = f'UNET_{nFilters}Filt_{nConv}Conv_{nPool}Pool_{nLayers}Layers_'+loss_fun+'_'+out_act
 
-conv_1a = SeparableConv2D(n_filters*1, (nConv, nConv), padding="same", kernel_initializer = "he_normal")(cnn_input)
-act_1a = Activation("relu")(conv_1a)
-conv_1b = SeparableConv2D(n_filters*1, (nConv, nConv), padding="same", kernel_initializer = "he_normal")(act_1a)
-act_1b = Activation("relu")(conv_1b)
-pool_1 = MaxPool2D(pool_size=(nPool, nPool))(act_1b)
+# define the input based on input data dimensions
+cnn_input = Input(shape=scaled_in_data.shape[1:])  
 
-conv_2a = SeparableConv2D(n_filters*2,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(pool_1)
-act_2a = Activation("relu")(conv_2a)
-conv_2b = SeparableConv2D(n_filters*2,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(act_2a)
-act_2b = Activation("relu")(conv_2b)
-pool_2 = MaxPool2D(pool_size=(nPool, nPool))(act_2b)
+# create the unet
+unet_out = mldef.add_unet_layers(cnn_input,nLayers,nFilters,nConv=nConv,nPool=nPool,activation="relu")
 
-conv_3a = SeparableConv2D(n_filters*4,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(pool_2)
-act_3a = Activation("relu")(conv_3a)
-conv_3b = SeparableConv2D(n_filters*4,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(act_3a)
-act_3b = Activation("relu")(conv_3b)
-pool_3 = MaxPool2D(pool_size=(nPool, nPool))(act_3b)
+# add the output layer
+out = Conv2D(scaled_train_labels.sizes['layer'],(1,1),padding="same",activation=out_act)(unet_out)
 
-conv_4a = SeparableConv2D(n_filters*8,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(pool_3)
-act_4a = Activation("relu")(conv_4a)
-
-conv_4b = SeparableConv2D(n_filters*8,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(act_4a)
-act_4b = Activation("relu")(conv_4b)
-
-upsamp_5 = Conv2DTranspose(n_filters*4, (nConv,nConv), strides=(nPool,nPool),padding="same")(act_4b)
-concat_5 = concatenate([upsamp_5,act_3b],axis=3)
-conv_5a = SeparableConv2D(n_filters*4,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(concat_5)
-act_5a = Activation("relu")(conv_5a)
-conv_5b = SeparableConv2D(n_filters*4,(nConv,nConv),padding="same", kernel_initializer = "he_normal")(act_5a)
-act_5b = Activation("relu")(conv_5b)
-
-
-upsamp_6 = Conv2DTranspose(n_filters*2, (nConv,nConv), strides=(nPool,nPool),padding="same")(act_5b)
-concat_6 = concatenate([upsamp_6,act_2b],axis=3)
-conv_6a = SeparableConv2D(n_filters*2,(nConv,nConv),padding="same",kernel_initializer = "he_normal")(concat_6)
-act_6a = Activation("relu")(conv_6a)
-conv_6b = SeparableConv2D(n_filters*2,(nConv,nConv),padding="same",kernel_initializer = "he_normal")(act_6a)
-act_6b = Activation("relu")(conv_6b)
-
-upsamp_7 = Conv2DTranspose(n_filters, (nConv,nConv), strides=(nPool,nPool),padding="same")(act_6b)
-concat_7 = concatenate([upsamp_7,act_1b],axis=3)
-conv_7a = SeparableConv2D(n_filters,(nConv,nConv),padding="same",kernel_initializer = "he_normal")(concat_7)
-act_7a = Activation("relu")(conv_7a)
-conv_7b = SeparableConv2D(n_filters,(nConv,nConv),padding="same",kernel_initializer = "he_normal")(act_7a)
-act_7b = Activation("relu")(conv_7b)
-
-out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(act_7b)
-
-
+# build and compile the model
 mod = Model(cnn_input, out)
 mod.compile(optimizer="adam", loss=loss_fun,metrics=['acc'])
 mod.summary()
