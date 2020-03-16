@@ -100,7 +100,7 @@ cnn_input = Input(shape=scaled_in_data.shape[1:])
 unet_out = mldef.add_unet_layers(cnn_input,nLayers,nFilters,nConv=nConv,nPool=nPool,activation="relu")
 
 # add the output layer
-out = Conv2D(scaled_train_labels.sizes['layer'],(1,1),padding="same",activation=out_act)(unet_out)
+out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
 
 # build and compile the model
 mod = Model(cnn_input, out)
