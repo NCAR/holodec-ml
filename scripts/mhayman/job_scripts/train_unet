@@ -5,9 +5,9 @@
 #SBATCH --account=NEOL0007
 #SBATCH --ntasks=1
 ###SBATCH --cpus-per-task=16
-#SBATCH --time=01:00:00
+#SBATCH --time=04:00:00
 #SBATCH --constraint=gpu
-#SBATCH --train_unet.out.%j
+###SBATCH --train_unet.out.%j
 
 export TMPDIR=/glade/scratch/$USER/temp
 mkdir -p $TMPDIR
