@@ -53,7 +53,8 @@ figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
 # ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v03.nc' # 10 um PSF with 1 cm depth
 ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v04.nc' # 5 um PSF with 2 cm depth
 
-ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
+# ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
+ds = xr.open_dataset(ds_path+ds_file)
 
 run_num = 0
 num_epochs = 150
