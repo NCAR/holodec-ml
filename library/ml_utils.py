@@ -10,7 +10,6 @@ mhayman@ucar.edu
 import numpy as np
 import xarray as xr
 
-
 from typing import Tuple, List, Union
 
 class MinMaxScalerX:

@@ -36,11 +36,11 @@ analyze_results = False
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
 
 # Training data file
-# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
-# figure_path = 'results/'
+ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
+figure_path = 'results/'
 
-ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
-figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
+# ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
+# figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
 
 # ds_file = 'image_data_256x256_50count.nc'
 # ds_file = 'image_data_256x256_5000count.nc'
@@ -51,10 +51,9 @@ figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
 # ds_file = 'random_image_multiplane_data_64x64_5000count.nc' # 1 um PSF with 1 cm depth
 # ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v02.nc' # 10 um PSF with 4 cm depth
 # ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v03.nc' # 10 um PSF with 1 cm depth
-ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v04.nc' # 5 um PSF with 2 cm depth
-
-# ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
-ds = xr.open_dataset(ds_path+ds_file)
+# ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v04.nc' # 5 um PSF with 2 cm depth
+ds_file = 'random_image_multiplane_data_256x256_1000count_1particles_v05.nc' # 5 um PSF with 2 cm depth and 4 training layers 
+ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
 
 run_num = 0
 num_epochs = 150
@@ -64,7 +63,7 @@ num_epochs = 150
 # Setup labels
 split_index = np.int(0.7*ds.sizes['hologram_number'])  # number of training+validation points
 valid_index = np.int(0.2*ds.sizes['hologram_number'])  # number of validation points
-all_labels = ds['labels'].sel(type=['amplitude','z'])
+all_labels = ds['labels'].sel(layer=['amplitude0','z0','amplitude1','z1','amplitude2','z2','amplitude3','z3'])
 
 train_labels = all_labels.isel(hologram_number=slice(valid_index,split_index))
 test_labels = all_labels.isel(hologram_number=slice(split_index,None))
@@ -86,10 +85,11 @@ scaled_in_data = in_data
 
 ### Define and build the UNET ###
 
+# define a UNET for image processing
 nFilters = 16
 nPool = 4
 nConv = 5
-nLayers = 5
+nLayers = 4
 loss_fun = "mse" #,"mae" #"binary_crossentropy"
 out_act = "linear" # "sigmoid"
 nn_descript = f'UNET_{nFilters}Filt_{nConv}Conv_{nPool}Pool_{nLayers}Layers_'+loss_fun+'_'+out_act
@@ -101,7 +101,7 @@ cnn_input = Input(shape=scaled_in_data.shape[1:])
 unet_out = mldef.add_unet_layers(cnn_input,nLayers,nFilters,nConv=nConv,nPool=nPool,activation="relu")
 
 # add the output layer
-out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
+out = Conv2D(scaled_train_labels.sizes['layer'],(1,1),padding="same",activation=out_act)(unet_out)
 
 # build and compile the model
 mod = Model(cnn_input, out)
