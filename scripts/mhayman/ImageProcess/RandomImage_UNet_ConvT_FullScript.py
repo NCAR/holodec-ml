@@ -36,11 +36,11 @@ analyze_results = False
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
 
 # Training data file
-# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
-# figure_path = 'results/'
+ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/'   # linux share
+figure_path = 'results/'
 
-ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
-figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
+# ds_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/'  # glade
+# figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
 
 # ds_file = 'image_data_256x256_50count.nc'
 # ds_file = 'image_data_256x256_5000count.nc'
@@ -53,8 +53,8 @@ figure_path = '/glade/scratch/mhayman/holodec/holodec-ml-data/results/'
 # ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v03.nc' # 10 um PSF with 1 cm depth
 ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v04.nc' # 5 um PSF with 2 cm depth
 
-# ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
-ds = xr.open_dataset(ds_path+ds_file)
+ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
+# ds = xr.open_dataset(ds_path+ds_file)
 
 run_num = 0
 num_epochs = 150
@@ -88,8 +88,8 @@ scaled_in_data = in_data
 
 nFilters = 16
 nPool = 4
-nConv = 5
-nLayers = 5
+nConv = 7
+nLayers = 4
 loss_fun = "mse" #,"mae" #"binary_crossentropy"
 out_act = "linear" # "sigmoid"
 nn_descript = f'UNET_{nFilters}Filt_{nConv}Conv_{nPool}Pool_{nLayers}Layers_'+loss_fun+'_'+out_act

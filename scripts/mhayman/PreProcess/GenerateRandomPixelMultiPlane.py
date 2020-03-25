@@ -130,9 +130,12 @@ for iholo in range(Nsets):
         # adata0 = np.zeros((image_dim['x'],image_dim['y']))
         
         # create the random particle
+        p_grow = 0.8+0.19*np.random.rand() # probability of growth in particle definition
+        p_decay = 0.8+0.19*np.random.rand() # decay rate of growth probability
+
         ml.next_pt((pix_x+grid.Nx*(Prop_Scale-1)//(Prop_Scale*2), \
             pix_y+grid.Nx*(Prop_Scale-1)//(Prop_Scale*2)), \
-                adatap,0.8,decay=0.9)
+                adatap,p_grow,decay=p_decay)
 
         if not binary_amplitude:
             # let amplitude be any number between 0 and 1
