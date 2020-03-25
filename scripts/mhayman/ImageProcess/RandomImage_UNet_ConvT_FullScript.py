@@ -57,8 +57,11 @@ ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
 # ds = xr.open_dataset(ds_path+ds_file)
 
 run_num = 0
-num_epochs = 150
+num_epochs = 50
 
+print('Training dataset attributes')
+for att in ds.attrs:
+    print('  '+att+': '+str(ds.attrs[att]))
 
 
 # Setup labels
@@ -88,7 +91,7 @@ scaled_in_data = in_data
 
 nFilters = 16
 nPool = 4
-nConv = 7
+nConv = 5
 nLayers = 4
 loss_fun = "mse" #,"mae" #"binary_crossentropy"
 out_act = "linear" # "sigmoid"
@@ -114,6 +117,9 @@ run_num=0
 # save a visualization of the net
 plot_model(mod,show_shapes=True,to_file=figure_path+"holodec_"+nn_descript+'_'+ds_file.replace(".nc","")+".png")
 
+print('Training dataset attributes')
+for att in ds.attrs:
+    print('  '+att+': '+str(ds.attrs[att]))
 
 ### Train the UNET ###
 history = mod.fit(scaled_in_data[valid_index:split_index].values,
