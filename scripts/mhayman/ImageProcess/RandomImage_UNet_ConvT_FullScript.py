@@ -57,7 +57,7 @@ ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
 # ds = xr.open_dataset(ds_path+ds_file)
 
 run_num = 0
-num_epochs = 50
+num_epochs = 151
 
 print('Training dataset attributes')
 for att in ds.attrs:
@@ -90,9 +90,9 @@ scaled_in_data = in_data
 ### Define and build the UNET ###
 
 nFilters = 16
-nPool = 4
+nPool = 2
 nConv = 5
-nLayers = 4
+nLayers = 6
 loss_fun = "mse" #,"mae" #"binary_crossentropy"
 out_act = "linear" # "sigmoid"
 nn_descript = f'UNET_{nFilters}Filt_{nConv}Conv_{nPool}Pool_{nLayers}Layers_'+loss_fun+'_'+out_act
