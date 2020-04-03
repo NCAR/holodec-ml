@@ -51,13 +51,14 @@ figure_path = 'results/'
 # ds_file = 'random_image_multiplane_data_64x64_5000count.nc' # 1 um PSF with 1 cm depth
 # ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v02.nc' # 10 um PSF with 4 cm depth
 # ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v03.nc' # 10 um PSF with 1 cm depth
-ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v04.nc' # 5 um PSF with 2 cm depth
+# ds_file = 'random_image_multiplane_data_256x256_5000count_1particles_v04.nc' # 5 um PSF with 2 cm depth
+ds_file = 'UNET_image_256x256_5000count_4particles_v05.nc' # 5 um PSF with 2 cm depth random particle count 1-4
 
 ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
 # ds = xr.open_dataset(ds_path+ds_file)
 
 run_num = 0
-num_epochs = 151
+num_epochs = 201
 
 print('Training dataset attributes')
 for att in ds.attrs:
@@ -80,7 +81,7 @@ scaled_test_labels = scaler.fit_transform(test_labels)
 scaled_all_labels = scaler.fit_transform(all_labels)
 
 # setup the input to be used
-in_data = ds['image']
+in_data = ds['image_ft']
 
 if not 'channel' in in_data.dims:
     in_data = in_data.expand_dims("channel", 3)
@@ -89,7 +90,7 @@ scaled_in_data = in_data
 
 ### Define and build the UNET ###
 
-nFilters = 16
+nFilters = 32
 nPool = 2
 nConv = 5
 nLayers = 6
