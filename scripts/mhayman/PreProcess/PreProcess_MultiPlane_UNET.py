@@ -23,8 +23,7 @@ if dirP_str not in sys.path:
 import ml_utils as ml
 
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/UNET/"
-# ds_file = "UNET_image_256x256_5000count_5particles_v01.nc"
-ds_file = "UNET_image_256x256_10count_5particles_v01.nc"
+ds_file = "UNET_image_256x256_5000count_5particles_v01.nc"
 
 print()
 print('loading file')
