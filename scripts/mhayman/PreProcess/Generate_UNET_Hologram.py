@@ -1,9 +1,12 @@
 """
-Generate randomized pixel data for 
-U-net image reconstruction
-Treat the problem as a classification problem
+Generate raw data of randomized pixels for
+UNET image reconstruction
+This is the raw data generator.
+Preprocessing is typically required before
+supplying to the UNET
 """
 import sys
+import os
 import numpy as np
 import xarray as xr
 import datetime
@@ -18,29 +21,30 @@ if dirP_str not in sys.path:
 
 import ml_utils as ml
 
-ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/"
+ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/UNET/"
 
 Nsets = 5000  # number of training images to generate
 wavelength = 355e-9
-zbins = 5 # number of histogram bins in z
+# zbins = 5 # number of histogram bins in z
 binary_amplitude = True  # amplitude is binary
+complevel = 5  # compression level
 
 zmiss = 0  # value for when amplitude is zero
 dspot = 5e-6  # resolvable spot size set by the aperture stop
-Nparticles = 4  # number of particles per hologram
+Nparticles = 5  # number of particles per hologram
 Prop_Scale = 4  # factor of times bigger propagation grid than detector
-random_particle_number = True # randomize the number of particles up to Nparticles
+random_particle_count = True # randomize the number of particles up to Nparticles
 
 
 # set the randomized space limits
 param_lim = {'z':[0,2e-2],
-             'amplitude':[0.2,1],
-             'Nrange':10}
+             'amplitude':[0.2,1]}
+            #  'Nrange':10}
 
 # depth_array = np.linspace(param_lim['z'][0],param_lim['z'][1],param_lim['Nrange'])
 # depth_array = np.array([param_lim['z'][1]])
 
-zedges = np.linspace(*param_lim['z'],zbins)
+# zedges = np.linspace(*param_lim['z'],zbins)
 
 rspot = dspot/2
 
@@ -49,7 +53,18 @@ image_dim = {'x':256,
              'y':256,
              'pixel_width':3e-6}
 
-nc_name = f"UNET_image_{image_dim['x']}x{image_dim['x']}_{Nsets}count_{Nparticles}particles_v05.nc"
+print()
+next_file = True
+file_count = 1
+while next_file:
+    nc_name = f"UNET_image_{image_dim['x']}x{image_dim['y']}_{Nsets}count_{Nparticles}particles_v%02d.nc"%file_count
+    if os.path.exists(ds_path+nc_name):
+        file_count+=1
+    else:
+        next_file = False
+        print("creating new raw file:")
+        print(ds_path+nc_name)
+
 
 # initialize simulation grid
 grid = FO.Coordinate_Grid(((image_dim['y']*Prop_Scale,image_dim['x']*Prop_Scale,),
@@ -67,7 +82,7 @@ OpticalTF = E0.grid.fr < 1/rspot
 
 ds_attr = {}
 ds_attr['xdim'] = image_dim['x']
-ds_attr['xdim'] = image_dim['y']
+ds_attr['ydim'] = image_dim['y']
 ds_attr['pixel_width'] = image_dim['pixel_width']
 ds_attr['wavelength'] = wavelength
 ds_attr['zmax'] = max(param_lim['z'])
@@ -76,7 +91,7 @@ ds_attr['z_invalid'] = zmiss
 ds_attr['rspot'] = rspot
 ds_attr['dspot'] = dspot
 ds_attr['Nparticles'] = Nparticles
-ds_attr['random_particle_number'] = np.int(random_particle_number)
+ds_attr['random_particle_count'] = np.int(random_particle_count)
 
 for var in ds_attr:
     print(var+f":{ds_attr[var]}")
@@ -100,9 +115,9 @@ imageh = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y']),dtype=float
                 dims=('hologram_number','xsize','ysize'),
                 coords={'xsize':xsize,'ysize':ysize})
 
-image_ft = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],2),dtype=float),
-                dims=('hologram_number','xsize','ysize','channel'),
-                coords={'xsize':xsize,'ysize':ysize,'channel':['real','imag']})
+# image_ft = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],2),dtype=float),
+#                 dims=('hologram_number','xsize','ysize','channel'),
+#                 coords={'xsize':xsize,'ysize':ysize,'channel':['real','imag']})
 
 labels = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y'],2),dtype=float),
                 dims=('hologram_number','xsize','ysize','type'),
@@ -121,7 +136,7 @@ loop
 """
 for iholo in range(Nsets):
 
-    if random_particle_number:
+    if random_particle_count:
         Nparticles = np.int(ds_attr['Nparticles']*np.random.rand()+1)
         
     
@@ -181,20 +196,24 @@ for iholo in range(Nsets):
     labels.loc[{'hologram_number':iholo,'type':'z'}] = zdata0
     labels.loc[{'hologram_number':iholo,'type':'amplitude'}] = adata0
     imageh.loc[{'hologram_number':iholo}] = image0.copy()
-    image_ft.loc[{'hologram_number':iholo,'channel':'real'}] = np.real(imageft0)
-    image_ft.loc[{'hologram_number':iholo,'channel':'imag'}] = np.imag(imageft0)
+    # image_ft.loc[{'hologram_number':iholo,'channel':'real'}] = np.real(imageft0)
+    # image_ft.loc[{'hologram_number':iholo,'channel':'imag'}] = np.imag(imageft0)
 
     # report progress
     print(f"\r{iholo+1} of {Nsets} holograms completed",end='')
 
 
-ds = xr.Dataset({'xsize':xsize,'ysize':ysize,'imageh':imageh,'labels':labels,'image_ft':image_ft},
+ds = xr.Dataset({'xsize':xsize,'ysize':ysize,'image':imageh,'labels':labels,},
                 attrs=ds_attr)
 
 # ds = xr.Dataset({'xsize':xsize,'ysize':ysize,'image':image,'labels':labels,'channel':channel},
 #                 attrs=ds_attr)
 
-print("saving data to")
+print("saving data with compression level %d to"%complevel)
 print(ds_path+nc_name)
-ds.to_netcdf(ds_path+nc_name)
+
+nccomp = dict(zlib=True, complevel=complevel)
+ncencoding = {var: nccomp for var in ds.data_vars}
+ds.to_netcdf(ds_path+nc_name, encoding=ncencoding)
+
 print('save complete')
