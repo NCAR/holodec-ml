@@ -66,7 +66,7 @@ OpticalTF = E0.grid.fr < 1/rspot
 
 ds_attr = {}
 ds_attr['xdim'] = image_dim['x']
-ds_attr['xdim'] = image_dim['y']
+ds_attr['ydim'] = image_dim['y']
 ds_attr['pixel_width'] = image_dim['pixel_width']
 ds_attr['wavelength'] = wavelength
 ds_attr['zmax'] = max(param_lim['z'])
