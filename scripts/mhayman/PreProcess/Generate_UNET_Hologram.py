@@ -27,7 +27,7 @@ Nsets = 5000  # number of training images to generate
 wavelength = 355e-9
 # zbins = 5 # number of histogram bins in z
 binary_amplitude = True  # amplitude is binary
-complevel = 5  # compression level
+complevel = 9  # compression level
 
 zmiss = 0  # value for when amplitude is zero
 dspot = 5e-6  # resolvable spot size set by the aperture stop
@@ -76,7 +76,7 @@ grid2 = FO.Coordinate_Grid(((image_dim['y'],image_dim['x'],),
                            ,inputType='ccd')
 # initialize plane wave definition
 E0 = FO.Efield(wavelength,grid,z=np.min(param_lim['z']))
-E0.field = E0.field*0.25
+E0.field = E0.field*np.sqrt(128.0)
 OpticalTF = E0.grid.fr < 1/rspot
 
 
@@ -111,7 +111,7 @@ ysize = xr.DataArray(np.arange(image_dim['y']),
 #                 coords={'xsize':xsize,'ysize':ysize,'channel':channel})
 
 # initial hologram image
-imageh = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y']),dtype=float),
+imageh = xr.DataArray(np.zeros((Nsets,image_dim['x'],image_dim['y']),dtype=np.uint8),
                 dims=('hologram_number','xsize','ysize'),
                 coords={'xsize':xsize,'ysize':ysize})
 
@@ -195,7 +195,7 @@ for iholo in range(Nsets):
 
     labels.loc[{'hologram_number':iholo,'type':'z'}] = zdata0
     labels.loc[{'hologram_number':iholo,'type':'amplitude'}] = adata0
-    imageh.loc[{'hologram_number':iholo}] = image0.copy()
+    imageh.loc[{'hologram_number':iholo}] = image0.astype(np.uint8)
     # image_ft.loc[{'hologram_number':iholo,'channel':'real'}] = np.real(imageft0)
     # image_ft.loc[{'hologram_number':iholo,'channel':'imag'}] = np.imag(imageft0)
 
@@ -214,6 +214,6 @@ print(ds_path+nc_name)
 
 nccomp = dict(zlib=True, complevel=complevel)
 ncencoding = {var: nccomp for var in ds.data_vars}
-ds.to_netcdf(ds_path+nc_name, encoding=ncencoding)
+ds.to_netcdf(ds_path+nc_name, encoding=ncencoding,format='netCDF4',engine='netcdf4',shuffle=True)
 
 print('save complete')
