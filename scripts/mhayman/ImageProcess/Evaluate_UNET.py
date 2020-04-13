@@ -161,27 +161,27 @@ amp_pred_b = np.array(amp_pred_b)
 # amp_diff = np.array(amp_diff)
 # amp_diff_b = np.array(amp_diff_b)
 
-# save evaluation data as netcdf file
-eval_ds = xr.Dataset({
-                        'z_actual':z_act,
-                        'z_amplitude':z_amp,
-                        'z_MinError':z_min,
-                        'amplitude_pred':a_amp,
-                        'amplitude_actual':a_act,
-                        'amplitude_MinError':a_min,
-                        'hologram_amplitude_actual':amp_act,
-                        'hologram_amplitude_pred':amp_pred,
-                        'hologram_amplitude_pred_binary':amp_pred_b,
-                        'hologram_amplitude_error':amp_diff,
-                        'hologram_amplitude_error_binary':amp_diff_b
-                })
-eval_ds.attrs['evaluation_dataset_path'] = ds_path
-eval_ds.attrs['evaluation_dataset'] = ds_file
-eval_ds.attrs['model_path'] = model_path
-eval_ds.attrs['model_file'] = model_file
-eval_ds.attrs['model'] = nn_descript
-eval_ds.attrs['this_model'] = save_descript
-eval_ds.to_netcdf(save_path+f"EvaluationData_"+save_descript+".nc")
+# # save evaluation data as netcdf file
+# eval_ds = xr.Dataset({
+#                         'z_actual':z_act,
+#                         'z_amplitude':z_amp,
+#                         'z_MinError':z_min,
+#                         'amplitude_pred':a_amp,
+#                         'amplitude_actual':a_act,
+#                         'amplitude_MinError':a_min,
+#                         'hologram_amplitude_actual':amp_act,
+#                         'hologram_amplitude_pred':amp_pred,
+#                         'hologram_amplitude_pred_binary':amp_pred_b,
+#                         'hologram_amplitude_error':amp_diff,
+#                         'hologram_amplitude_error_binary':amp_diff_b
+#                 })
+# eval_ds.attrs['evaluation_dataset_path'] = ds_path
+# eval_ds.attrs['evaluation_dataset'] = ds_file
+# eval_ds.attrs['model_path'] = model_path
+# eval_ds.attrs['model_file'] = model_file
+# eval_ds.attrs['model'] = nn_descript
+# eval_ds.attrs['this_model'] = save_descript
+# eval_ds.to_netcdf(save_path+f"EvaluationData_"+save_descript+".nc")
 
 
 # Scatter plot z position data
