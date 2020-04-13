@@ -40,7 +40,7 @@ valid_fraction = 0.1  # fraction of points used for validation
 
 # Training data file
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
-ds_file='UNET_image_256x256_5000count_5particles_v02/UNET_image_256x256_5000count_5particles_9zplanes_v02.nc'
+ds_file='UNET_image_256x256_5000count_5particles_9zplanes_v02.nc'
 
 input_variable = 'image_planes'
 
