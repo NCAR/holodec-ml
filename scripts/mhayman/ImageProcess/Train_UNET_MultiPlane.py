@@ -32,13 +32,16 @@ import ml_defs as mldef
 
 # Model Training settings
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
-num_epochs = 201  # number of training epochs to run
+num_epochs = 101  # number of training epochs to run
 batch_size = 64   # training batch size
+split_fraction = 0.7  # fraction of points used for training/validation (not testing)
+valid_fraction = 0.1  # fraction of points used for validation
 
 
 # Training data file
-ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v01/'   # linux share
-ds_file='UNET_image_256x256_5000count_5particles_10zlayers_v01.nc'
+ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
+ds_file='UNET_image_256x256_5000count_5particles_v02/UNET_image_256x256_5000count_5particles_9zplanes_v02.nc'
+
 input_variable = 'image_planes'
 
 model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
@@ -49,7 +52,7 @@ nFilters = 32
 nPool = 2
 nConv = 5
 nLayers = 6
-loss_fun = "mse" #,"mae" #"binary_crossentropy"
+loss_fun = "mse" 
 out_act = "linear" # "sigmoid"
 
 
@@ -76,6 +79,10 @@ ml.ensure_path(save_path1)
 save_path_mod = 'results/'+nn_descript+"/"
 ml.ensure_path(save_path_mod)
 
+print('Training UNET on')
+print(ds_file)
+print('located in')
+print(ds_path)
 
 # open the data to train on
 ds = xr.open_dataset(ds_path+ds_file,chunks={'hologram_number': h_chunk})
@@ -87,8 +94,8 @@ for att in ds.attrs:
 
 
 # Setup labels
-split_index = np.int(0.7*ds.sizes['hologram_number'])  # number of training+validation points
-valid_index = np.int(0.1*ds.sizes['hologram_number'])  # number of validation points
+split_index = np.int(split_fraction*ds.sizes['hologram_number'])  # number of training+validation points
+valid_index = np.int(valid_fraction*ds.sizes['hologram_number'])  # number of validation points
 all_labels = ds['labels'].sel(type=['amplitude','z'])
 
 train_labels = all_labels.isel(hologram_number=slice(valid_index,split_index))
@@ -171,6 +178,8 @@ plt.savefig(save_path1+"AccuracyHistory_"+f"_epochs{num_epochs}_run{run_num}"+".
 ### Save the Model ### 
 model_name = nn_descript+f"_epochs{num_epochs}_run{run_num}"+".h5"
 save_model(mod, model_path+nn_descript+f"_epochs{num_epochs}_run{run_num}"+".h5", save_format="h5")
+print('saved model as')
+print(model_path+nn_descript+f"_epochs{num_epochs}_run{run_num}"+".h5")
 
 # Save the training history
 res_ds = xr.Dataset({
@@ -178,9 +187,14 @@ res_ds = xr.Dataset({
                     'Training_Loss':history.history['loss'],
                     'Validation_Loss':history.history['val_loss'],
                     'Training_Accuracy':history.history['acc'],
-                    'Validation_Accuracy':history.history['val_acc']
+                    'Validation_Accuracy':history.history['val_acc'],
+                    'split_index':split_index,
+                    'valid_index':valid_index,
+                    'input_variable':input_variable
                     })
 res_ds.attrs['batch_size'] = batch_size
 res_ds.attrs['training_data'] = ds_file
 res_ds.attrs['model'] = model_name
 res_ds.to_netcdf(model_path+nn_descript+f"_epochs{num_epochs}_run{run_num}_TrainingHistory.nc")
+
+ds.close()

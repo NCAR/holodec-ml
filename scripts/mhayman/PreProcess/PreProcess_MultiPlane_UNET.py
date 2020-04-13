@@ -23,7 +23,9 @@ if dirP_str not in sys.path:
 import ml_utils as ml
 
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/UNET/"
-ds_file = "UNET_image_256x256_5000count_5particles_v01.nc"
+ds_file = "UNET_image_256x256_5000count_5particles_v02.nc"
+
+rescale = 255
 
 print()
 print('loading file')
@@ -32,10 +34,10 @@ print('from path')
 print(ds_path)
 
 # specify number of layers to reconstruct
-params = {'zplanes':10,
+params = {'zplanes':9,
           'preprocess_type':'multi-plane reconstruction',
           'raw_file':ds_file,
-          'complevel':5}
+          'complevel':9}
 
 ds_fn = ds_file.split('_v')
 save_file = ds_fn[0]+'_%dzplanes_v'%params['zplanes']+ds_fn[1]
@@ -86,7 +88,7 @@ channel_type = xr.DataArray(['real','imag']*depth_array.size,
 # iterate through each hologram and reconstruct the z-planes
 for iholo in range(ds0.dims['hologram_number']):
     # initialize the reconstruction with the hologram
-    E2 = FO.Efield(ds0.attrs['wavelength'],grid2,z=ds0.attrs['zmax'],fielddef=ds0['image'].isel(hologram_number=iholo).values)
+    E2 = FO.Efield(ds0.attrs['wavelength'],grid2,z=ds0.attrs['zmax'],fielddef=ds0['image'].isel(hologram_number=iholo).values/rescale)
     # reconstruct each depth plane
     for idepth,depthr in enumerate(depth_array):
         E2.propagate_to(depthr)
@@ -114,8 +116,10 @@ ds_pre = xr.Dataset({'xsize':ds0['xsize'],'ysize':ds0['ysize'],
 print("saving data with compression level %d to"%params['complevel'])
 print(save_path+save_file)
 
-nccomp = dict(zlib=True, complevel=params['complevel'])
+nccomp = dict(zlib=True, complevel=params['complevel'],shuffle=True)
 ncencoding = {var: nccomp for var in ds_pre.data_vars}
-ds_pre.to_netcdf(save_path+save_file, encoding=ncencoding)
+ds_pre.to_netcdf(save_path+save_file, encoding=ncencoding,format='netCDF4',engine='netcdf4')
+
+ds0.close()
 
 print('save complete')

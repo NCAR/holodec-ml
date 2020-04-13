@@ -37,7 +37,7 @@ random_particle_count = True # randomize the number of particles up to Nparticle
 
 
 # set the randomized space limits
-param_lim = {'z':[0,2e-2],
+param_lim = {'z':[0,5e-2],
              'amplitude':[0.2,1]}
             #  'Nrange':10}
 
@@ -212,8 +212,8 @@ ds = xr.Dataset({'xsize':xsize,'ysize':ysize,'image':imageh,'labels':labels,},
 print("saving data with compression level %d to"%complevel)
 print(ds_path+nc_name)
 
-nccomp = dict(zlib=True, complevel=complevel)
+nccomp = dict(zlib=True, complevel=complevel,shuffle=True)
 ncencoding = {var: nccomp for var in ds.data_vars}
-ds.to_netcdf(ds_path+nc_name, encoding=ncencoding,format='netCDF4',engine='netcdf4',shuffle=True)
+ds.to_netcdf(ds_path+nc_name, encoding=ncencoding,format='netCDF4',engine='netcdf4')
 
 print('save complete')
