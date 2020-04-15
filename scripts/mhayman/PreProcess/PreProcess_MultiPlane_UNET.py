@@ -34,7 +34,7 @@ print('from path')
 print(ds_path)
 
 # specify number of layers to reconstruct
-params = {'zplanes':9,
+params = {'zplanes':10,
           'preprocess_type':'multi-plane reconstruction',
           'raw_file':ds_file,
           'complevel':9}
