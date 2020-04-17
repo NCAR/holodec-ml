@@ -50,7 +50,7 @@ model_file = ''  # if empty, creates a new model
 ### New Model Definitions
 nFilters = 32
 nPool = 2
-nConv = 5
+nConv = 3
 nLayers = 6
 loss_fun = "mse" 
 out_act = "linear" # "sigmoid"
