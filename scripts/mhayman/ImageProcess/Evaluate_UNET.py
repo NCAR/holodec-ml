@@ -61,10 +61,15 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 # model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_10zplanes_v02/'
 # model_file='UNET_Layers6_Conv5_Pool2_Filt32_mse_linear_epochs101_run1.h5'
 
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_10zplanes_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_10zplanes_v02/'
+# model_file='UNET_Layers6_Conv3_Pool2_Filt32_mse_linear_epochs101_run1.h5'
+
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
-ds_file='UNET_image_256x256_5000count_5particles_10zplanes_v02.nc'
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_10zplanes_v02/'
-model_file='UNET_Layers6_Conv3_Pool2_Filt32_mse_linear_epochs101_run1.h5'
+ds_file='UNET_image_256x256_5000count_5particles_2zplanes_v02.nc'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_2zplanes_v02/'
+model_file='UNET_Layers6_Conv5_Pool2_Filt32_mse_linear_epochs101_run1.h5'
 
 nn_descript = model_file.split('_epochs')[0]
 save_descript = model_file.replace('.h5','')
@@ -134,18 +139,18 @@ a_act = []
 amp_act = []
 amp_pred = []
 amp_pred_b = []
-amp_diff = np.array([])
-amp_diff_b = np.array([])
+# amp_diff = np.array([])
+# amp_diff_b = np.array([])
 for ih in test_labels.coords['hologram_number'].values:
     preds0 = preds_original.sel(hologram_number=ih)
     amp_act+=[np.sum(test_labels.sel(hologram_number=ih,type='amplitude').values)]
     amp_pred+=[np.sum(preds0.sel(type='amplitude').values)]
     amp_pred_b+=[np.sum((preds0.sel(type='amplitude').values>0.1))]
-    amp_diff=np.concatenate((amp_diff,(test_labels.sel(hologram_number=ih,type='amplitude').values -
-                preds0.sel(type='amplitude').values).flatten()))
-    amp_diff_b=np.concatenate((amp_diff_b,
-                (test_labels.sel(hologram_number=ih,type='amplitude').values -
-                (preds0.sel(type='amplitude').values>0.1)).flatten()))
+    # amp_diff=np.concatenate((amp_diff,(test_labels.sel(hologram_number=ih,type='amplitude').values -
+    #             preds0.sel(type='amplitude').values).flatten()))
+    # amp_diff_b=np.concatenate((amp_diff_b,
+    #             (test_labels.sel(hologram_number=ih,type='amplitude').values -
+    #             (preds0.sel(type='amplitude').values>0.1)).flatten()))
     ampset = np.nonzero(test_labels.sel(hologram_number=ih,type='amplitude').values > 0.1)
     zset = np.unique(test_labels.sel(hologram_number=ih,type='z').values[ampset])
     # print('hologram '+str(ih))
