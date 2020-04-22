@@ -48,9 +48,9 @@ model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
 model_file = ''  # if empty, creates a new model
 
 ### New Model Definitions
-nFilters = 32
+nFilters = 64
 nPool = 2
-nConv = 7
+nConv = 3
 nLayers = 4
 loss_fun = "mse" 
 out_act = "linear" # "sigmoid"
