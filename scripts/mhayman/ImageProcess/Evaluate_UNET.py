@@ -86,10 +86,15 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 # model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv3_Pool2_Filt64_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
 # model_file='UNET_Layers4_Conv3_Pool2_Filt64_mse_linear_epochs101_run1.h5'
 
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers5_Conv7_Pool2_Filt16_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
+# model_file='UNET_Layers5_Conv7_Pool2_Filt16_mse_linear_epochs101_run1.h5'
+
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
 ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers5_Conv7_Pool2_Filt16_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
-model_file='UNET_Layers5_Conv7_Pool2_Filt16_mse_linear_epochs101_run1.h5'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv13_Pool2_Filt16_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
+model_file='UNET_Layers4_Conv13_Pool2_Filt16_mse_linear_epochs101_run1.h5'
 
 nn_descript = model_file.split('_epochs')[0]
 save_descript = model_file.replace('.h5','')
