@@ -22,10 +22,10 @@ if dirP_str not in sys.path:
 
 import ml_utils as ml
 
-ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/UNET/"
-ds_file = "UNET_image_256x256_5000count_5particles_v02.nc"
+# ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/UNET/"
+# ds_file = "UNET_image_256x256_5000count_5particles_v02.nc"
 
-rescale = 255
+# rescale = 255
 
 print()
 print('loading file')
@@ -33,11 +33,11 @@ print(ds_file)
 print('from path')
 print(ds_path)
 
-# specify number of layers to reconstruct
-params = {'zplanes':10,
-          'preprocess_type':'multi-plane reconstruction',
-          'raw_file':ds_file,
-          'complevel':9}
+# # specify number of layers to reconstruct
+# params = {'zplanes':2,
+#           'preprocess_type':'multi-plane reconstruction',
+#           'raw_file':ds_file,
+#           'complevel':9}
 
 ds_fn = ds_file.split('_v')
 save_file = ds_fn[0]+'_%dzplanes_v'%params['zplanes']+ds_fn[1]
