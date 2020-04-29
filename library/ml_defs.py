@@ -10,6 +10,7 @@ mhayman@ucar.edu
 
 
 from tensorflow.keras.layers import Activation, MaxPool2D, SeparableConv2D, concatenate, Conv2DTranspose
+import tensorflow.keras.backend as K
 
 from typing import Tuple, List, Union
 
@@ -84,3 +85,31 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
     
     # return the result to the next layer up
     return act_2u
+
+def filtered_mae(y_true,y_pred):
+    """
+    Custom loss function for unet trained to identify
+    particle images and positions.
+    
+    This function calculates mean absolute error of all
+    amplitude pixels but calculates mean absolute error of
+    only particle pixels on the z pixels.
+
+    This assumes that the first channel is the z data and
+    the second channel is the amplitude data.
+    """
+
+    z_true = y_true[...,0]
+    a_true = y_true[...,1]
+
+    z_pred = y_pred[...,0]
+    a_pred = y_pred[...,1]
+
+    # calculate mae amplitude loss
+    a_loss = K.mean(K.abs(a_true-a_pred),axis=(1,2))
+
+    # calculate mae z loss with masking
+    z_pred[a_true<=0.10] = z_true[a_true<=0.10]
+    z_loss = K.sum(K.abs(z_true-z_pred),axis=(1,2))/K.sum(a_true>0.10,axis(1,2))
+    
+    return a_loss+z_loss
