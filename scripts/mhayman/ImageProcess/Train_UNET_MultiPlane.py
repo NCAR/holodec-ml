@@ -48,17 +48,18 @@ model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
 model_file = ''  # if empty, creates a new model
 
 ### New Model Definitions
-nFilters = 16
+nFilters = 32
 nPool = 2
 nConv = 13
 nLayers = 4
-loss_fun = "mse" 
+loss_fun = mldef.filtered_mae  # definition passed into compiler 
+loss_str = "filtered_mae"  # string representation of loss for filename
 out_act = "linear" # "sigmoid"
 
 
 if len(model_file) == 0:
     new_model = True  # Create a new model
-    nn_descript = f'UNET_Layers{nLayers}_Conv{nConv}_Pool{nPool}_Filt{nFilters}_'+loss_fun+'_'+out_act
+    nn_descript = f'UNET_Layers{nLayers}_Conv{nConv}_Pool{nPool}_Filt{nFilters}_'+loss_str+'_'+out_act
     run_num = 0
     model_path = "/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/"+nn_descript+"/"+ds_file.replace(".nc","/")
 else:
