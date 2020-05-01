@@ -109,7 +109,6 @@ def filtered_mae(y_true,y_pred):
     a_loss = K.mean(K.abs(a_true-a_pred),axis=(1,2))
 
     # calculate mae z loss with masking
-    z_pred[a_true<=0.10] = z_true[a_true<=0.10]
-    z_loss = K.sum(K.abs(z_true-z_pred),axis=(1,2))/K.sum(a_true>0.10,axis(1,2))
+    z_loss = K.sum(K.cast(K.greater(a_true,0.10),'float32')*K.abs(z_true-z_pred),axis=(1,2))/K.sum(K.cast(K.greater(a_true,0.10),'float32'),axis=(1,2))
     
     return a_loss+z_loss
