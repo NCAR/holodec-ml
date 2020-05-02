@@ -96,10 +96,17 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 # model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv13_Pool2_Filt16_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
 # model_file='UNET_Layers4_Conv13_Pool2_Filt16_mse_linear_epochs101_run1.h5'
 
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv13_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
+# model_file='UNET_Layers4_Conv13_Pool2_Filt32_mse_linear_epochs101_run1.h5'
+
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
 ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv13_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
-model_file='UNET_Layers4_Conv13_Pool2_Filt32_mse_linear_epochs101_run1.h5'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv5_Pool2_Filt32_filtered_mae_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
+model_file='UNET_Layers4_Conv5_Pool2_Filt32_filtered_mae_linear_epochs101_run1.h5'
+loss_fun = mldef.filtered_mae  # definition passed into compiler 
+loss_str = "filtered_mae"  # string representation of loss for filename
 
 
 nn_descript = model_file.split('_epochs')[0]
@@ -144,7 +151,8 @@ if not 'channel' in in_data.dims:
 scaled_in_data = in_data
 
 # load the CNN model
-mod = load_model(model_path+model_file)
+mod = load_model(model_path+model_file,compile=False)
+mod.compile(optimizer="adam", loss=loss_fun, metrics=['acc'])
 
 print("Evaluating test data...")
 cnn_start = datetime.datetime.now()

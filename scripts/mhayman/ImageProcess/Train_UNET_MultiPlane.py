@@ -50,7 +50,7 @@ model_file = ''  # if empty, creates a new model
 ### New Model Definitions
 nFilters = 32
 nPool = 2
-nConv = 13
+nConv = 5
 nLayers = 4
 loss_fun = mldef.filtered_mae  # definition passed into compiler 
 loss_str = "filtered_mae"  # string representation of loss for filename
