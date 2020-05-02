@@ -88,6 +88,41 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
 
 def filtered_mae(y_true,y_pred):
     """
+    Calculate mean absolute error for particle amplitude
+    and position.
+
+    Custom loss function for unet trained to identify
+    particle images and positions.
+    
+    This function calculates mean absolute error of all
+    amplitude pixels but calculates mean absolute error of
+    only particle pixels on the z pixels.
+
+    This assumes that the first channel is the z data and
+    the second channel is the amplitude data.
+    """
+    # break out the truth values
+    # assume z is 0 index and amplitude is 1 index
+    z_true = y_true[...,0]
+    a_true = y_true[...,1]
+
+    # break out the predicted values
+    z_pred = y_pred[...,0]
+    a_pred = y_pred[...,1]
+
+    # calculate mae amplitude loss
+    a_loss = K.mean(K.abs(a_true-a_pred),axis=(1,2))
+
+    # calculate mae z loss with masking
+    z_loss = K.sum(K.cast(K.greater(a_true,0.10),'float32')*K.abs(z_true-z_pred),axis=(1,2))/K.maximum(K.sum(K.cast(K.greater(a_true,0.10),'float32'),axis=(1,2)),1)
+    
+    return a_loss+z_loss
+
+def filtered_mse(y_true,y_pred):
+    """
+    Calculate mean square error for particle amplitude
+    and position.
+
     Custom loss function for unet trained to identify
     particle images and positions.
     
@@ -99,16 +134,19 @@ def filtered_mae(y_true,y_pred):
     the second channel is the amplitude data.
     """
 
+    # break out the truth values
+    # assume z is 0 index and amplitude is 1 index
     z_true = y_true[...,0]
     a_true = y_true[...,1]
 
+    # break out the predicted values
     z_pred = y_pred[...,0]
     a_pred = y_pred[...,1]
 
     # calculate mae amplitude loss
-    a_loss = K.mean(K.abs(a_true-a_pred),axis=(1,2))
+    a_loss = K.mean(K.square(a_true-a_pred),axis=(1,2))
 
     # calculate mae z loss with masking
-    z_loss = K.sum(K.cast(K.greater(a_true,0.10),'float32')*K.abs(z_true-z_pred),axis=(1,2))/K.maximum(K.sum(K.cast(K.greater(a_true,0.10),'float32'),axis=(1,2)),1)
+    z_loss = K.sum(K.cast(K.greater(a_true,0.10),'float32')*K.square(z_true-z_pred),axis=(1,2))/K.maximum(K.sum(K.cast(K.greater(a_true,0.10),'float32'),axis=(1,2)),1)
     
     return a_loss+z_loss
