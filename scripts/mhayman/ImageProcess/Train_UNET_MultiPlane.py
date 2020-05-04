@@ -52,8 +52,8 @@ nFilters = 32
 nPool = 2
 nConv = 5
 nLayers = 4
-loss_fun = 'mae'  # definition passed into compiler 
-loss_str = "mae"  # string representation of loss for filename
+loss_fun = mldef.filtered_mse  # definition passed into compiler 
+loss_str = "filtered_mse"  # string representation of loss for filename
 out_act = "linear" # "sigmoid"
 
 
