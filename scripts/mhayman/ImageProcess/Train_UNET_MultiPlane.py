@@ -32,7 +32,7 @@ import ml_defs as mldef
 
 # Model Training settings
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
-num_epochs = 101  # number of training epochs to run
+num_epochs = 201  # number of training epochs to run
 batch_size = 64   # training batch size
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
@@ -44,8 +44,9 @@ ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
 
 input_variable = 'image_planes'
 
-model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
-model_file = ''  # if empty, creates a new model
+# model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
+model_file = 'UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear_epochs101_run1.h5'  # if empty, creates a new model
 
 ### New Model Definitions
 nFilters = 32
@@ -65,7 +66,7 @@ if len(model_file) == 0:
 else:
     new_model = False
     nn_descript = model_file.split('_epochs')[0]
-    run_num = np.int(model_file.split('_run').replace('.h5',''))
+    run_num = np.int(model_file.split('_run')[1].replace('.h5',''))
     
       
 # make sure there file structure is in place
@@ -140,7 +141,9 @@ if new_model:
     plot_model(mod,show_shapes=True,to_file=save_path_mod+nn_descript+".png")
 
 else:
-    mod = load_model(model_path+model_file)
+    mod = load_model(model_path+model_file,compile=False)
+    mod.compile(optimizer="adam", loss=loss_fun, metrics=['acc'])
+    # mod = load_model(model_path+model_file)
     mod.summary()
 
 
