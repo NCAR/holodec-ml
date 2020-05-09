@@ -44,14 +44,15 @@ ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
 
 input_variable = 'image_planes'
 
-# model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
-model_file = 'UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear_epochs101_run1.h5'  # if empty, creates a new model
+model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
+model_file = ''
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
+# model_file = 'UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear_epochs101_run1.h5'  # if empty, creates a new model
 
 ### New Model Definitions
 nFilters = 32
 nPool = 2
-nConv = 5
+nConv = 6
 nLayers = 4
 loss_fun = mldef.filtered_mse  # definition passed into compiler 
 loss_str = "filtered_mse"  # string representation of loss for filename
