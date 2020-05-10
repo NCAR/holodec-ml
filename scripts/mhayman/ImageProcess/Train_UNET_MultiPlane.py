@@ -40,7 +40,7 @@ valid_fraction = 0.1  # fraction of points used for validation
 
 # Training data file
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
-ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
+ds_file='UNET_image_256x256_5000count_5particles_10zplanes_v02.nc'
 
 input_variable = 'image_planes'
 
@@ -52,8 +52,8 @@ model_file = ''
 ### New Model Definitions
 nFilters = 32
 nPool = 2
-nConv = 6
-nLayers = 4
+nConv = 3
+nLayers = 5
 loss_fun = mldef.filtered_mse  # definition passed into compiler 
 loss_str = "filtered_mse"  # string representation of loss for filename
 out_act = "linear" # "sigmoid"
