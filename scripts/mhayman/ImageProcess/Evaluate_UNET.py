@@ -136,10 +136,17 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 # loss_fun = mldef.filtered_mse  # definition passed into compiler 
 # loss_str = "filtered_mse"  # string representation of loss for filename
 
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_10zplanes_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_10zplanes_v02/'
+# model_file='UNET_Layers4_Conv3_Pool2_Filt32_filtered_mse_linear_epochs201_run1.h5'
+# loss_fun = mldef.filtered_mse  # definition passed into compiler 
+# loss_str = "filtered_mse"  # string representation of loss for filename
+
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
 ds_file='UNET_image_256x256_5000count_5particles_10zplanes_v02.nc'
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_10zplanes_v02/'
-model_file='UNET_Layers4_Conv3_Pool2_Filt32_filtered_mse_linear_epochs201_run1.h5'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers5_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_10zplanes_v02/'
+model_file='UNET_Layers5_Conv3_Pool2_Filt32_filtered_mse_linear_epochs201_run1.h5'
 loss_fun = mldef.filtered_mse  # definition passed into compiler 
 loss_str = "filtered_mse"  # string representation of loss for filename
 
