@@ -9,6 +9,7 @@ mhayman@ucar.edu
 
 import numpy as np
 import xarray as xr
+import os
 
 from typing import Tuple, List, Union
 
@@ -63,3 +64,18 @@ def next_pt(point:Union[Tuple,List],grid:np.ndarray,pgrow:np.int,decay:np.int=1.
         if np.all(np.array(pt) >= 0) and np.all(np.array(pt) < np.array(grid.shape)):
             if np.random.rand() < pgrow and grid[pt[0],pt[1]] == 0:
                 next_pt(pt,grid,pgrow*decay,decay=decay)
+
+def ensure_path(path:str):
+    """
+    Checks if a path exists.  If it doesn't, creates the
+    necessary folders.
+    path - path to check for or create
+    """
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except FileExistsError:
+                print()
+                print('tried creating data directory but it already exists')
+                print(path)
+                print()
