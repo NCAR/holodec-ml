@@ -42,7 +42,11 @@ print(ds_path)
 ds_fn = ds_file.split('_v')
 save_file = ds_fn[0]+'_FTplanes_v'+ds_fn[1]
 
-save_path = ds_path + ds_file.replace('.nc','/')
+if save_path is None:
+    save_path = ds_path + ds_file.replace('.nc','/')
+else:
+    save_path = save_path + ds_file.replace('.nc','/')
+    
 if not os.path.exists(save_path):
     try:
         os.makedirs(save_path)
@@ -91,7 +95,7 @@ for iholo in range(ds0.dims['hologram_number']):
     E2 = FO.Efield(ds0.attrs['wavelength'],grid2,z=ds0.attrs['zmax'],fielddef=ds0['image'].isel(hologram_number=iholo).values/rescale)
     # store real and imaginary components
     image0 = ds0['image'].isel(hologram_number=iholo).values
-    image0_ft = FO.OpticsFFT(image0-np.mean(image0))
+    image0_ft = FO.OpticsFFT(image0-np.mean(image0))/rescale
     image_ft.loc[{'hologram_number':iholo,'channel':'real'}] = np.real(image0_ft)
     image_ft.loc[{'hologram_number':iholo,'channel':'imag'}] = np.imag(image0_ft)
 

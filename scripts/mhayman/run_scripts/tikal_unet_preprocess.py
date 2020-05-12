@@ -18,6 +18,7 @@ software_path = "/h/eol/mhayman/PythonScripts/Optics/holodec-ml/scripts/mhayman/
 
 ds_path = "/scr/sci/mhayman/holodec/holodec-ml-data/UNET/"
 ds_file = "UNET_image_256x256_5000count_5particles_v02.nc"
+save_path = None
 
 rescale = 255
 
