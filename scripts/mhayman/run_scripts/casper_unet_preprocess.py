@@ -1,9 +1,17 @@
 """
 Run Script for Creating a Preprocessed Training Dataset
 On Casper
-
-TODO: Add Fourier Optics libraries to python path
 """
+
+import matplotlib
+matplotlib.use('Agg')
+
+import sys
+
+# set path to Fourier Optics library
+dirP_str = '/glade/u/home/mhayman/Python/Python-Optics/Libraries/'
+if dirP_str not in sys.path:
+    sys.path.append(dirP_str)
 
 software_path = "/glade/u/home/mhayman/Python/holodec-ml/scripts/mhayman/"
 
