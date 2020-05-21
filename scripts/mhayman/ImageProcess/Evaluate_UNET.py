@@ -35,7 +35,12 @@ h_chunk = 256 # size of dask array chunks along hologram_number dimension
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
 
-input_variable = 'image_planes'
+# input_variable = 'image_planes'
+# input_scale = 1.0
+
+
+input_variable = 'image'
+input_scale = 255.0
 
 index_list = [235,332,841,1078,1398]  # example cases to run
 
@@ -157,12 +162,19 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 # loss_fun = mldef.filtered_mse  # definition passed into compiler 
 # loss_str = "filtered_mse"  # string representation of loss for filename
 
-ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
-ds_file='UNET_image_256x256_5000count_5particles_FTplanes_v02.nc'
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_FTplanes_v02/'
-model_file='UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear_epochs201_run1.h5'
-loss_fun = mldef.filtered_mse  # definition passed into compiler 
-loss_str = "filtered_mse"  # string representation of loss for filename
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_FTplanes_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_FTplanes_v02/'
+# model_file='UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear_epochs201_run1.h5'
+# loss_fun = mldef.filtered_mse  # definition passed into compiler 
+# loss_str = "filtered_mse"  # string representation of loss for filename
+
+ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
+ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs20_run1.h5'
+loss_fun = 'mse'  # definition passed into compiler 
+loss_str = "mse"  # string representation of loss for filename
 
 nn_descript = model_file.split('_epochs')[0]
 save_descript = model_file.replace('.h5','')
@@ -203,7 +215,7 @@ in_data = ds[input_variable].isel(hologram_number=slice(split_index,None))
 if not 'channel' in in_data.dims:
     in_data = in_data.expand_dims("channel", 3)
 
-scaled_in_data = in_data
+scaled_in_data = in_data/input_scale
 
 # load the CNN model
 mod = load_model(model_path+model_file,compile=False)
