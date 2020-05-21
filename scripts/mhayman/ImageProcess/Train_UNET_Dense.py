@@ -49,8 +49,8 @@ input_variable = 'image'
 
 model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
 model_file = ''
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
-model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs20_run1.h5'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+# model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs20_run1.h5'
 # model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
 # model_file = 'UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear_epochs101_run1.h5'  # if empty, creates a new model
 

@@ -9,7 +9,7 @@ mhayman@ucar.edu
 """
 
 
-from tensorflow.keras.layers import Activation, MaxPool2D, SeparableConv2D, concatenate, Conv2DTranspose
+from tensorflow.keras.layers import Activation, MaxPool2D, SeparableConv2D, concatenate, Conv2DTranspose,Flatten,Lambda, Conv2D,Dense, Reshape
 import tensorflow.keras.backend as K
 
 from typing import Tuple, List, Union
@@ -80,6 +80,90 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
         act_1 = Activation("relu")(conv_1)
 
         conv_2 = SeparableConv2D(n_filters,(nConv,nConv),padding="same", kernel_initializer = kernel_initializer)(act_1)
+        act_2u = Activation("relu")(conv_2)
+    
+    
+    # return the result to the next layer up
+    return act_2u
+
+def add_unet_dense(input_node,n_layers,n_filters,nConv=5,
+            nPool=4,activation="relu",kernel_initializer = "he_normal",
+            Ndense=64,):
+    """
+    Recursive function for defining a encoding/decoding UNET
+    input_node - the input supplied to the UNET
+    n_layers - the number of desired layers in the UNET
+    n_filters - the number of convolution filters in the first layer
+        this will grow by factors of two for each additional layer depth
+    nConv - number of points in each convolution kernel
+    nPool - number of points in each max-pool operation
+    activation - activation function to use.  Typically 'relu'.
+
+
+    Example use:
+    # UNET parameter definitions
+    nFilters = 16
+    nPool = 4
+    nConv = 5
+    nLayers = 4
+    loss_fun = "mse"
+    out_act = "linear" 
+
+    # define the input based on input data dimensions
+    cnn_input = Input(shape=scaled_in_data.shape[1:])  
+
+    # create the unet
+    unet_out = add_unet_layers(cnn_input,nLayers,nFilters,nConv=nConv,nPool=nPool,activation="relu")
+
+    # add the output layer
+    out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
+
+    # build and compile the model
+    mod = Model(cnn_input, unet_out)
+    mod.compile(optimizer="adam", loss=loss_fun,metrics=['acc'])
+    mod.summary()
+
+    """
+    
+    if n_layers > 1:
+        # another layer will be created below this one
+        
+        # define the down sampling layer
+        conv_1d = Conv2D(n_filters, (nConv, nConv), padding="same", kernel_initializer = kernel_initializer)(input_node)
+        act_1d = Activation("relu")(conv_1d)
+        conv_2d = Conv2D(n_filters, (nConv, nConv), padding="same", kernel_initializer = kernel_initializer)(act_1d)
+        act_2d = Activation("relu")(conv_2d)
+        pool = MaxPool2D(pool_size=(nPool, nPool))(act_2d)
+
+        # create the next layer below this one
+        return_node = add_unet_dense(pool,n_layers-1,n_filters*2,nConv=nConv,nPool=nPool,activation=activation,Ndense=Ndense)
+
+        # define the up sampling and feed foward layer
+        upsamp_1u = Conv2DTranspose(n_filters, (nConv,nConv), strides=(nPool,nPool),padding="same")(return_node)
+        concat_1u = concatenate([upsamp_1u,act_2d],axis=3)
+        conv_1u = Conv2D(n_filters,(nConv,nConv),padding="same",kernel_initializer = kernel_initializer)(concat_1u)
+        act_1u = Activation("relu")(conv_1u)
+        conv_2u = Conv2D(n_filters,(nConv,nConv),padding="same",kernel_initializer = kernel_initializer)(act_1u)
+        act_2u = Activation("relu")(conv_2u)
+    else:
+        # this is the bottom of the encoding layers
+        channel_branch = []
+        for i in range(n_filters//2):
+            # Slicing the ith channel:
+            chan = Lambda(lambda x: x[..., i])(input_node)
+            chan_flat = Flatten()(chan)
+            d1 = Dense(Ndense*Ndense,activation='tanh')(chan_flat)
+            d2 = Dense(Ndense*Ndense,activation='tanh')(d1)
+            d2_reshape = Reshape((Ndense,Ndense,1))(d2)
+            channel_branch.append(d2_reshape)
+
+        # Concatenating together the per-channel results:
+        dense_out = concatenate(channel_branch,axis=3)
+
+        conv_1 = Conv2D(n_filters,(nConv,nConv),padding="same", kernel_initializer = kernel_initializer)(dense_out)
+        act_1 = Activation("relu")(conv_1)
+
+        conv_2 = Conv2D(n_filters,(nConv,nConv),padding="same", kernel_initializer = kernel_initializer)(act_1)
         act_2u = Activation("relu")(conv_2)
     
     
