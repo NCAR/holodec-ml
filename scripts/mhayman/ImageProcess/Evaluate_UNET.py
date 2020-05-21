@@ -172,7 +172,8 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
 ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
 model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
-model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs20_run1.h5'
+# model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs20_run1.h5'
+model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs50_run2.h5'
 loss_fun = 'mse'  # definition passed into compiler 
 loss_str = "mse"  # string representation of loss for filename
 
@@ -408,13 +409,21 @@ for ind in index_list:
 
 
 # Input Example Plots
-channel_number = in_data.sizes['channel']
-for ind in index_list:
-    fig, ax = plt.subplots(2, channel_number//2, figsize=(channel_number*3, 8))
-    for ai in range(channel_number):
-        axind = ai//2+np.mod(ai,2)*channel_number//2
-        ax[np.mod(ai,2),ai//2].imshow(scaled_in_data.isel(channel=ai,hologram_number=ind),vmin=-0.25,vmax=0.25)
-    plt.savefig(save_example_path+f"ExampleInput_{ind}_"+save_descript+".png",dpi=300)
+if input_variable == 'image_planes':
+    channel_number = in_data.sizes['channel']
+    for ind in index_list:
+        fig, ax = plt.subplots(2, channel_number//2, figsize=(channel_number*3, 8))
+        for ai in range(channel_number):
+            axind = ai//2+np.mod(ai,2)*channel_number//2
+            ax[np.mod(ai,2),ai//2].imshow(scaled_in_data.isel(channel=ai,hologram_number=ind),vmin=-0.25,vmax=0.25)
+        plt.savefig(save_example_path+f"ExampleInput_{ind}_"+save_descript+".png",dpi=300)
+else:
+    for ind in index_list:
+        fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+        
+        ax.imshow(scaled_in_data.isel(channel=0,hologram_number=ind),vmin=0,vmax=1.0)
+        plt.savefig(save_example_path+f"ExampleInput_{ind}_"+save_descript+".png",dpi=300)
+
 
 # 3D Example Plots
 xg,yg = np.meshgrid(preds_original['xsize'].values,preds_original['ysize'].values)
