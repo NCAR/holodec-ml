@@ -57,8 +57,8 @@ model_file = ''
 ### New Model Definitions
 nFilters = 32
 nPool = 2
-nConv = 3
-nLayers = 5
+nConv = 5
+nLayers = 6
 loss_fun = 'mse'  # definition passed into compiler 
 loss_str = "mse"  # string representation of loss for filename
 out_act = "linear" # "sigmoid"
