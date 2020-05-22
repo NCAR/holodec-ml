@@ -337,7 +337,7 @@ plt.savefig(save_path+f"Zscatter_"+save_descript+".png",dpi=300)
 
 # Scatter plot of error vs particle size
 # z_one_to_one = [z_act.min()*1e3,z_act.max()*1e3]
-fig, ax = plt.subplots(1,1, figsize=(4, 4))
+fig, ax = plt.subplots(1,1, figsize=(5, 5))
 # ax.plot(z_one_to_one,z_one_to_one,'k--')
 ax.scatter(n_part,(z_amp-z_act)*1e3,s=5,alpha=0.5,label='max amplitude')
 # ax.scatter(z_act*1e3,z_min*1e3,s=5,alpha=0.5,label='min error')
