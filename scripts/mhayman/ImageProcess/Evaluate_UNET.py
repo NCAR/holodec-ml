@@ -253,6 +253,7 @@ a_act = []
 amp_act = []
 amp_pred = []
 amp_pred_b = []
+n_part = []
 # amp_diff = np.array([])
 # amp_diff_b = np.array([])
 for ih in test_labels.coords['hologram_number'].values:
@@ -284,6 +285,7 @@ for ih in test_labels.coords['hologram_number'].values:
         a_act += [np.max(apred)]
         a_amp += [apred[iamp]]
         a_min += [apred[imin]]
+        n_part += [ipart[0].size]  # number of pixels in particle
     print(f"\r{ih+1} of {test_labels['hologram_number'].size} holograms completed",end='')
 z_act = np.array(z_act)
 z_amp = np.array(z_amp)
@@ -294,6 +296,7 @@ a_min = np.array(a_min)
 amp_act = np.array(amp_act)
 amp_pred = np.array(amp_pred)
 amp_pred_b = np.array(amp_pred_b)
+n_part = np.array(n_part)
 # amp_diff = np.array(amp_diff)
 # amp_diff_b = np.array(amp_diff_b)
 
@@ -331,6 +334,18 @@ ax.set_ylabel('z predicted [mm]')
 ax.grid(b=True)
 ax.legend()
 plt.savefig(save_path+f"Zscatter_"+save_descript+".png",dpi=300)
+
+# Scatter plot of error vs particle size
+# z_one_to_one = [z_act.min()*1e3,z_act.max()*1e3]
+fig, ax = plt.subplots(1,1, figsize=(4, 4))
+# ax.plot(z_one_to_one,z_one_to_one,'k--')
+ax.scatter(n_part,(z_amp-z_act)*1e3,s=5,alpha=0.5,label='max amplitude')
+# ax.scatter(z_act*1e3,z_min*1e3,s=5,alpha=0.5,label='min error')
+ax.set_xlabel('particle area [pixels]')
+ax.set_ylabel('z error [mm]')
+ax.grid(b=True)
+# ax.legend()
+plt.savefig(save_path+f"SizeErrorscatter_"+save_descript+".png",dpi=300)
 
 # Plot Max Amplitude Histogram
 hbins = np.linspace(-10,10,100)
