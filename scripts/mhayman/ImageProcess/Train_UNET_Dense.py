@@ -46,20 +46,21 @@ ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
 # ds_file='UNET_image_256x256_5000count_5particles_FTplanes_v02.nc'
 
 input_variable = 'image'
+input_scale = 255.0
 
-# model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
-# model_file = ''
-model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
-model_file = 'UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear_epochs50_run1.h5'
+model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/'
+model_file = ''
+# model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+# model_file = 'UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear_epochs50_run1.h5'
 # model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
 # model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs20_run1.h5'
 # model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
 # model_file = 'UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear_epochs101_run1.h5'  # if empty, creates a new model
 
 ### New Model Definitions
-nFilters = 32
+nFilters = 64
 nPool = 2
-nConv = 5
+nConv = 3
 nLayers = 5
 loss_fun = 'mse'  # definition passed into compiler 
 loss_str = "mse"  # string representation of loss for filename
@@ -124,7 +125,7 @@ in_data = ds[input_variable]
 if not 'channel' in in_data.dims:
     in_data = in_data.expand_dims("channel", 3)
 
-scaled_in_data = in_data/255
+scaled_in_data = in_data/input_scale
 
 ### Build the UNET ###
 
