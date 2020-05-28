@@ -4,7 +4,7 @@ PRO checkfile, fn
    loadct,0   
    v=''
    window,0,xsize=data.global.nx, ysize=data.global.ny
-   FOR i=0,data.global.nholograms-1 DO BEGIN
+   FOR i=0L,long(data.global.nholograms)-1 DO BEGIN
       print,i,format='(i6, $)'
       restorenc, fn, 'd2', var='image', offset=[0,0,i], count=[data.global.ny, data.global.nx, 1]
       image=transpose(d2.image)  ;netCDF convention is different than IDL
@@ -26,8 +26,8 @@ PRO checkfile, fn
       
       ;Write properties to screen
       FOR j=0, nw-1 DO BEGIN
-         ;xyouts, x[j], y[j]+10, string('D=',data.d[w[j]],'um  z=', data.z[w[j]]/1e4,'cm',format='(a2,f4.1,a6,f4.1,a2)'), /device, charsize=1.5, charthick=2
-         cgtext, x[j], y[j]+10, string('D=',data.d[w[j]],'um  z=', data.z[w[j]]/1e4,'cm',format='(a2,f4.1,a6,f4.1,a2)'), /device, color='white', charsize=2.5, charthick=2, /font, tt_font='Helvetica'
+         xyouts, x[j], y[j]+10, string('D=',data.d[w[j]],'um  z=', data.z[w[j]]/1e4,'cm',format='(a2,f4.1,a6,f4.1,a2)'), /device, charsize=1.5, charthick=2
+         ;cgtext, x[j], y[j]+10, string('D=',data.d[w[j]],'um  z=', data.z[w[j]]/1e4,'cm',format='(a2,f4.1,a6,f4.1,a2)'), /device, color='white', charsize=2.5, charthick=2, /font, tt_font='Helvetica'
       ENDFOR
       
       ;Move to next image
