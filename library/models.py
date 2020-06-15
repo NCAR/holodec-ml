@@ -50,7 +50,7 @@ class Conv2DNeuralNetwork(object):
 
     def build_neural_network(self, inputs, outputs):
         """Create Keras neural network model and compile it."""
-        conv_input = Input(shape=(inputs.shape + (1,)), name="input")
+        conv_input = Input(shape=(inputs + (1,)), name="input")
         nn_model = conv_input
         for h in range(len(self.filters)):
             nn_model = Conv2D(self.filters[h], self.kernel_sizes[h], padding="same",
