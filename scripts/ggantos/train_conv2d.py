@@ -48,7 +48,7 @@ def main():
                                         config["output_cols"],
                                         input_scaler)
     
-    # train the model
+    # train and save the model
     mod = Conv2DNeuralNetwork(**config["conv2d_network"])
     mod.fit(scaled_train_inputs.values, scaled_train_outputs.values)
     print("Saving the model")
@@ -62,14 +62,17 @@ def main():
                                              index=scaled_train_outputs.index,
                                              columns=scaled_train_outputs.columns)
     
+    # calculate error
     train_error = metrics[config["metric"]](scaled_train_outputs, scaled_pred_train_outputs)
     valid_error = metrics[config["metric"]](scaled_valid_outputs, scaled_pred_valid_outputs)
     print(f"Training Error of: {train_error}")
     print(f"Validation Error of: {valid_error}")
-
+    
+    # inverse scaler applied to outputs
     pred_valid_outputs = input_scaler.inverse_transform(scaled_pred_valid_outputs)
     pred_train_outputs = input_scaler.inverse_transform(scaled_pred_train_outputs)    
     
+    # save results
     print("Saving the data")
     pd.DataFrame(data={'train_error': train_error}, index=[0]).to_csv(join(out_path, "conv2d_train_error.csv"), index_label="Output")
     pd.DataFrame(data={'valid_error': valid_error}, index=[0]).to_csv(join(out_path, "conv2d_valid_error.csv"), index_label="Output")

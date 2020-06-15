@@ -48,9 +48,9 @@ class Conv2DNeuralNetwork(object):
         self.verbose = verbose
         self.model = None
 
-    def build_neural_network(self, inputs, outputs):
+    def build_neural_network(self, input_shape, output_shape):
         """Create Keras neural network model and compile it."""
-        conv_input = Input(shape=(inputs), name="input")
+        conv_input = Input(shape=(input_shape), name="input")
         nn_model = conv_input
         for h in range(len(self.filters)):
             nn_model = Conv2D(self.filters[h], self.kernel_sizes[h], padding="same",
@@ -59,7 +59,7 @@ class Conv2DNeuralNetwork(object):
         nn_model = Flatten()(nn_model)
         for h in range(len(self.dense_sizes)):
             nn_model = Dense(self.dense_sizes[h], activation=self.dense_activation, name=f"dense_{h:02d}")(nn_model)
-        nn_model = Dense(outputs, name=f"dense_outputs")(nn_model)
+        nn_model = Dense(output_shape, name=f"dense_output")(nn_model)
         self.model = Model(conv_input, nn_model)
         if self.optimizer == "adam":
             self.optimizer_obj = Adam(lr=self.lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2, decay=self.decay)
@@ -72,11 +72,11 @@ class Conv2DNeuralNetwork(object):
         if len(x.shape[1:])==2:
             x = np.expand_dims(x, axis=-1)
         if len(y.shape) == 1:
-            outputs = 1
+            output_shape = 1
         else:
-            outputs = y.shape[1]
-        inputs = x.shape[1:]
-        self.build_neural_network(inputs, outputs)
+            output_shape = y.shape[1]
+        input_shape = x.shape[1:]
+        self.build_neural_network(input_shape, output_shape)
         self.model.fit(x, y, batch_size=self.batch_size, epochs=self.epochs, verbose=self.verbose)
         return
 
