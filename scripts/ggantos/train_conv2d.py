@@ -21,10 +21,6 @@ scalers = {"MinMaxScaler": MinMaxScaler,
 
 metrics = {"mae": mean_absolute_error}
 
-data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-out_path: "/glade/p/cisl/aiml/ggantos/holodec/conv2d_1particle/"
-model_name: "cnn.h5"
-num_particles: 1
 
 def main():
     
@@ -53,10 +49,10 @@ def main():
                                         input_scaler)
     
     # train the model
-    mod = Conv2DNeuralNetwork(**config['conv2d_network'])
+    mod = Conv2DNeuralNetwork(**config["conv2d_network"])
     mod.fit(scaled_train_inputs.values, scaled_train_outputs.values)
     print("Saving the model")
-    mod.model.save(join(out_path, config["model_name"]))
+    mod.model.save(join(out_path, config["model_name"], ".h5"))
     
     # predict outputs
     scaled_pred_valid_outputs = pd.DataFrame(mod.predict(scaled_valid_inputs),

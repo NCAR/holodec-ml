@@ -11,11 +11,10 @@ class Conv2DNeuralNetwork(object):
     A Conv2D Neural Network Model that can support arbitrary numbers of layers.
 
     Attributes:
-        conv2D_layers: Number of Conv2D layers
         filters: List of number of filters in each Conv2D layer
-        kernel_sizes: List of tuple kernel sizes in each Conv2D layer
+        kernel_sizes: List of kernel sizes in each Conv2D layer
         conv2d_activation: Type of activation function for conv2d layers
-        pool_sizes: List of tuple Max Pool sizes
+        pool_sizes: List of Max Pool sizes
         debse_sizes: Sizes of dense layers
         dense_activation: Type of activation function for dense layers
         learning_rate: Optimizer learning rate
@@ -26,15 +25,14 @@ class Conv2DNeuralNetwork(object):
         verbose: Level of detail to provide during training
         model: Keras Model object
     """
-    def __init__(self, conv2D_layers=3, filters=8, kernel_sizes=[(5,5)], conv2d_activation="relu",
-                 pool_sizes = [(4,4)], dense_sizes = [64,32,4], dense_activation="relu",
+    def __init__(self, filters=8, kernel_sizes=(5), conv2d_activation="relu",
+                 pool_sizes=(4), dense_sizes=64, dense_activation="relu",
                  lr=0.001, optimizer="adam",  adam_beta_1=0.9, adam_beta_2=0.999,
                  sgd_momentum=0.9, decay=0, loss="mae", batch_size=32, epochs=2, verbose=0):
-        self.conv2D_layers = conv2D_layers
         self.filters = filters
-        self.kernel_sizes = [tuple(v) for v in kernel_sizes]
+        self.kernel_sizes = [tuple(v,v) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
-        self.pool_sizes = [tuple(v) for v in pool_sizes]
+        self.pool_sizes = [tuple(v,v) for v in pool_sizes]
         self.dense_sizes = dense_sizes
         self.dense_activation = dense_activation
         self.lr = lr
@@ -52,17 +50,16 @@ class Conv2DNeuralNetwork(object):
 
     def build_neural_network(self, inputs, outputs):
         """Create Keras neural network model and compile it."""
-        conv_input = Input(shape=(600, 400, 1), name="input")
+        conv_input = Input(shape=(inputs.shape + (1,)), name="input")
         nn_model = conv_input
-        for h in range(self.conv2D_layers):
+        for h in range(len(self.filters)):
             nn_model = Conv2D(self.filters[h], self.kernel_sizes[h], padding="same",
                               activation=self.conv2d_activation, name=f"conv2D_{h:02d}")(nn_model)
             nn_model = MaxPool2D(self.pool_sizes[h], name=f"maxpool2D_{h:02d}")(nn_model)
         nn_model = Flatten()(nn_model)
-        for h in range(len(self.dense_sizes[:-1])):
+        for h in range(len(self.dense_sizes)):
             nn_model = Dense(self.dense_sizes[h], activation=self.dense_activation, name=f"dense_{h:02d}")(nn_model)
-        h += 1
-        nn_model = Dense(self.dense_sizes[-1], name=f"dense_{h:02d}")(nn_model)
+        nn_model = Dense(outputs, name=f"dense_outputs")(nn_model)
         self.model = Model(conv_input, nn_model)
         if self.optimizer == "adam":
             self.optimizer_obj = Adam(lr=self.lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2, decay=self.decay)
@@ -72,7 +69,10 @@ class Conv2DNeuralNetwork(object):
         self.model.summary()
 
     def fit(self, x, y):
-        inputs = x.shape[1]
+        if len(x.shape)==2:
+            x = np.expand_dims(x, axis=-1)
+        if len(x.shape)==3:
+            inputs = x.shape[1:]
         if len(y.shape) == 1:
             outputs = 1
         else:
