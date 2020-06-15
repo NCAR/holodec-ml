@@ -15,7 +15,7 @@ class Conv2DNeuralNetwork(object):
         kernel_sizes: List of kernel sizes in each Conv2D layer
         conv2d_activation: Type of activation function for conv2d layers
         pool_sizes: List of Max Pool sizes
-        debse_sizes: Sizes of dense layers
+        dense_sizes: Sizes of dense layers
         dense_activation: Type of activation function for dense layers
         learning_rate: Optimizer learning rate
         optimizer: Name of optimizer or optimizer object.
@@ -25,8 +25,8 @@ class Conv2DNeuralNetwork(object):
         verbose: Level of detail to provide during training
         model: Keras Model object
     """
-    def __init__(self, filters=8, kernel_sizes=(5), conv2d_activation="relu",
-                 pool_sizes=(4), dense_sizes=64, dense_activation="relu",
+    def __init__(self, filters=(8,), kernel_sizes=(5,), conv2d_activation="relu",
+                 pool_sizes=(4,), dense_sizes=(64,), dense_activation="relu",
                  lr=0.001, optimizer="adam",  adam_beta_1=0.9, adam_beta_2=0.999,
                  sgd_momentum=0.9, decay=0, loss="mae", batch_size=32, epochs=2, verbose=0):
         self.filters = filters
@@ -50,7 +50,7 @@ class Conv2DNeuralNetwork(object):
 
     def build_neural_network(self, inputs, outputs):
         """Create Keras neural network model and compile it."""
-        conv_input = Input(shape=(inputs + (1,)), name="input")
+        conv_input = Input(shape=(inputs), name="input")
         nn_model = conv_input
         for h in range(len(self.filters)):
             nn_model = Conv2D(self.filters[h], self.kernel_sizes[h], padding="same",
@@ -69,14 +69,13 @@ class Conv2DNeuralNetwork(object):
         self.model.summary()
 
     def fit(self, x, y):
-        if len(x.shape)==2:
+        if len(x.shape[1:])==2:
             x = np.expand_dims(x, axis=-1)
-        if len(x.shape)==3:
-            inputs = x.shape[1:]
         if len(y.shape) == 1:
             outputs = 1
         else:
             outputs = y.shape[1]
+        inputs = x.shape[1:]
         self.build_neural_network(inputs, outputs)
         self.model.fit(x, y, batch_size=self.batch_size, epochs=self.epochs, verbose=self.verbose)
         return

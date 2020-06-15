@@ -52,7 +52,7 @@ def main():
     mod = Conv2DNeuralNetwork(**config["conv2d_network"])
     mod.fit(scaled_train_inputs.values, scaled_train_outputs.values)
     print("Saving the model")
-    mod.model.save(join(out_path, config["model_name"], ".h5"))
+    mod.model.save(join(out_path, config["model_name"]+".h5"))
     
     # predict outputs
     scaled_pred_valid_outputs = pd.DataFrame(mod.predict(scaled_valid_inputs),
