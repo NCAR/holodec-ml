@@ -30,9 +30,9 @@ class Conv2DNeuralNetwork(object):
                  lr=0.001, optimizer="adam",  adam_beta_1=0.9, adam_beta_2=0.999,
                  sgd_momentum=0.9, decay=0, loss="mae", batch_size=32, epochs=2, verbose=0):
         self.filters = filters
-        self.kernel_sizes = [tuple(v,v) for v in kernel_sizes]
+        self.kernel_sizes = [tuple((v,v)) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
-        self.pool_sizes = [tuple(v,v) for v in pool_sizes]
+        self.pool_sizes = [tuple((v,v)) for v in pool_sizes]
         self.dense_sizes = dense_sizes
         self.dense_activation = dense_activation
         self.lr = lr
