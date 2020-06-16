@@ -35,7 +35,12 @@ h_chunk = 256 # size of dask array chunks along hologram_number dimension
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
 
-input_variable = 'image_planes'
+# input_variable = 'image_planes'
+# input_scale = 1.0
+
+
+input_variable = 'image'
+input_scale = 255.0
 
 index_list = [235,332,841,1078,1398]  # example cases to run
 
@@ -50,6 +55,8 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 # ds_file='UNET_image_256x256_5000count_5particles_5zplanes_v02.nc'
 # model_path = '/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_5zplanes_v02/'
 # model_file = 'UNET_Layers6_Conv5_Pool2_Filt32_mse_linear_epochs201_run1.h5'
+# loss_fun = 'mse'  # definition passed into compiler 
+# loss_str = "mse"  # string representation of loss for filename
 
 # ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
 # ds_file='UNET_image_256x256_5000count_5particles_9zplanes_v02.nc'
@@ -157,12 +164,49 @@ index_list = [235,332,841,1078,1398]  # example cases to run
 # loss_fun = mldef.filtered_mse  # definition passed into compiler 
 # loss_str = "filtered_mse"  # string representation of loss for filename
 
-ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
-ds_file='UNET_image_256x256_5000count_5particles_FTplanes_v02.nc'
-model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_FTplanes_v02/'
-model_file='UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear_epochs201_run1.h5'
-loss_fun = mldef.filtered_mse  # definition passed into compiler 
-loss_str = "filtered_mse"  # string representation of loss for filename
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/UNET_image_256x256_5000count_5particles_v02/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_FTplanes_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_FTplanes_v02/'
+# model_file='UNET_Layers6_Conv3_Pool2_Filt32_filtered_mse_linear_epochs201_run1.h5'
+# loss_fun = mldef.filtered_mse  # definition passed into compiler 
+# loss_str = "filtered_mse"  # string representation of loss for filename
+
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+# # model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs20_run1.h5'
+# model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_mse_linear_epochs50_run2.h5'
+# loss_fun = 'mse'  # definition passed into compiler 
+# loss_str = "mse"  # string representation of loss for filename
+
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt32_filtered_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+# model_file='UNET_D_Layers5_Conv3_Pool2_Filt32_filtered_mse_linear_epochs50_run1.h5'
+# loss_fun = mldef.filtered_mse  # definition passed into compiler 
+# loss_str = "filtered_mse"  # string representation of loss for filename
+
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers6_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+# model_file='UNET_D_Layers6_Conv5_Pool2_Filt32_mse_linear_epochs50_run1.h5'
+# loss_fun = 'mse'  # definition passed into compiler 
+# loss_str = "mse"  # string representation of loss for filename
+
+# ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
+# ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
+# model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+# # model_file='UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear_epochs50_run1.h5'
+# model_file='UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear_epochs50_run2.h5'
+# loss_fun = 'mse'  # definition passed into compiler 
+# loss_str = "mse"  # string representation of loss for filename
+
+ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
+ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv3_Pool2_Filt64_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+model_file='UNET_D_Layers5_Conv3_Pool2_Filt64_mse_linear_epochs50_run1.h5'
+loss_fun = 'mse'  # definition passed into compiler 
+loss_str = "mse"  # string representation of loss for filename
 
 nn_descript = model_file.split('_epochs')[0]
 save_descript = model_file.replace('.h5','')
@@ -203,7 +247,7 @@ in_data = ds[input_variable].isel(hologram_number=slice(split_index,None))
 if not 'channel' in in_data.dims:
     in_data = in_data.expand_dims("channel", 3)
 
-scaled_in_data = in_data
+scaled_in_data = in_data/input_scale
 
 # load the CNN model
 mod = load_model(model_path+model_file,compile=False)
@@ -233,6 +277,7 @@ a_act = []
 amp_act = []
 amp_pred = []
 amp_pred_b = []
+n_part = []
 # amp_diff = np.array([])
 # amp_diff_b = np.array([])
 for ih in test_labels.coords['hologram_number'].values:
@@ -264,6 +309,7 @@ for ih in test_labels.coords['hologram_number'].values:
         a_act += [np.max(apred)]
         a_amp += [apred[iamp]]
         a_min += [apred[imin]]
+        n_part += [ipart[0].size]  # number of pixels in particle
     print(f"\r{ih+1} of {test_labels['hologram_number'].size} holograms completed",end='')
 z_act = np.array(z_act)
 z_amp = np.array(z_amp)
@@ -274,6 +320,7 @@ a_min = np.array(a_min)
 amp_act = np.array(amp_act)
 amp_pred = np.array(amp_pred)
 amp_pred_b = np.array(amp_pred_b)
+n_part = np.array(n_part)
 # amp_diff = np.array(amp_diff)
 # amp_diff_b = np.array(amp_diff_b)
 
@@ -311,6 +358,20 @@ ax.set_ylabel('z predicted [mm]')
 ax.grid(b=True)
 ax.legend()
 plt.savefig(save_path+f"Zscatter_"+save_descript+".png",dpi=300)
+
+# Scatter plot of error vs particle size
+# z_one_to_one = [z_act.min()*1e3,z_act.max()*1e3]
+fig, ax = plt.subplots(1,1, figsize=(5, 5))
+# ax.plot(z_one_to_one,z_one_to_one,'k--')
+ax.scatter(n_part,(z_amp-z_act)*1e3,s=5,alpha=0.5,label='max amplitude')
+# ax.scatter(z_act*1e3,z_min*1e3,s=5,alpha=0.5,label='min error')
+ax.set_xlabel('particle area [pixels]')
+ax.set_ylabel('z error [mm]')
+ax.minorticks_on()
+ax.grid(b=True)
+ax.grid(which='minor',linestyle=':')
+# ax.legend()
+plt.savefig(save_path+f"SizeErrorscatter_"+save_descript+".png",dpi=300)
 
 # Plot Max Amplitude Histogram
 hbins = np.linspace(-10,10,100)
@@ -396,13 +457,21 @@ for ind in index_list:
 
 
 # Input Example Plots
-channel_number = in_data.sizes['channel']
-for ind in index_list:
-    fig, ax = plt.subplots(2, channel_number//2, figsize=(channel_number*3, 8))
-    for ai in range(channel_number):
-        axind = ai//2+np.mod(ai,2)*channel_number//2
-        ax[np.mod(ai,2),ai//2].imshow(scaled_in_data.isel(channel=ai,hologram_number=ind),vmin=-0.25,vmax=0.25)
-    plt.savefig(save_example_path+f"ExampleInput_{ind}_"+save_descript+".png",dpi=300)
+if input_variable == 'image_planes':
+    channel_number = in_data.sizes['channel']
+    for ind in index_list:
+        fig, ax = plt.subplots(2, channel_number//2, figsize=(channel_number*3, 8))
+        for ai in range(channel_number):
+            axind = ai//2+np.mod(ai,2)*channel_number//2
+            ax[np.mod(ai,2),ai//2].imshow(scaled_in_data.isel(channel=ai,hologram_number=ind),vmin=-0.25,vmax=0.25)
+        plt.savefig(save_example_path+f"ExampleInput_{ind}_"+save_descript+".png",dpi=300)
+else:
+    for ind in index_list:
+        fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+        
+        ax.imshow(scaled_in_data.isel(channel=0,hologram_number=ind),vmin=0,vmax=1.0)
+        plt.savefig(save_example_path+f"ExampleInput_{ind}_"+save_descript+".png",dpi=300)
+
 
 # 3D Example Plots
 xg,yg = np.meshgrid(preds_original['xsize'].values,preds_original['ysize'].values)
