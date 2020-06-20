@@ -1,9 +1,9 @@
 data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-out_path: "/glade/p/cisl/aiml/ggantos/holodec/conv2d_1particle/"
+out_path: "/glade/p/cisl/aiml/ggantos/holodec/conv2d_3particle_20/"
 model_name: "cnn"
-num_particles: 1
+num_particles: 3
 random_seed: 328942
-output_cols: ["x", "y", "z", "d"]
+output_cols: ["x", "y", "z", "d", "hid"]
 input_scaler: "MinMaxScaler"
 metric: "mae"
 conv2d_network:
@@ -18,4 +18,5 @@ conv2d_network:
   loss: "mae"
   batch_size: 32
   epochs: 20
-  verbose: 1
+  verbose: 0
+
