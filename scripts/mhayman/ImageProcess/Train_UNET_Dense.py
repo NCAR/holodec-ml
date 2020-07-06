@@ -33,7 +33,7 @@ import ml_defs as mldef
 # Model Training settings
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
 num_epochs = 50  # number of training epochs to run
-batch_size = 64   # training batch size
+batch_size = 256   # training batch size
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
 
@@ -58,9 +58,9 @@ model_file = ''
 # model_file = 'UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear_epochs101_run1.h5'  # if empty, creates a new model
 
 ### New Model Definitions
-nFilters = 64
+nFilters = 32
 nPool = 2
-nConv = 3
+nConv = 5
 nLayers = 5
 loss_fun = 'mse'  # definition passed into compiler 
 loss_str = "mse"  # string representation of loss for filename
