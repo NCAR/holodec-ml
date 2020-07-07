@@ -32,7 +32,7 @@ import ml_defs as mldef
 
 # Model Training settings
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
-num_epochs = 50  # number of training epochs to run
+num_epochs = 201  # number of training epochs to run
 batch_size = 256   # training batch size
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
@@ -177,6 +177,7 @@ ax.plot(epochs,history.history['loss'],'bo-',alpha=0.5,label='Training')
 ax.plot(epochs,history.history['val_loss'],'rs-',alpha=0.5,label='Validation')
 ax.set_xlabel('Epoch')
 ax.set_ylabel('Loss')
+ax.set_yscale('log')
 ax.grid(b=True)
 plt.legend()
 plt.savefig(save_path1+"LossHistory_"+f"_epochs{num_epochs}_run{run_num}"+".png", dpi=200, bbox_inches="tight")
