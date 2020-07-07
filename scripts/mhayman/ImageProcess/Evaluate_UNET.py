@@ -208,6 +208,14 @@ model_file='UNET_D_Layers5_Conv3_Pool2_Filt64_mse_linear_epochs50_run1.h5'
 loss_fun = 'mse'  # definition passed into compiler 
 loss_str = "mse"  # string representation of loss for filename
 
+
+ds_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/'   # linux share
+ds_file='UNET_image_256x256_5000count_5particles_v02.nc'
+model_path='/scr/sci/mhayman/holodec/holodec-ml-data/UNET/models/UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear/UNET_image_256x256_5000count_5particles_v02/'
+model_file='UNET_D_Layers5_Conv5_Pool2_Filt32_mse_linear_epochs50_run1.h5'
+loss_fun = 'mse'  # definition passed into compiler 
+loss_str = "mse"  # string representation of loss for filename
+
 nn_descript = model_file.split('_epochs')[0]
 save_descript = model_file.replace('.h5','')
 
