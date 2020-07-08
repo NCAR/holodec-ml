@@ -33,7 +33,7 @@ import ml_defs as mldef
 # Model Training settings
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
 num_epochs = 201  # number of training epochs to run
-batch_size = 256   # training batch size
+batch_size = 64   # training batch size
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
 
@@ -136,7 +136,8 @@ if new_model:
     # create the unet
     unet_out = mldef.add_unet_dense(cnn_input,nLayers,nFilters,
             nConv=nConv,nPool=nPool,activation="relu",
-            Ndense=scaled_in_data.shape[1]//2**(nLayers-1))
+            Ndense=scaled_in_data.shape[1]//2**(nLayers-1),
+            kernel_initializer = "he_uniform")
 
     # add the output layer
     out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
