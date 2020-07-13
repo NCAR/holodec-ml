@@ -32,7 +32,7 @@ import ml_defs as mldef
 
 # Model Training settings
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
-num_epochs = 201  # number of training epochs to run
+num_epochs = 71  # number of training epochs to run
 batch_size = 64   # training batch size
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
@@ -62,8 +62,8 @@ nFilters = 32
 nPool = 2
 nConv = 5
 nLayers = 5
-loss_fun = 'mse'  # definition passed into compiler 
-loss_str = "mse"  # string representation of loss for filename
+loss_fun = filtered_mse  # definition passed into compiler 
+loss_str = "filtered_mse"  # string representation of loss for filename
 out_act = "linear" # "sigmoid"
 
 
