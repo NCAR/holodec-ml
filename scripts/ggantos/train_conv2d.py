@@ -1,9 +1,10 @@
 import sys
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, max_error
 import pandas as pd
 import numpy as np
 import argparse
+import pickle
 import yaml
 import os
 from os.path import join, exists
@@ -11,7 +12,7 @@ from datetime import datetime
 
 sys.path.append('../../')
     
-from library.data import load_scaled_datasets, open_dataset, flatten_dataset
+from library.data import load_scaled_datasets
 from library.models import Conv2DNeuralNetwork
 
 
@@ -26,78 +27,78 @@ metrics = {"mae": mean_absolute_error}
 def main():
         
     # parse arguments from config/yaml file
-    parser = argparse.ArgumentParser(description='Describe a Conv2D neural network for single particle holodec.')
+    parser = argparse.ArgumentParser(description='Describe a Conv2D nn')
     parser.add_argument("config", help="Path to config file")
     args = parser.parse_args()
     with open(args.config) as config_file:
         config = yaml.load(config_file, Loader=yaml.FullLoader)
 
-    data_path = config["data_path"]
-    out_path = config["out_path"]
+    path_data = config["path_data"]
+    path_save = config["path_save"]
+    if not os.path.exists(path_save):
+        os.makedirs(path_save)
     num_particles = config["num_particles"]
     output_cols = config["output_cols"]
     np.random.seed(config["random_seed"])
-    if not exists(out_path):
-        os.makedirs(out_path)
     
     # load data
-    input_scaler = scalers[config["input_scaler"]]()
-
-    scaled_train_inputs, \
-    scaled_valid_inputs, \
-    scaled_train_outputs, \
-    scaled_valid_outputs, \
-    input_scaler = load_scaled_datasets(data_path,
-                                        num_particles,
-                                        output_cols,
-                                        input_scaler)
+    scaler_out = scalers[config["scaler_out"]]()
+    load_start = datetime.now()
+    train_inputs,\
+    train_outputs,\
+    valid_inputs,\
+    valid_outputs = load_scaled_datasets(path_data,
+                                         num_particles,
+                                         output_cols,
+                                         scaler_out,
+                                         config["subset"],
+                                         config["num_z_bins"])
+    print(f"Loading datasets took {datetime.now() - load_start} time")
     
     # train and save the model
     model_start = datetime.now()
     mod = Conv2DNeuralNetwork(**config["conv2d_network"])
-    mod.fit(scaled_train_inputs.values, scaled_train_outputs.values)
+    hist = mod.fit(train_inputs, train_outputs,
+                   valid_inputs, valid_outputs)
     print(f"Running model took {datetime.now() - model_start} time")
-    print("Saving the model")
-    mod.model.save(join(out_path, config["model_name"]+".h5"))
     
     # predict outputs
-    scaled_pred_valid_outputs = pd.DataFrame(mod.predict(scaled_valid_inputs),
-                                             index=scaled_valid_outputs.index,
-                                             columns=scaled_valid_outputs.columns)
-    scaled_pred_train_outputs = pd.DataFrame(mod.predict(scaled_train_inputs),
-                                             index=scaled_train_outputs.index,
-                                             columns=scaled_train_outputs.columns)
+    train_outputs_pred = mod.predict(train_inputs)
+    valid_outputs_pred = mod.predict(valid_inputs)
     
     # apply inverse scaler to outputs
-    pred_train_outputs = input_scaler.inverse_transform(scaled_pred_train_outputs)        
-    pred_valid_outputs = input_scaler.inverse_transform(scaled_pred_valid_outputs)
+    train_outputs_pred_raw = scaler_out.inverse_transform(train_outputs_pred)       
+    valid_outputs_pred_raw = scaler_out.inverse_transform(valid_outputs_pred)
     
     # calculate error
-    train_outputs = open_dataset(data_path, num_particles, "train")[output_cols].to_dataframe()
-    valid_outputs = open_dataset(data_path, num_particles, "valid")[output_cols].to_dataframe()
-    if len(output_cols) == 5:
-        train_outputs = flatten_dataset(train_outputs)
-        valid_outputs = flatten_dataset(valid_outputs)
-    error = {"train": {}, "valid": {}}
-    for i, var in enumerate(train_outputs.columns):
-        err = mean_absolute_error(train_outputs[var], pred_train_outputs[:,i])
-        error["train"][var] = err
-        print (f"Training error in {var}: ", err)
-    for i, var in enumerate(valid_outputs.columns):
-        err = mean_absolute_error(valid_outputs[var], pred_valid_outputs[:,i])
-        error["valid"][var] = err
-        print (f"Validation error in {var}: ", err)    
+    valid_maes = np.zeros(len(output_cols))
+    valid_maxerror = np.zeros(len(output_cols))
+    for col in range(len(output_cols)):
+        valid_maes[col] = mean_absolute_error(valid_outputs[col],
+                                              valid_outputs_pred[col])
+        valid_maxerror[col] = max_error(valid_outputs[col],
+                                        valid_outputs_pred[col])
     
     # save results
     print("Saving results and config file..")
-    with open(os.path.join(out_path, 'config.yml'), 'w') as f:
+    mod.model.save(join(path_save, config["model_name"]+".h5"))
+    name_save = open(join(path_save, "train_outputs_pred.pkl"), 'wb')
+    pickle.dump(train_outputs_pred, name_save)
+    name_save = open(join(path_save, "train_outputs_pred_raw.pkl"), 'wb')
+    pickle.dump(train_outputs_pred_raw, name_save)
+    name_save = open(join(path_save, "valid_outputs_pred.pkl"), 'wb')
+    pickle.dump(valid_outputs_pred, name_save)
+    name_save = open(join(path_save, "valid_outputs_pred_raw.pkl"), 'wb')
+    pickle.dump(valid_outputs_pred_raw, name_save)
+    name_save = open(join(path_save, 'hist.pkl'), 'wb')
+    pickle.dump(hist, name_save)
+    name_save = open(join(path_save, 'valid_maes.pkl'), 'wb')
+    pickle.dump(valid_maes, name_save)
+    name_save = open(join(path_save, 'valid_maxerror.pkl'), 'wb')
+    pickle.dump(valid_maxerror, name_save)
+    with open(join(path_save, 'config.yml'), 'w') as f:
         yaml.dump(config, f)
-    pd.DataFrame.from_dict(error, orient='index').to_csv(join(out_path, "error.csv"),index=False)
-    pd.DataFrame(data=pred_valid_outputs).to_csv(join(out_path, "pred_valid_outputs.csv"), index=False)
-    pd.DataFrame(data=pred_train_outputs).to_csv(join(out_path, "pred_train_outputs.csv"), index=False)
-    pd.DataFrame(data=scaled_pred_train_outputs).to_csv(join(out_path, "scaled_pred_train_outputs.csv"), index=False)
-    pd.DataFrame(data=scaled_pred_valid_outputs).to_csv(join(out_path, "scaled_pred_valid_outputs.csv"), index=False)
-
+                     
     return
 
 if __name__ == "__main__":

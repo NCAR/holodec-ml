@@ -42,15 +42,15 @@ def main():
     np.random.seed(config["random_seed"])
     
     # load data
+    scaler_out = scalers[config["scaler_out"]]()
     load_start = datetime.now()
-    output_scaler = scalers[config["output_scaler"]]()
     train_inputs,\
     train_outputs,\
     valid_inputs,\
     valid_outputs = load_scaled_datasets(path_data,
                                          num_particles,
                                          output_cols,
-                                         output_scaler,
+                                         scaler_out,
                                          config["subset"],
                                          config["num_z_bins"])
     print(f"Loading datasets took {datetime.now() - load_start} time")
@@ -75,7 +75,7 @@ def main():
     pickle.dump(valid_outputs_pred, name_save)
     name_save = open(join(path_save, 'hist.pkl'), 'wb')
     pickle.dump(hist, name_save)
-    with open(join(path_save, 'config.yml'), 'wb') as f:
+    with open(join(path_save, 'config.yml'), 'w') as f:
         yaml.dump(config, f)
     
     return

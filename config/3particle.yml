@@ -1,25 +1,25 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/conv2d_3particle_base/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/zmass_3/dense3216filters81216/"
 model_name: "cnn"
 num_particles: 3
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]
-output_scaler: "MinMaxScaler"
+scaler_out: "MinMaxScaler"
 num_z_bins: 20
 subset: False
 metric: "mae"
 conv2d_network:
-  filters: [16, 24, 32]
+  filters: [8, 12, 16]
   kernel_sizes: [5, 5, 5]
   conv2d_activation: "relu"
   pool_sizes: [4, 4, 4]
-  dense_sizes: [64, 32]
+  dense_sizes: [32, 16]
   dense_activation: "elu"
   lr: 0.0003
   decay: 0.1
   optimizer: "adam"
   loss: "categorical_crossentropy"
-  batch_size: 32
-  epochs: 2
+  batch_size: 256
+  epochs: 20
   verbose: 1
 
