@@ -32,7 +32,7 @@ import ml_defs as mldef
 
 # Model Training settings
 h_chunk = 256 # size of dask array chunks along hologram_number dimension
-num_epochs = 50  # number of training epochs to run
+num_epochs = 201  # number of training epochs to run
 batch_size = 64   # training batch size
 split_fraction = 0.7  # fraction of points used for training/validation (not testing)
 valid_fraction = 0.1  # fraction of points used for validation
@@ -58,9 +58,9 @@ model_file = ''
 # model_file = 'UNET_Layers4_Conv5_Pool2_Filt32_filtered_mse_linear_epochs101_run1.h5'  # if empty, creates a new model
 
 ### New Model Definitions
-nFilters = 64
+nFilters = 32
 nPool = 2
-nConv = 3
+nConv = 5
 nLayers = 5
 loss_fun = 'mse'  # definition passed into compiler 
 loss_str = "mse"  # string representation of loss for filename
@@ -136,7 +136,8 @@ if new_model:
     # create the unet
     unet_out = mldef.add_unet_dense(cnn_input,nLayers,nFilters,
             nConv=nConv,nPool=nPool,activation="relu",
-            Ndense=scaled_in_data.shape[1]//2**(nLayers-1))
+            Ndense=scaled_in_data.shape[1]//2**(nLayers-1),
+            kernel_initializer = "he_uniform")
 
     # add the output layer
     out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
@@ -177,6 +178,7 @@ ax.plot(epochs,history.history['loss'],'bo-',alpha=0.5,label='Training')
 ax.plot(epochs,history.history['val_loss'],'rs-',alpha=0.5,label='Validation')
 ax.set_xlabel('Epoch')
 ax.set_ylabel('Loss')
+ax.set_yscale('log')
 ax.grid(b=True)
 plt.legend()
 plt.savefig(save_path1+"LossHistory_"+f"_epochs{num_epochs}_run{run_num}"+".png", dpi=200, bbox_inches="tight")
