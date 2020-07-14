@@ -61,7 +61,7 @@ model_file = ''
 nFilters = 32
 nPool = 2
 nConv = 5
-nLayers = 2
+nLayers = 5
 loss_fun = 'mse'  # definition passed into compiler 
 loss_str = "mse"  # string representation of loss for filename
 out_act = "linear" # "sigmoid"
@@ -144,7 +144,7 @@ if new_model:
     # create the unet
     unet_out = mldef.add_unet_layers(cnn_input,nLayers,nFilters,
             nConv=nConv,nPool=nPool,activation="relu",
-            kernel_initializer = "he_normal",cat=False)
+            kernel_initializer = "he_normal",cat=True)
 
     # add the output layer
     out = Conv2D(1,(1,1),padding="same",activation=out_act)(unet_out)
