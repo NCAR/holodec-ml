@@ -17,7 +17,7 @@ from typing import Tuple, List, Union
 
 
 def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
-            nPool=4,activation="relu",kernel_initializer = "he_normal"):
+            nPool=4,activation="relu",kernel_initializer = "he_normal",cat=True):
     """
     Recursive function for defining a encoding/decoding UNET
     input_node - the input supplied to the UNET
@@ -27,7 +27,7 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
     nConv - number of points in each convolution kernel
     nPool - number of points in each max-pool operation
     activation - activation function to use.  Typically 'relu'.
-
+    cat - concatenate the feedforward onto the other side of the UNET
 
     Example use:
     # UNET parameter definitions
@@ -37,6 +37,7 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
     nLayers = 4
     loss_fun = "mse"
     out_act = "linear" 
+    
 
     # define the input based on input data dimensions
     cnn_input = Input(shape=scaled_in_data.shape[1:])  
@@ -69,7 +70,11 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
 
         # define the up sampling and feed foward layer
         upsamp_1u = Conv2DTranspose(n_filters, (nConv,nConv), strides=(nPool,nPool),padding="same")(return_node)
-        concat_1u = concatenate([upsamp_1u,act_2d],axis=3)
+        if cat:
+            concat_1u = concatenate([upsamp_1u,act_2d],axis=3)
+        else:
+            concat_1u = upsamp_1u
+
         conv_1u = SeparableConv2D(n_filters,(nConv,nConv),padding="same",kernel_initializer = kernel_initializer)(concat_1u)
         act_1u = Activation("relu")(conv_1u)
         conv_2u = SeparableConv2D(n_filters,(nConv,nConv),padding="same",kernel_initializer = kernel_initializer)(act_1u)
