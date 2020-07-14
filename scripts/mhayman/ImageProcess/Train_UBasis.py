@@ -147,7 +147,7 @@ if new_model:
             kernel_initializer = "he_normal",cat=False)
 
     # add the output layer
-    out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
+    out = Conv2D(1,(1,1),padding="same",activation=out_act)(unet_out)
 
     # build and compile the model
     mod = Model(cnn_input, out)
