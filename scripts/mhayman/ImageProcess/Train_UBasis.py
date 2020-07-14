@@ -115,6 +115,10 @@ train_labels = scaled_all_labels.isel(hologram_number=slice(valid_index,split_in
 test_labels = scaled_all_labels.isel(hologram_number=slice(split_index,None))
 val_labels = scaled_all_labels.isel(hologram_number=slice(None,valid_index))
 
+scaled_train_labels = all_labels.isel(hologram_number=slice(valid_index,split_index))
+scaled_test_labels = all_labels.isel(hologram_number=slice(split_index,None))
+scaled_val_labels = all_labels.isel(hologram_number=slice(None,valid_index))
+
 # scaler = ml.MinMaxScalerX(train_labels,dim=('hologram_number','xsize','ysize'))
 # scaler = ml.MinMaxScalerX(train_labels,dim=('xsize','ysize'))
 # scaled_train_labels = scaler.fit_transform(train_labels)
