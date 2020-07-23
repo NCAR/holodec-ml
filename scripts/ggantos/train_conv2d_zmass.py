@@ -5,10 +5,12 @@ import pandas as pd
 import numpy as np
 import argparse
 import pickle
+import random
 import yaml
 import os
 from os.path import join, exists
 from datetime import datetime
+import tensorflow as tf
 
 sys.path.append('../../')
     
@@ -39,7 +41,10 @@ def main():
         os.makedirs(path_save)
     num_particles = config["num_particles"]
     output_cols = config["output_cols"]
-    np.random.seed(config["random_seed"])
+    seed = config["random_seed"]
+    np.random.seed(seed)
+    random.seed(seed)
+    tf.random.set_seed(seed)
     
     # load data
     scaler_out = scalers[config["scaler_out"]]()

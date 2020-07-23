@@ -87,27 +87,27 @@ def load_raw_datasets(path_data, num_particles, split, subset, output_cols):
     ds.close()
     return inputs, outputs
 
-def scale_images(images, scaler_vals=None):
+def scale_images(images, scaler_in=None):
     """
     Takes in array of images and scales pixel values between 0 and 1
     
     Args: 
         images: (np array) Input image data
-        scaler_vals: (dict) Image scaler 'max' and 'min' values
+        scaler_in: (dict) Image scaler 'max' and 'min' values
         
     Returns:
         images_scaled: (np array) Input image data scaled between 0 and 1
-        scaler_vals: (dict) Image scaler 'max' and 'min' values
+        scaler_in: (dict) Image scaler 'max' and 'min' values
     """
     
-    if scaler_vals is None:
-        scaler_vals = {}
-        scaler_vals["min"] = images.min()
-        scaler_vals["max"] = images.max()
-    images_scaled = (images.astype(np.float32) - scaler_vals["min"])
-    images_scaled /= (scaler_vals["max"] - scaler_vals["min"])
+    if scaler_in is None:
+        scaler_in = {}
+        scaler_in["min"] = images.min()
+        scaler_in["max"] = images.max()
+    images_scaled = (images.astype(np.float32) - scaler_in["min"])
+    images_scaled /= (scaler_in["max"] - scaler_in["min"])
 
-    return images_scaled, scaler_vals
+    return images_scaled, scaler_in
 
 def calc_z_relative_mass(outputs, num_z_bins=20, z_bins=None):
     """
@@ -153,10 +153,19 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     z_min = np.minimum(train_outputs["z"].min(), valid_outputs["z"].min())
     z_max = np.maximum(train_outputs["z"].max(), valid_outputs["z"].max())
     z_bins = np.linspace(z_min, z_max, num_z_bins)
-    return z_bins
+    return z_bins    
+
+def flatten_coordinate(outputs, hids, output_col):
+    outputs = pd.DataFrame({output_col: outputs, 'hid': hids})
+    outputs_flattened = []
+    for h in np.unique(hids):
+        outputs_flattened.append(outputs[outputs.hid == h][output_col].values)
+    outputs = np.array(outputs_flattened, dtype=object)
+    return outputs
 
 def load_scaled_datasets(path_data, num_particles, output_cols,
-                         output_scaler=False, subset=False, num_z_bins=False):
+                         scaler_out=False, subset=False, num_z_bins=False,
+                         flatten_coord=False):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns scaled inputs and raw outputs.
@@ -165,9 +174,10 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
         path_data: (str) Path to dataset directory
         num_particles: (int or str) Number of particles per hologram
         output_cols: (list of strings) List of feature columns
-        output_scaler: (sklearn.preprocessing scaler) Output data scaler
+        scaler_out: (sklearn.preprocessing scaler) Output data scaler
         subset: (float) Fraction of data to be loaded
         num_z_bins: (int) Number of bins along z-axis
+        flatten_coord: (boolean) If True, flatten single coord by hid
         
     Returns:
         train_inputs: (np array) Train input data scaled between 0 and 1
@@ -182,11 +192,17 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
     valid_inputs,\
     valid_outputs = load_raw_datasets(path_data, num_particles, 'valid',
                                       subset, output_cols)
-
-    train_inputs, scaler_vals = scale_images(train_inputs)
-    valid_inputs, _ = scale_images(valid_inputs, scaler_vals)
+    
+    if flatten_coord:
+        train_hids = train_outputs["hid"].values
+        valid_hids = valid_outputs["hid"].values
+        train_outputs = train_outputs.drop(['hid'], axis=1)
+        valid_outputs = valid_outputs.drop(['hid'], axis=1)
+    
+    train_inputs, scaler_in = scale_images(train_inputs)
+    valid_inputs, _ = scale_images(valid_inputs, scaler_in)
     train_inputs = np.expand_dims(train_inputs, -1)
-    valid_inputs = np.expand_dims(valid_inputs, -1) 
+    valid_inputs = np.expand_dims(valid_inputs, -1)
     
     if num_z_bins:
         z_bins = calc_z_bins(train_outputs, valid_outputs, num_z_bins)
@@ -195,7 +211,20 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
         valid_outputs, _ = calc_z_relative_mass(outputs=valid_outputs,
                                                 z_bins=z_bins)
     else:
-        train_outputs = output_scaler.fit_transform(train_outputs)
-        valid_outputs = output_scaler.transform(valid_outputs)
+        train_outputs = scaler_out.fit_transform(train_outputs)
+        valid_outputs = scaler_out.transform(valid_outputs)
+
+    if flatten_coord:
+        output_cols.remove("hid")
+        train_outputs = flatten_coordinate(train_outputs.flatten(),
+                                           train_hids, output_cols[0])
+        valid_outputs = flatten_coordinate(valid_outputs.flatten(),
+                                           valid_hids, output_cols[0]) 
+        
+    if train_inputs.shape[0] != train_outputs.shape[0]:
+        factor = int(train_outputs.shape[0]/train_inputs.shape[0])
+        train_inputs = np.repeat(train_inputs, factor, axis=0)
+        factor = int(valid_outputs.shape[0]/valid_inputs.shape[0])
+        valid_inputs = np.repeat(valid_inputs, factor, axis=0)
         
     return train_inputs, train_outputs, valid_inputs, valid_outputs

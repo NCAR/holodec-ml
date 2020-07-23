@@ -4,11 +4,13 @@ from sklearn.metrics import mean_absolute_error, max_error
 import pandas as pd
 import numpy as np
 import argparse
+import random
 import pickle
 import yaml
 import os
 from os.path import join, exists
 from datetime import datetime
+import tensorflow as tf
 
 sys.path.append('../../')
     
@@ -39,7 +41,10 @@ def main():
         os.makedirs(path_save)
     num_particles = config["num_particles"]
     output_cols = config["output_cols"]
-    np.random.seed(config["random_seed"])
+    seed = config["random_seed"]
+    np.random.seed(seed)
+    random.seed(seed)
+    tf.random.set_seed(seed)
     
     # load data
     scaler_out = scalers[config["scaler_out"]]()
@@ -52,7 +57,8 @@ def main():
                                          output_cols,
                                          scaler_out,
                                          config["subset"],
-                                         config["num_z_bins"])
+                                         config["num_z_bins"],
+                                         config["flatten_coord"])
     print(f"Loading datasets took {datetime.now() - load_start} time")
     
     # train and save the model
@@ -103,3 +109,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

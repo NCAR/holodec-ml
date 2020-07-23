@@ -1,5 +1,5 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/conv2d_1particle/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/xyz3/base1/"
 model_name: "cnn"
 num_particles: 1
 random_seed: 328942
