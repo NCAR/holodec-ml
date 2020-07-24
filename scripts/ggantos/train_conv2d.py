@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import argparse
 import random
-import pickle
 import yaml
 import os
 from os.path import join, exists
@@ -65,7 +64,7 @@ def main():
     model_start = datetime.now()
     mod = Conv2DNeuralNetwork(**config["conv2d_network"])
     hist = mod.fit(train_inputs, train_outputs,
-                   valid_inputs, valid_outputs)
+                   xv=valid_inputs, yv=valid_outputs)
     print(f"Running model took {datetime.now() - model_start} time")
     
     # predict outputs
@@ -88,20 +87,16 @@ def main():
     # save results
     print("Saving results and config file..")
     mod.model.save(join(path_save, config["model_name"]+".h5"))
-    name_save = open(join(path_save, "train_outputs_pred.pkl"), 'wb')
-    pickle.dump(train_outputs_pred, name_save)
-    name_save = open(join(path_save, "train_outputs_pred_raw.pkl"), 'wb')
-    pickle.dump(train_outputs_pred_raw, name_save)
-    name_save = open(join(path_save, "valid_outputs_pred.pkl"), 'wb')
-    pickle.dump(valid_outputs_pred, name_save)
-    name_save = open(join(path_save, "valid_outputs_pred_raw.pkl"), 'wb')
-    pickle.dump(valid_outputs_pred_raw, name_save)
-    name_save = open(join(path_save, 'hist.pkl'), 'wb')
-    pickle.dump(hist, name_save)
-    name_save = open(join(path_save, 'valid_maes.pkl'), 'wb')
-    pickle.dump(valid_maes, name_save)
-    name_save = open(join(path_save, 'valid_maxerror.pkl'), 'wb')
-    pickle.dump(valid_maxerror, name_save)
+    np.savetxt(join(path_save, "train_outputs_pred.csv"), train_outputs_pred)
+    np.savetxt(join(path_save, "train_outputs_pred_raw.csv"),
+               train_outputs_pred_raw)
+    np.savetxt(join(path_save, "valid_outputs_pred.csv"), valid_outputs_pred)   
+    np.savetxt(join(path_save, "valid_outputs_pred_raw.csv"),
+               valid_outputs_pred_raw)
+    np.savetxt(join(path_save, "valid_maes.csv"), valid_maes)    
+    np.savetxt(join(path_save, "valid_maxerror.csv"), valid_maxerror)    
+    for k in hist.keys():
+        np.savetxt(join(path_save, k+".csv"), hist[k])
     with open(join(path_save, 'config.yml'), 'w') as f:
         yaml.dump(config, f)
                      

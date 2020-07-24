@@ -87,7 +87,7 @@ class Conv2DNeuralNetwork(object):
         self.model.compile(optimizer=self.optimizer, loss=self.loss)
         self.model.summary()
 
-    def fit(self, x, y, xv, yv):
+    def fit(self, x, y, xv=None, yv=None):
         if len(x.shape[1:])==2:
             x = np.expand_dims(x, axis=-1)
         if len(y.shape) == 1:
