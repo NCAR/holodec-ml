@@ -1,9 +1,10 @@
 import sys
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
-from sklearn.metrics import mean_absolute_error, max_error
+from sklearn.metrics import mean_absolute_error
 import pandas as pd
 import numpy as np
 import argparse
+import pickle
 import random
 import yaml
 import os
@@ -56,8 +57,7 @@ def main():
                                          output_cols,
                                          scaler_out,
                                          config["subset"],
-                                         config["num_z_bins"],
-                                         config["flatten_coord"])
+                                         config["num_z_bins"])
     print(f"Loading datasets took {datetime.now() - load_start} time")
     
     # train and save the model
@@ -69,39 +69,19 @@ def main():
     
     # predict outputs
     train_outputs_pred = mod.predict(train_inputs)
-    valid_outputs_pred = mod.predict(valid_inputs)
-    
-    # apply inverse scaler to outputs
-    train_outputs_pred_raw = scaler_out.inverse_transform(train_outputs_pred)       
-    valid_outputs_pred_raw = scaler_out.inverse_transform(valid_outputs_pred)
-    
-    # calculate error
-    valid_maes = np.zeros(len(output_cols))
-    valid_maxerror = np.zeros(len(output_cols))
-    for col in range(len(output_cols)):
-        valid_maes[col] = mean_absolute_error(valid_outputs[col],
-                                              valid_outputs_pred[col])
-        valid_maxerror[col] = max_error(valid_outputs[col],
-                                        valid_outputs_pred[col])
+    valid_outputs_pred = mod.predict(valid_inputs) 
     
     # save results
     print("Saving results and config file..")
     mod.model.save(join(path_save, config["model_name"]+".h5"))
     np.savetxt(join(path_save, "train_outputs_pred.csv"), train_outputs_pred)
-    np.savetxt(join(path_save, "train_outputs_pred_raw.csv"),
-               train_outputs_pred_raw)
     np.savetxt(join(path_save, "valid_outputs_pred.csv"), valid_outputs_pred)   
-    np.savetxt(join(path_save, "valid_outputs_pred_raw.csv"),
-               valid_outputs_pred_raw)
-    np.savetxt(join(path_save, "valid_maes.csv"), valid_maes)    
-    np.savetxt(join(path_save, "valid_maxerror.csv"), valid_maxerror)    
     for k in hist.keys():
         np.savetxt(join(path_save, k+".csv"), hist[k])
     with open(join(path_save, 'config.yml'), 'w') as f:
         yaml.dump(config, f)
-                     
+    
     return
 
 if __name__ == "__main__":
     main()
-    
