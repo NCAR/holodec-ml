@@ -7,7 +7,7 @@ paths = {   'data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
 
 settings = {    'data_file':'synthetic_holograms_1particle_gamma_training.nc',
                 'input_func':{'abs':np.abs},
-                'input_scale':{'abs':255}
+                'input_scale':{'abs':255},
                 'FourierTransform':True,
                 'hist_edges':np.linspace(0,300,100)
                 }
