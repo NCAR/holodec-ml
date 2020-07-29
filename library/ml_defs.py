@@ -242,3 +242,12 @@ def filtered_mse(y_true,y_pred):
     z_loss = K.mean(K.cast(K.greater(a_true,0.10),'float32')*K.square(z_true-z_pred),axis=(1,2))
     
     return a_loss+z_loss
+
+def ks_test(y_true,y_pred):
+    """
+    Custom loss function for the
+    Kolmogorov–Smirnov test.
+    Requires that y is a 1D array representing
+    a histogram
+    """
+    return K.max(K.abs(K.cumsum(y_true,axis=1)-K.cumsum(y_pred,axis=1)))
