@@ -2,6 +2,8 @@
 Run proprocessing of histogram data on cheyenne
 """
 
+import numpy as np
+
 paths = {   'data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
             'save':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/'}
 
