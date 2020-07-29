@@ -57,7 +57,7 @@ def main():
                                          scaler_out,
                                          config["subset"],
                                          config["num_z_bins"],
-                                         config["flatten_coord"])
+                                         config["mass"])
     print(f"Loading datasets took {datetime.now() - load_start} time")
     
     # train and save the model

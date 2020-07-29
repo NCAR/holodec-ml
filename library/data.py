@@ -57,7 +57,7 @@ def open_dataset(path_data, num_particles, split):
     ds = xr.open_dataset(path_data)
     return ds
 
-def load_raw_datasets(path_data, num_particles, split, subset, output_cols):
+def load_raw_datasets(path_data, num_particles, split, output_cols, subset):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns raw inputs and outputs. Can specify
@@ -138,6 +138,34 @@ def calc_z_relative_mass(outputs, num_z_bins=20, z_bins=None):
     z_mass /= np.expand_dims(z_mass.sum(axis=1), -1)
     return z_mass, z_bins
 
+def calc_z_dist(outputs, num_z_bins=20, z_bins=None):
+    """
+    Calculate z distribution
+    
+    Args: 
+        outputs: (df) Output data specified by output_col 
+        num_z_bins: (int) Number of bins for z-axis linspace
+        z_bins: (np array) Bin linspace along the z-axis
+    
+    Returns:
+        z_dist: (np array) Particle z distribution by hologram along z-axis
+        z_bins: (np array) Bin linspace along the z-axis
+    """
+    
+    if z_bins is None:
+        z_bins = np.linspace(outputs["z"].min() - 100,
+                             outputs["z"].max() + 100,
+                             num_z_bins)
+    else:
+        num_z_bins = z_bins.size
+    holograms = len(outputs["hid"].unique())
+    z_dist = np.zeros((holograms, num_z_bins), dtype=np.float32)
+    for i in range(outputs.shape[0]):
+        z_pos = np.searchsorted(z_bins, outputs.loc[i, "z"], side="right") - 1
+        z_dist[int(outputs.loc[i, "hid"]) - 1, z_pos] += 1
+    z_dist /= np.expand_dims(z_dist.sum(axis=1), -1)
+    return z_dist, z_bins
+
 def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     """
     Calculate z-axis linspace.
@@ -153,19 +181,11 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     z_min = np.minimum(train_outputs["z"].min(), valid_outputs["z"].min())
     z_max = np.maximum(train_outputs["z"].max(), valid_outputs["z"].max())
     z_bins = np.linspace(z_min, z_max, num_z_bins)
-    return z_bins    
-
-def flatten_coordinate(outputs, hids, output_col):
-    outputs = pd.DataFrame({output_col: outputs, 'hid': hids})
-    outputs_flattened = []
-    for h in np.unique(hids):
-        outputs_flattened.append(outputs[outputs.hid == h][output_col].values)
-    outputs = np.array(outputs_flattened, dtype=object)
-    return outputs
+    return z_bins
 
 def load_scaled_datasets(path_data, num_particles, output_cols,
                          scaler_out=False, subset=False, num_z_bins=False,
-                         flatten_coord=False):
+                         mass=False):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns scaled inputs and raw outputs.
@@ -177,7 +197,7 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
         scaler_out: (sklearn.preprocessing scaler) Output data scaler
         subset: (float) Fraction of data to be loaded
         num_z_bins: (int) Number of bins along z-axis
-        flatten_coord: (boolean) If True, flatten single coord by hid
+        mass: (boolean) If True, calculate particle mass on z-axis
         
     Returns:
         train_inputs: (np array) Train input data scaled between 0 and 1
@@ -193,12 +213,6 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
     valid_outputs = load_raw_datasets(path_data, num_particles, 'valid',
                                       subset, output_cols)
     
-    if flatten_coord:
-        train_hids = train_outputs["hid"].values
-        valid_hids = valid_outputs["hid"].values
-        train_outputs = train_outputs.drop(['hid'], axis=1)
-        valid_outputs = valid_outputs.drop(['hid'], axis=1)
-    
     train_inputs, scaler_in = scale_images(train_inputs)
     valid_inputs, _ = scale_images(valid_inputs, scaler_in)
     train_inputs = np.expand_dims(train_inputs, -1)
@@ -206,20 +220,19 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
     
     if num_z_bins:
         z_bins = calc_z_bins(train_outputs, valid_outputs, num_z_bins)
-        train_outputs, _ = calc_z_relative_mass(outputs=train_outputs,
-                                                z_bins=z_bins)
-        valid_outputs, _ = calc_z_relative_mass(outputs=valid_outputs,
-                                                z_bins=z_bins)
+        if mass:
+            train_outputs, _ = calc_z_relative_mass(outputs=train_outputs,
+                                                    z_bins=z_bins)
+            valid_outputs, _ = calc_z_relative_mass(outputs=valid_outputs,
+                                                    z_bins=z_bins)
+        else:
+            train_outputs, _ = calc_z_dist(outputs=train_outputs,
+                                           z_bins=z_bins)
+            valid_outputs, _ = calc_z_dist(outputs=valid_outputs,
+                                           z_bins=z_bins)            
     else:
         train_outputs = scaler_out.fit_transform(train_outputs)
         valid_outputs = scaler_out.transform(valid_outputs)
-
-    if flatten_coord:
-        output_cols.remove("hid")
-        train_outputs = flatten_coordinate(train_outputs.flatten(),
-                                           train_hids, output_cols[0])
-        valid_outputs = flatten_coordinate(valid_outputs.flatten(),
-                                           valid_hids, output_cols[0]) 
         
     if train_inputs.shape[0] != train_outputs.shape[0]:
         factor = int(train_outputs.shape[0]/train_inputs.shape[0])
