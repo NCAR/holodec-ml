@@ -1,12 +1,12 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/z3_flatten/base/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/z_bin/base/"
 model_name: "cnn"
 num_particles: 3
 random_seed: 328942
 output_cols: ["z","hid"]
 scaler_out: "MinMaxScaler"
-num_z_bins: False
-flatten_coord: True
+num_z_bins: 10
+mass: False
 subset: False
 metric: "mae"
 conv2d_network:
@@ -18,7 +18,7 @@ conv2d_network:
   dense_activation: "relu"
   lr: 0.001
   optimizer: "adam"
-  loss: "mae"
+  loss: "categorical_crossentropy"
   batch_size: 256
   epochs: 20
   verbose: 1
