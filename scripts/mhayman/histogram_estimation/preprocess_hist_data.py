@@ -19,7 +19,7 @@ import os
 
 import numpy as np
 import xarray as xr
-import dask as da
+import dask.array as da
 import datetime
 import json
 
@@ -124,7 +124,7 @@ image_in_da = xr.DataArray(image_ft,
 
 
 hist_bin_cent = xr.DataArray(histogram_centers,
-                                coords={'histogram_bin_centers':hist_bin_cent},
+                                coords={'histogram_bin_centers':histogram_centers},
                                 dims=('histogram_bin_centers'))
 
 histogram_da = xr.DataArray(np.concatenate(histogram,axis=0),
