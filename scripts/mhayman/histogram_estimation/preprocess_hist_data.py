@@ -71,8 +71,6 @@ with xr.open_dataset(paths['data']+settings['data_file']) as ds:
     print('   max particle size: %d'%ds['d'].values.max())
     print()
 
-    histogram = []
-
     # store the Fourier Transform and particle size histogram for each hologram
     print("Performing Fourier Transform")
     ft_start_time = datetime.datetime.now()
@@ -84,7 +82,10 @@ with xr.open_dataset(paths['data']+settings['data_file']) as ds:
         # make a histogram of particles and store it in the data set
         hist0 = np.histogram(ds['d'].values[particle_index],
                     bins=histogram_edges)
-        histogram+=[hist0[0][np.newaxis,...]]            
+        if im == 0:
+            histogram = da.array(hist0[0][np.newaxis,...])
+        else:
+            histogram = da.concatenate([histogram,hist0[0][np.newaxis,...]],axis=0)        
         
         if settings['FourierTransform']:
             in_chan = list(settings['input_func'].keys())
@@ -127,7 +128,7 @@ hist_bin_cent = xr.DataArray(histogram_centers,
                                 coords={'histogram_bin_centers':histogram_centers},
                                 dims=('histogram_bin_centers'))
 
-histogram_da = xr.DataArray(np.concatenate(histogram,axis=0),
+histogram_da = xr.DataArray(histogram,
             dims={'hologram_number','histogram_bin_centers'},
             coords={'hologram_number':holo_num,
                     'histogram_bin_centers':hist_bin_cent})
