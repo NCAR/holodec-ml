@@ -30,6 +30,7 @@ if dirP_str not in sys.path:
     sys.path.append(dirP_str)
 
 import ml_utils as ml
+import FourierOpticsLib as FO
 
 
 
@@ -89,7 +90,7 @@ with xr.open_dataset(paths['data']+settings['data_file']) as ds:
             in_chan = list(settings['input_func'].keys())
             # FT the image and store the desired operations
             image0 = ds['image'].sel(hologram_number=im)  # select the hologram image
-            image_ft0 = ml.OpticsFFT(image0-np.mean(image0))  # FFT the image
+            image_ft0 = FO.OpticsFFT(image0-np.mean(image0))  # FFT the image
             # perform requested operations for storage
             image_ft_list = []
             for ik,func in enumerate(settings['input_func'].keys()):
