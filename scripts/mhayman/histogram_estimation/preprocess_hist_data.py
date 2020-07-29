@@ -58,7 +58,7 @@ histogram_centers = 0.5*np.diff(histogram_edges) \
 file_base = 'histogram_training_data_'+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 
 # load the dataset file
-with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_number':4}) as ds:
+with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_number':1}) as ds:
     # pre-process training data
     # generate a histogram for each image
     # initialize the particle property histogram bins
