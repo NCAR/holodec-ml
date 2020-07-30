@@ -4,8 +4,8 @@ Run proprocessing of histogram data on cheyenne
 
 import numpy as np
 
-paths = {   'data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
-            'save':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/'}
+paths = {   'data':'/h/eol/bansemer/holodec/holodec-ml/datasets/',
+            'save':'/scr/sci/mhayman/holodec/holodec-ml-data/histogram/'}
 
 settings = {    'data_file':'synthetic_holograms_1particle_gamma_training.nc',
                 'input_func':{'abs':np.abs},
