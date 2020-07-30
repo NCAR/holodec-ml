@@ -208,10 +208,10 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
     
     train_inputs,\
     train_outputs = load_raw_datasets(path_data, num_particles, 'train',
-                                      subset, output_cols)
+                                      output_cols, subset)
     valid_inputs,\
     valid_outputs = load_raw_datasets(path_data, num_particles, 'valid',
-                                      subset, output_cols)
+                                      output_cols, subset)
     
     train_inputs, scaler_in = scale_images(train_inputs)
     valid_inputs, _ = scale_images(valid_inputs, scaler_in)
