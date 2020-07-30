@@ -46,7 +46,8 @@ settings = {    'data_file':'synthetic_holograms_1particle_gamma_training.nc'
                 'input_func':{'real':np.real,'imag':np.imag},
                 'input_scale':{'real':255,'imag':255}
                 'FourierTransform:True,
-                'hist_edges':np.linspace(0,300,100)
+                'hist_edges':np.linspace(0,300,100),
+                'max_hist_count':None
                 }
 
 """
@@ -55,15 +56,19 @@ histogram_edges = settings['hist_edges']
 histogram_centers = 0.5*np.diff(histogram_edges) \
                     +histogram_edges[:-1]
 
-file_base = 'histogram_training_data_'+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
-
 # load the dataset file
 with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_number':1}) as ds:
     # pre-process training data
     # generate a histogram for each image
     # initialize the particle property histogram bins
 
-    hologram_count = ds['hologram_number'].values.size
+    if settings['max_hist_count'] is None:
+        hologram_count = ds['hologram_number'].values.size
+    else:
+        hologram_count = settings['max_hist_count']
+
+    
+    file_base = 'histogram_training_data_%dcount'%hologram_count+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 
     print("   histogram bins: ")
     print("      "+str(histogram_centers.size))
@@ -77,7 +82,7 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
     # store the Fourier Transform and particle size histogram for each hologram
     print("Performing Fourier Transform")
     ft_start_time = datetime.datetime.now()
-    for im in ds['hologram_number'].values:
+    for im in ds['hologram_number'].values[slice(None,settings['max_hist_count'])]:
         # find the particles in this hologram
         # hologram indexing is base 1
         particle_index = np.nonzero(ds['hid'].values==im+1)[0]  
