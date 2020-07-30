@@ -63,6 +63,8 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
     # generate a histogram for each image
     # initialize the particle property histogram bins
 
+    hologram_count = ds['hologram_number'].values.size
+
     print("   histogram bins: ")
     print("      "+str(histogram_centers.size))
     print("       ["+str(histogram_centers[0])+', '+str(histogram_centers[-1])+']')
@@ -103,7 +105,7 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
             else:
                 image_ft = da.concatenate([image_ft,np.concatenate(image_ft_list,axis=0)[np.newaxis,...]],axis=0)
 
-        print(f'completed hologram {im} of {ds['hologram_number'].values[-1]}',end='\r')
+        print(f'completed hologram {im} of {hologram_count}',end='\r')
     ft_stop_time = datetime.datetime.now()
 
     xsize = ds.coords['xsize'].copy()
