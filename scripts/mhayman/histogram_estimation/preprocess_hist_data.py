@@ -110,7 +110,7 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
             else:
                 image_ft = da.concatenate([image_ft,np.concatenate(image_ft_list,axis=0)[np.newaxis,...]],axis=0)
 
-        print(f'completed hologram {im} of {hologram_count}',end='\r')
+        print(f'completed hologram {im} of {hologram_count}') # ,end='\r
     ft_stop_time = datetime.datetime.now()
 
     xsize = ds.coords['xsize'].copy()
