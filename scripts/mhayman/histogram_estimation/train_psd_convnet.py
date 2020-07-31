@@ -70,9 +70,9 @@ print(settings['data_file'])
 print('located in')
 print(paths['load_data'])
 
-if settings['loss_function'].lower() = 'kldivergence':
+if settings['loss_function'].lower() == 'kldivergence':
     loss_func = tf.keras.losses.KLDivergence()
-elif settings['loss_function'].lower() = 'kstest'
+elif settings['loss_function'].lower() == 'kstest':
     loss_func = mldef.ks_test
 else:
     loss_func = settings['loss_function']
