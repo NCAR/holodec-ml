@@ -102,7 +102,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
     # normalize based on training data
     
-    output_scaler = ml.MinMaxScalerX(train_labels,dim=all_labels.dims[1:])
+    output_scaler = ml.MinMaxScalerX(all_labels,dim=all_labels.dims[1:])
     scaled_all_labels = output_scaler.fit_transform(all_labels)
 
     scaled_train_labels = scaled_all_labels.isel(hologram_number=slice(test_index,None))
@@ -112,7 +112,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     # setup the input to be used
     in_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
     train_input = in_data.isel(hologram_number=slice(test_index,None))
-    input_scalar = ml.MinMaxScalerX(train_input,dim=in_data.dims[1:])
+    input_scalar = ml.MinMaxScalerX(in_data,dim=in_data.dims[1:])
     scaled_in_data = input_scalar.fit_transform(in_data)
 
     scaled_train_input = scaled_in_data.isel(hologram_number=slice(test_index,None))
