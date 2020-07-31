@@ -87,7 +87,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     test_index = np.int((settings['valid_fraction']+settings['test_fraction'])*ds.sizes['hologram_number'])  # number of training+validation points
     valid_index = np.int(settings['valid_fraction']*ds.sizes['hologram_number'])  # number of validation points
     
-    all_labels = ds[label_variable]
+    all_labels = ds[label_variable]ds[input_variable]
     train_labels = all_labels.isel(hologram_number=slice(test_index,None))
     # test_labels = all_labels.isel(hologram_number=slice(valid_index,test_index))
     # val_labels = all_labels.isel(hologram_number=slice(None,valid_index))
@@ -102,7 +102,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     scaled_val_labels = scaled_all_labels.isel(hologram_number=slice(None,valid_index))
 
     # setup the input to be used
-    in_data = ds[input_variable]
+    in_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
     train_input = in_data.isel(hologram_number=slice(test_index,None))
     input_scalar = ml.MinMaxScalerX(train_input,dim=in_data.dims[1:])
     scaled_in_data = input_scalar.fit_transform(in_data)
