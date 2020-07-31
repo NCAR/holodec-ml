@@ -113,6 +113,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
     # build conv NN model
     mod = Sequential()
+    mod.add(Input(shape=scaled_in_data.shape[1:]))
 
     # add convolutional layers
     for ai,n_filters in enumerate(settings['conv_chan']):
