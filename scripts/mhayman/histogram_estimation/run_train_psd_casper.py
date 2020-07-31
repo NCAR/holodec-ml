@@ -6,7 +6,7 @@ paths = {   'load_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogra
             'save_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/'}
 
 settings = {
-            'data_file':'histogram_training_data_5000count20200731T133118.nc',     # training data file
+            'data_file':'histogram_training_data_5000count20200731T154352.nc',     # training data file
             'num_epochs':50,    # the number of training epochs
             'conv_chan':[16,32],# list length defines number of operations
             'conv_size':[5,5],  # convolution kernel size
