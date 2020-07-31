@@ -81,6 +81,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     print('Training dataset attributes')
     for att in ds.attrs:
         print('  '+att+': '+str(ds.attrs[att]))
+    print(ds.dims)
+    print(ds.sizes)
 
     # split data into training, validation and test data
     # ordered as (validation, test, train)
@@ -116,8 +118,21 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     scaled_valid_input = scaled_in_data.isel(hologram_number=slice(None,valid_index))
 
     print('input data shape')
+    print(in_data.shape)
+
+    print('input scaled data shape')
+    print(scaled_in_data.shape)
+
+    print('output label shape')
+    print(all_labels.shape)
+
+    print('output scaled label shape')
+    print(scaled_all_labels.shape)
+
+
+    print('input training data shape')
     print(scaled_train_input.shape)
-    print('input label shape')
+    print('input training label shape')
     print(scaled_train_labels.shape)
 
     # build conv NN model
