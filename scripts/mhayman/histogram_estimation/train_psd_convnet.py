@@ -175,12 +175,14 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
                         'Validation_Loss':history.history['val_loss'],
                         'Training_Accuracy':history.history['acc'],
                         'Validation_Accuracy':history.history['val_acc'],
-                        'split_index':split_index,
+                        'test_index':test_index,
                         'valid_index':valid_index,
                         'input_variable':input_variable
                         })
-    res_ds.attrs['batch_size'] = batch_size
-    res_ds.attrs['training_data'] = ds_file
+    res_ds.attrs['batch_size'] = settings['batch_size']
+    res_ds.attrs['training_data'] = settings['data_file']
+    res_ds.attrs['training_path'] = paths['load_data']
+    res_ds.attrs['output_path'] = paths['save_data']
     res_ds.attrs['model'] = model_name
     res_ds.to_netcdf(save_file_path+nn_descript+save_file_base+"_TrainingHistory.nc")
 
