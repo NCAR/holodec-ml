@@ -150,10 +150,11 @@ hist_bin_edges = xr.DataArray(histogram_edges,
                                 coords={'histogram_bin_edges':histogram_edges},
                                 dims=('histogram_bin_edges'))
 
-histogram_da = xr.DataArray(histogram.T,
-            dims={'hologram_number','histogram_bin_centers'},
+histogram_da = xr.DataArray((histogram.T)[...,np.newaxis],
+            dims={'hologram_number','histogram_bin_centers','output_channels'},
             coords={'hologram_number':holo_num[:hologram_count],
-                    'histogram_bin_centers':hist_bin_cent})
+                    'histogram_bin_centers':hist_bin_cent,
+                    'output_channels':['hist']})
 
 preproc_ds = xr.Dataset({'histogram':histogram_da,
                 'histogram_bin_centers':hist_bin_cent,
