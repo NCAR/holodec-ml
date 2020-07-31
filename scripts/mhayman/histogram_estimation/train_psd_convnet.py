@@ -120,7 +120,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
                 (settings['conv_size'][ai],settings['conv_size'][ai]),
                 padding="same",kernel_initializer = "he_normal"))
         mod.add(Activation("relu"))
-        mod.add(MaxPool2D(pool_size=(settings['max_pool'],settings['max_pool'])))
+        mod.add(MaxPool2D(pool_size=(settings['max_pool'][ai],settings['max_pool'][ai])))
 
     # flatten the convolution output for Dense Layers
     mod.add(Flatten())
