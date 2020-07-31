@@ -163,6 +163,7 @@ preproc_ds = xr.Dataset({'histogram':histogram_da,
 
 
 print("Writing to netcdf")
+print(paths['save']+file_base+".nc")
 preproc_ds.to_netcdf(paths['save']+file_base+".nc")
 
 # save the settings in human readable format
