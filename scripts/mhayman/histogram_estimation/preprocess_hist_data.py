@@ -168,6 +168,14 @@ preproc_ds.to_netcdf(paths['save']+file_base+".nc")
 # save the settings in human readable format
 # with a small file size
 json_dct = {'settings':settings,'paths':paths}
+for k in json_dct['settings']:
+    if hasattr(json_dct['settings'][k], '__call__'):
+        json_dct['settings'][k] = json_dct['settings'][k].__name__
+    if hasattr(json_dct['settings'][k],'__iter__'):
+        for j in range(json_dct['settings'][k]):
+            if hasattr(json_dct['settings'][k][j], '__call__'):
+                json_dct['settings'][k][j] = json_dct['settings'][k][j].__name__
+    
 with open(paths['save']+file_base+".json", 'w') as fp:
     json.dump(json_dct, fp, indent=4)
 
