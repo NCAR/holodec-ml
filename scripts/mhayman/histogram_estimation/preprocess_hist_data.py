@@ -135,13 +135,17 @@ image_in_da = xr.DataArray(image_ft,
                                         'xsize':xsize,
                                         'ysize':ysize},
                                 dims=[image_dims[0]]
-                                    +[len(in_chan)]
+                                    +['input_channels']
                                     +list(image_dims[1:]))
 
 
 hist_bin_cent = xr.DataArray(histogram_centers,
                                 coords={'histogram_bin_centers':histogram_centers},
                                 dims=('histogram_bin_centers'))
+
+hist_bin_edges = xr.DataArray(histogram_edges,
+                                coords={'histogram_bin_edges':histogram_edges},
+                                dims=('histogram_bin_edges'))
 
 histogram_da = xr.DataArray(histogram,
             dims={'hologram_number','histogram_bin_centers'},
@@ -150,7 +154,7 @@ histogram_da = xr.DataArray(histogram,
 
 preproc_ds = xr.Dataset({'histogram':histogram_da,
                 'histogram_bin_centers':hist_bin_cent,
-                'histogram_bin_edges':histogram_edges,
+                'histogram_bin_edges':hist_bin_edges,
                 'input_image':image_in_da},
                 attrs={'data_file':settings['data_file']})
 
