@@ -115,6 +115,11 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     scaled_test_input = scaled_in_data.isel(hologram_number=slice(valid_index,test_index))
     scaled_valid_input = scaled_in_data.isel(hologram_number=slice(None,valid_index))
 
+    print('input data shape')
+    print(scaled_train_input.shape)
+    print('input label shape')
+    print(scaled_train_labels.shape)
+
     # build conv NN model
     mod = Sequential()
     mod.add(Input(shape=scaled_in_data.shape[1:]))
