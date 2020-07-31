@@ -39,7 +39,7 @@ import xarray as xr
 from tensorflow.keras.layers import Input, Conv2D, Dense, Flatten, Activation, MaxPool2D, SeparableConv2D, UpSampling2D, concatenate, Conv2DTranspose
 from tensorflow.keras.models import Model, save_model, load_model, Sequential
 from tensorflow.keras.utils import plot_model
-import tf.keras.losses
+import tensorflow.keras.losses
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -71,7 +71,7 @@ print('located in')
 print(paths['load_data'])
 
 if settings['loss_function'].lower() == 'kldivergence':
-    loss_func = tf.keras.losses.KLDivergence()
+    loss_func = tensorflow.keras.losses.KLDivergence()
 elif settings['loss_function'].lower() == 'kstest':
     loss_func = mldef.ks_test
 else:
