@@ -87,6 +87,10 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     test_index = np.int((settings['valid_fraction']+settings['test_fraction'])*ds.sizes['hologram_number'])  # number of training+validation points
     valid_index = np.int(settings['valid_fraction']*ds.sizes['hologram_number'])  # number of validation points
     
+    print('test index: %d'%test_index)
+    print('validation index: %d'%valid_index)
+    print('hologram count: %d'%ds.sizes['hologram_number'])
+
     all_labels = ds[label_variable]
     train_labels = all_labels.isel(hologram_number=slice(test_index,None))
     # test_labels = all_labels.isel(hologram_number=slice(valid_index,test_index))
