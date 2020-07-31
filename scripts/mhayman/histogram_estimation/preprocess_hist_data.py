@@ -113,6 +113,9 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
         print(f'completed hologram {im} of {hologram_count}') # ,end='\r
     ft_stop_time = datetime.datetime.now()
 
+    print('histogram shape:')
+    print(histogram.shape)
+
     xsize = ds.coords['xsize'].copy()
     ysize = ds.coords['ysize'].copy()
     holo_num = ds.coords['hologram_number'].copy()
