@@ -217,7 +217,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     res_ds.attrs['training_path'] = paths['load_data']
     res_ds.attrs['output_path'] = paths['save_data']
     res_ds.attrs['model'] = model_name
-    res_ds.to_netcdf(save_file_path+nn_descript+save_file_base+"_TrainingHistory.nc")
+    res_ds.to_netcdf(save_file_path+save_file_base+"_TrainingHistory.nc")
 
 # # save the settings in human readable format
 # # with a small file size
