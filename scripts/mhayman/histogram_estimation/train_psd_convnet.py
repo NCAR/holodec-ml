@@ -239,9 +239,14 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     holo_num = 105
 
     plt.figure()
-    plt.bar(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,facecolor=None,edgecolor='k')
+    plt.bar(ds['histogram_bin_edges'].values[:-1],preds_original.isel(hologram_number=holo_num,output_channels=0).values,
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
+    plt.bar(ds['histogram_bin_edges'].values[:-1],test_labels.isel(hologram_number=holo_num,output_channels=0).values,
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='white',edgecolor='black',fill=False,label='true')
     # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
-    plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
+    # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
     plt.xlabel('Particle Diameter [$\mu m$]')
     plt.ylabel('Count')
     plt.xscale('log')
