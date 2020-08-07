@@ -87,7 +87,9 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
         # hologram indexing is base 1
         particle_index = np.nonzero(ds['hid'].values==im+1)[0]  
 
-        print(f'  found {ds['d'].values[particle_index].size} particles')
+        particle_count = ds['d'].values[particle_index].size
+        print(particle_count)
+        # print(f'  found {particle_count} particles')
         
         # make a histogram of particles and store it in the data set
         hist0 = np.histogram(ds['d'].values[particle_index],
