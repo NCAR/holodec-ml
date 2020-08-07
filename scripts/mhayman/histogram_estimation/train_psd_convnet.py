@@ -228,7 +228,10 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
     print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
 
-    preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','xsize','ysize','output_channels'),
+    if len(preds_out.shape)==2:
+        preds_out = preds_out[...,np.newaxis]
+
+    preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','histogram_bin_centers','output_channels'),
                                 coords=scaled_test_labels.coords)
 
     preds_original = output_scaler.inverse_transform(preds_out_da)
@@ -236,10 +239,12 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     holo_num = 101
 
     plt.figure()
-    plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
-    plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'x')
+    plt.bar(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,facecolor=None,edgecolor='k')
+    # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
+    plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
     plt.xlabel('Particle Diameter [$\mu m$]')
     plt.ylabel('Count')
+    plt.xscale('log')
     plt.savefig(save_file_path+save_file_base+f"_ExampleHist_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
     plt.figure()
