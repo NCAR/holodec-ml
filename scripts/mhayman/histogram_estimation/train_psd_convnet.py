@@ -97,7 +97,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
     all_labels = ds[label_variable]
     train_labels = all_labels.isel(hologram_number=slice(test_index,None))
-    # test_labels = all_labels.isel(hologram_number=slice(valid_index,test_index))
+    test_labels = all_labels.isel(hologram_number=slice(valid_index,test_index))
     # val_labels = all_labels.isel(hologram_number=slice(None,valid_index))
 
     # normalize based on training data
@@ -218,6 +218,34 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     res_ds.attrs['output_path'] = paths['save_data']
     res_ds.attrs['model'] = model_name
     res_ds.to_netcdf(save_file_path+save_file_base+"_TrainingHistory.nc")
+
+
+    # evaluate the test data
+    print("Evaluating test data...")
+    cnn_start = datetime.datetime.now()
+    preds_out = mod.predict(scaled_test_input.values, batch_size=settings['batch_size'])
+    cnn_stop = datetime.datetime.now()
+    print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
+    print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
+
+    preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','xsize','ysize','output_channels'),
+                                coords=scaled_test_labels.coords)
+
+    preds_original = output_scaler.inverse_transform(preds_out_da)
+
+    holo_num = 101
+
+    plt.figure()
+    plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
+    plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'x')
+    plt.xlabel('Particle Diameter [$\mu m$]')
+    plt.ylabel('Count')
+    plt.savefig(save_file_path+save_file_base+f"_ExampleHist_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+
+    plt.figure()
+    plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
+    plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+    
 
 # # save the settings in human readable format
 # # with a small file size
