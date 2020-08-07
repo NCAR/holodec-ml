@@ -236,7 +236,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
     preds_original = output_scaler.inverse_transform(preds_out_da)
 
-    holo_num = 101
+    holo_num = 105
 
     plt.figure()
     plt.bar(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,facecolor=None,edgecolor='k')
