@@ -9,8 +9,8 @@ settings = {
             'data_file':'histogram_training_data_5000count20200731T154352.nc',     # training data file
             'num_epochs':20,    # the number of training epochs
             'conv_chan':[32,64],# list length defines number of operations
-            'conv_size':[11,11],  # convolution kernel size
-            'max_pool':[10,10],   # maxpool decimation
+            'conv_size':[11,5],  # convolution kernel size
+            'max_pool':[4,4],   # maxpool decimation
             'nn_size':[128,64,],  # excludes the output layer (set by the input data)
             'batch_size':128,    # training batch size
             'output_activation':'relu', # output activation function,
