@@ -1,4 +1,4 @@
-function x = syntheticHoloScript(op, fn)
+function x = syntheticHoloScript(op, fn, dist)
     %% Generate holograms of random particles
 
     %Get the default settings, mostly consistent with HOLODEC
@@ -21,6 +21,16 @@ function x = syntheticHoloScript(op, fn)
     else
         RandomizeNParticles = 0;
         TotalNParticles = op.nHolograms * op.NParticles;
+    end
+    
+    if exist('dist')
+        havedistributions = 1;
+        if RandomizeNParticles == 1
+            disp('Incompatible options'); 
+            return
+        end
+    else
+        havedistributions = 0;
     end
 
     %% Set up the netCDF file
@@ -45,6 +55,13 @@ function x = syntheticHoloScript(op, fn)
         'x', 'Particle x-position (origin at center)', 'microns';
         'y', 'Particle y-position (origin at center)', 'microns';
         'z', 'Particle z-position (origin at sensor)', 'microns'};
+    if havedistributions
+        numprops = length(ncdfprops);
+        ncdfprops(numprops+1:numprops+4, :) = {'n0', 'Gamma distribution N0', 'm^-4';
+            'mu', 'Gamma distribution mu', 'unitless';
+            'lam', 'Gamma distribution lambda', '1/m';
+            'distid', 'Gamma distribution index', 'unitless'};
+    end
     for i = 1:length(ncdfprops)
         varid = netcdf.defVar(ncid, ncdfprops{i,1}, 'float', particle_dimid);
         netcdf.putAtt(ncid, varid, 'longname', ncdfprops{i,2});
@@ -78,7 +95,12 @@ function x = syntheticHoloScript(op, fn)
     dvarid = netcdf.inqVarID(ncid, 'd');
     hvarid = netcdf.inqVarID(ncid, 'hid');
     ivarid = netcdf.inqVarID(ncid, 'image');
-
+    if havedistributions
+        n0varid = netcdf.inqVarID(ncid, 'n0');
+        lamvarid = netcdf.inqVarID(ncid, 'lam');
+        muvarid = netcdf.inqVarID(ncid, 'mu');
+        distidvarid = netcdf.inqVarID(ncid, 'distid');
+    end
     %% Make the holograms
     for i = 1:op.nHolograms
         if RandomizeNParticles == 1
@@ -87,7 +109,17 @@ function x = syntheticHoloScript(op, fn)
 
         % Generate random particle sizes and positions
         op.particles = randomParticles(op);
-        %particleData = op.particles;
+        if havedistributions
+            %this may crash for NParticles > 1, untested
+            clear n0 lam mu distid  %Will rebuild these arrays below, need to be right size for nCDF write
+            for j = 1:op.NParticles
+                op.particles(j).Dp = dist.Dp((i-1)*op.NParticles+j);
+                n0(j) = dist.n0((i-1)*op.NParticles+j);
+                lam(j) = dist.lam((i-1)*op.NParticles+j);
+                mu(j) = dist.mu((i-1)*op.NParticles+j);
+                distid(j) = dist.id((i-1)*op.NParticles+j);
+            end
+        end
 
         % Make the hologram
         holoField = perfectHolo(op);
@@ -112,9 +144,14 @@ function x = syntheticHoloScript(op, fn)
         netcdf.putVar(ncid, dvarid, offset, op.NParticles, [op.particles.Dp]*1e6) 
         netcdf.putVar(ncid, hvarid, offset, op.NParticles, zeros(1,op.NParticles)+i) 
         netcdf.putVar(ncid, ivarid, [0, 0, (i-1)], [op.Ny, op.Nx, 1], img2write) 
-
+        if havedistributions
+            netcdf.putVar(ncid, n0varid, offset, op.NParticles, n0)
+            netcdf.putVar(ncid, lamvarid, offset, op.NParticles, lam)
+            netcdf.putVar(ncid, muvarid, offset, op.NParticles, mu)
+            netcdf.putVar(ncid, distidvarid, offset, op.NParticles, distid)
+        end
         if mod(i,10) == 0
-        %    disp([i,op.nHolograms])
+           disp([i,op.nHolograms])
         end
     end  
 
