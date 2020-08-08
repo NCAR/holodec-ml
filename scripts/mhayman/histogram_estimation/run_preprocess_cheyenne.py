@@ -12,7 +12,7 @@ settings = {    'data_file':'synthetic_holograms_20particle_gamma_training.nc',
                 'input_scale':{'abs':255},
                 'FourierTransform':True,
                 'hist_edges':np.logspace(0,3,40),
-                'max_hist_count':5000
+                'max_hist_count':10000
                 }
 
 exec_file = 'preprocess_hist_data.py'
