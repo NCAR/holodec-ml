@@ -250,4 +250,5 @@ def ks_test(y_true,y_pred):
     Requires that y is a 1D array representing
     a histogram
     """
-    return K.max(K.abs(K.cumsum(y_true,axis=1)-K.cumsum(y_pred,axis=1)))
+    # return K.max(K.abs(K.cumsum(y_true,axis=1)-K.cumsum(y_pred,axis=1)))
+    return K.mean(K.square(K.cumsum(y_true,axis=1)-K.cumsum(y_pred,axis=1)))
