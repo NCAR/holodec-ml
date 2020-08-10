@@ -77,10 +77,10 @@ def load_raw_datasets(path_data, num_particles, split, output_cols, subset):
     
     ds = open_dataset(path_data, num_particles, split)
     if subset:
-        in_ix = int(subset * ds['image'].shape[0])
-        out_ix = int(in_ix * (ds['hid'].shape[0]/ds['image'].shape[0]))
-        inputs = ds['image'][:in_ix].values
-        outputs = ds[output_cols].sel(particle=slice(0,out_ix)).to_dataframe()
+        ix = int(subset * ds['image'].shape[0])
+        inputs = ds['image'][:ix].values
+        outputs = ds[output_cols].to_dataframe()
+        outputs = outputs[outputs["hid"] < (ix+1)]
     else:
         inputs = ds["image"].values
         outputs = ds[output_cols].to_dataframe()
@@ -231,13 +231,9 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
             valid_outputs, _ = calc_z_dist(outputs=valid_outputs,
                                            z_bins=z_bins)            
     else:
+        train_outputs.drop(['hid'], axis=1)
         train_outputs = scaler_out.fit_transform(train_outputs)
+        valid_outputs.drop(['hid'], axis=1)
         valid_outputs = scaler_out.transform(valid_outputs)
-        
-    if train_inputs.shape[0] != train_outputs.shape[0]:
-        factor = int(train_outputs.shape[0]/train_inputs.shape[0])
-        train_inputs = np.repeat(train_inputs, factor, axis=0)
-        factor = int(valid_outputs.shape[0]/valid_inputs.shape[0])
-        valid_inputs = np.repeat(valid_inputs, factor, axis=0)
         
     return train_inputs, train_outputs, valid_inputs, valid_outputs

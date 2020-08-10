@@ -1,6 +1,9 @@
+import sherpa
+
 import numpy as np
 import pandas as pd
 
+import tensorflow as tf
 from tensorflow.keras.layers import Input, Conv2D, Dense, Flatten, MaxPool2D
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.optimizers import Adam, SGD
@@ -36,7 +39,7 @@ class Conv2DNeuralNetwork(object):
                  dense_activation="relu", output_activation="softmax",
                  lr=0.001, optimizer="adam", adam_beta_1=0.9,
                  adam_beta_2=0.999, sgd_momentum=0.9, decay=0, loss="mse",
-                 batch_size=32, epochs=2, verbose=0):
+                 batch_size=32, epochs=2, verbose=0, study=None, trial=None):
         self.filters = filters
         self.kernel_sizes = [tuple((v,v)) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
@@ -55,6 +58,8 @@ class Conv2DNeuralNetwork(object):
         self.batch_size = batch_size
         self.epochs = epochs
         self.verbose = verbose
+        self.study = study
+        self.trial = trial
         self.model = None
 
     def build_neural_network(self, input_shape, output_shape):
@@ -84,7 +89,10 @@ class Conv2DNeuralNetwork(object):
         elif self.optimizer == "sgd":
             self.optimizer_obj = SGD(lr=self.lr, momentum=self.sgd_momentum,
                                      decay=self.decay)
-        self.model.compile(optimizer=self.optimizer, loss=self.loss)
+        
+        self.model.compile(optimizer=self.optimizer, loss=self.loss,
+                           metrics=[TruePositives(), FalsePositives(),
+                                    FalseNegatives(), TrueNegatives()])
         self.model.summary()
 
     def fit(self, x, y, xv=None, yv=None):
@@ -97,14 +105,131 @@ class Conv2DNeuralNetwork(object):
         input_shape = x.shape[1:]
         self.build_neural_network(input_shape, output_shape)
         self.model.fit(x, y, batch_size=self.batch_size, epochs=self.epochs,
-                       verbose=self.verbose, validation_data=(xv, yv))
+                       verbose=self.verbose, validation_data=(xv, yv),
+                       callbacks=[self.study.keras_callback(self.trial, objective_name='val_loss')])
         return self.model.history.history
 
     def predict(self, x):
-        y_out = self.model.predict(np.expand_dims(x, axis=-1),
+        y_out = self.model.predict(x,
                                    batch_size=self.batch_size)
         return y_out
 
     def predict_proba(self, x):
         y_prob = self.model.predict(x, batch_size=self.batch_size)
         return y_prob
+    
+    def saliency(self, x, layer_index=-3, ref_activation=10):
+        """
+        Output the gradient of input field with respect to each neuron in the specified layer.
+        Args:
+            x:
+            layer_index:
+            ref_activation: Reference activation value for loss function.
+        Returns:
+        """
+        saliency_values = np.zeros((self.model.layers[layer_index].output.shape[-1],
+                                    x.shape[0], x.shape[1],
+                                    x.shape[2], x.shape[3]),
+                                   dtype=np.float32)
+        for s in trange(self.model.layers[layer_index].output.shape[-1], desc="neurons"):
+            sub_model = Model(self.model.input, self.model.layers[layer_index].output[:, s])
+            batch_indices = np.append(np.arange(0, x.shape[0], self.batch_size), x.shape[0])
+            for b, batch_index in enumerate(tqdm(batch_indices[:-1], desc="batch examples", leave=False)):
+                x_case = tf.Variable(x[batch_index:batch_indices[b + 1]])
+                with tf.GradientTape() as tape:
+                    tape.watch(x_case)
+                    act_out = sub_model(x_case)
+                    loss = (ref_activation - act_out) ** 2
+                saliency_values[s, batch_index:batch_indices[b + 1]] = tape.gradient(loss, x_case)
+
+        return saliency_values
+    
+    def output_hidden_layer(self, x, batch_size=1024, layer_index=-3):
+        """
+        Chop the end off the neural network and capture the output from the specified layer index
+        Args:
+            x: input data
+            layer_index (int): list index of the layer being output.
+        Returns:
+            output: array containing output of that layer for each example.
+        """
+        sub_model = Model(self.model.input, self.model.layers[layer_index].output)
+        output = sub_model.predict(x, batch_size=batch_size)
+        return output
+
+class TruePositives(tf.metrics.Metric):
+    def __init__(self, name="true_pos", **kwargs):
+        super(TruePositives, self).__init__(name=name, **kwargs)
+        self.true_pos = self.add_weight(name="tp", dtype="float64",
+                                        initializer="zeros")
+        
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        true = tf.keras.backend.flatten(tf.where(y_true > 0, 1, 0))
+        pred = tf.keras.backend.flatten(tf.where(y_pred > 1/y_pred.shape[1],
+                                                 1, 0))
+        cm = tf.math.confusion_matrix(true, pred)
+        self.true_pos.assign(cm[1,1] / tf.keras.backend.sum(cm))
+
+    def result(self):
+        return self.true_pos
+
+    def reset_states(self):
+        self.true_pos.assign(0.0)
+
+class FalsePositives(tf.metrics.Metric):
+    def __init__(self, name="false_pos", **kwargs):
+        super(FalsePositives, self).__init__(name=name, **kwargs)
+        self.false_pos = self.add_weight(name="fp", dtype="float64",
+                                         initializer="zeros")
+        
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        true = tf.keras.backend.flatten(tf.where(y_true > 0, 1, 0))
+        pred = tf.keras.backend.flatten(tf.where(y_pred > 1/y_pred.shape[1],
+                                                 1, 0))
+        cm = tf.math.confusion_matrix(true, pred)
+        self.false_pos.assign(cm[0,1]/tf.keras.backend.sum(cm))
+
+    def result(self):
+        return self.false_pos
+
+    def reset_states(self):
+        self.false_pos.assign(0.0)
+
+class FalseNegatives(tf.metrics.Metric):
+    def __init__(self, name="false_neg", **kwargs):
+        super(FalseNegatives, self).__init__(name=name, **kwargs)
+        self.false_neg = self.add_weight(name="fn", dtype="float64",
+                                         initializer="zeros")
+        
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        true = tf.keras.backend.flatten(tf.where(y_true > 0, 1, 0))
+        pred = tf.keras.backend.flatten(tf.where(y_pred > 1/y_pred.shape[1],
+                                                 1, 0))
+        cm = tf.math.confusion_matrix(true, pred)
+        self.false_neg.assign(cm[1,0]/tf.keras.backend.sum(cm))
+
+    def result(self):
+        return self.false_neg
+
+    def reset_states(self):
+        self.false_neg.assign(0.0)
+
+class TrueNegatives(tf.metrics.Metric):
+    def __init__(self, name="true_neg", **kwargs):
+        super(TrueNegatives, self).__init__(name=name, **kwargs)
+        self.true_neg = self.add_weight(name="tn", dtype="float64",
+                                        initializer="zeros")
+        
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        true = tf.keras.backend.flatten(tf.where(y_true > 0, 1, 0))
+        pred = tf.keras.backend.flatten(tf.where(y_pred > 1 / y_pred.shape[1],
+                                                 1, 0))
+        cm = tf.math.confusion_matrix(true, pred)
+        self.true_neg.assign(cm[0,0] / tf.keras.backend.sum(cm))
+
+    def result(self):
+        return self.true_neg
+
+    def reset_states(self):
+        self.true_neg.assign(0.0)
+        

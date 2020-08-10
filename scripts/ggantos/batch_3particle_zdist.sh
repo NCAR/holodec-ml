@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH -J casp_nb
 #SBATCH --account=NAML0001
-#SBATCH -t 4:00:00
+#SBATCH -t 8:00:00
 #SBATCH --mem=256G
 #SBATCH -n 1
 #SBATCH --gres=gpu:v100:1

@@ -1,15 +1,16 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/zdist/base_1000_filters4816/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/zdist_multi/base_100_filters4816/"
 model_name: "cnn"
-num_particles: 3
+num_particles: "multi"
 random_seed: 328942
 output_cols: ["z","hid"]
 scaler_out: "MinMaxScaler"
-num_z_bins: 1000
+num_z_bins: 100
 subset: False
 mass: False
 metric: "mae"
 conv2d_network:
+  layers: 3
   filters: [4, 8, 16]
   kernel_sizes: [5, 5, 5]
   conv2d_activation: "relu"
