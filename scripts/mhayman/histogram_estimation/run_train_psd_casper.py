@@ -11,7 +11,7 @@ settings = {
             'conv_chan':[32,32],# list length defines number of operations
             'conv_size':[5,5],  # convolution kernel size
             'max_pool':[4,4],   # maxpool decimation
-            'nn_size':[128,64,],  # excludes the output layer (set by the input data)
+            'nn_size':[128,128,],  # excludes the output layer (set by the input data)
             'batch_size':128,    # training batch size
             'output_activation':'relu', # output activation function,
             'valid_fraction':0.2,   # fraction of data reserved for validation
