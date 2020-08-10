@@ -16,7 +16,7 @@ settings = {
             'output_activation':'relu', # output activation function,
             'valid_fraction':0.2,   # fraction of data reserved for validation
             'test_fraction':0.3,    # fraction of data reserved for training
-            'loss_function':'kstest',     # loss function
+            'loss_function':'mse',     # loss function
             'h_chunk':128,      # xarray chunk size when loading
             }
 
