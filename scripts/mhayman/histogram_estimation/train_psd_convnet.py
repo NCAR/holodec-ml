@@ -259,7 +259,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
 # # save the settings in human readable format
 # # with a small file size
-# json_dct = {'settings':settings,'paths':paths}
+json_dct = {'settings':settings,'paths':paths}
 # for k in json_dct['settings']:
 #     if hasattr(json_dct['settings'][k], '__call__'):
 #         json_dct['settings'][k] = json_dct['settings'][k].__name__
@@ -268,5 +268,5 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 #             if hasattr(json_dct['settings'][k][j], '__call__'):
 #                 json_dct['settings'][k][j] = json_dct['settings'][k][j].__name__
     
-# with open(save_file_path+save_file_base+"_run_settings.json", 'w') as fp:
-#     json.dump(json_dct, fp, indent=4)
+with open(save_file_path+save_file_base+"_run_settings.json", 'w') as fp:
+    json.dump(json_dct, fp, indent=4)
