@@ -251,4 +251,11 @@ def ks_test(y_true,y_pred):
     a histogram
     """
     # return K.max(K.abs(K.cumsum(y_true,axis=1)-K.cumsum(y_pred,axis=1)))
-    return K.mean(K.square(K.cumsum(y_true,axis=1)-K.cumsum(y_pred,axis=1)))
+    return K.mean(K.square(K.cumsum(y_true,axis=1)-K.cumsum(y_pred,axis=1)),axis=1)
+
+def poisson_nll(y_true,y_pred):
+    """
+    negative log-likelihood loss function for
+    Poisson observations
+    """
+    return K.sum(y_pred-y_true*K.log(y_pred),axis=1)
