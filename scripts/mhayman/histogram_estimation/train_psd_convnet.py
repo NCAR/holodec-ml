@@ -186,7 +186,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     ax.plot(epochs,history.history['val_loss'],'rs-',alpha=0.5,label='Validation')
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
-    ax.set_yscale('log')
+    if np.sum(history.history['loss']<=0) == 0:
+        ax.set_yscale('log')
     ax.grid(b=True)
     plt.legend()
     plt.savefig(save_file_path+save_file_base+"_LossHistory.png", dpi=200, bbox_inches="tight")
