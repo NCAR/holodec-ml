@@ -75,6 +75,8 @@ if settings['loss_function'].lower() == 'kldivergence':
     loss_func = tensorflow.keras.losses.KLDivergence()
 elif settings['loss_function'].lower() == 'kstest':
     loss_func = mldef.ks_test
+elif settings['loss_function'].lower() == 'poisson':
+    loss_func = mldef.poisson_nll
 else:
     loss_func = settings['loss_function']
 
