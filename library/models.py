@@ -1,9 +1,18 @@
+import sys 
 import numpy as np
 import pandas as pd
 
 from tensorflow.keras.layers import Input, Conv2D, Dense, Flatten, MaxPool2D
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.optimizers import Adam, SGD
+
+sys.path.append("/glade/work/schreck/repos/holodec-ml/library")
+from library.losses import SymmetricCrossEntropy
+
+
+custom_losses = {
+    "sce": SymmetricCrossEntropy(1.0, 1.0)
+}
 
 
 class Conv2DNeuralNetwork(object):
@@ -36,7 +45,7 @@ class Conv2DNeuralNetwork(object):
                  dense_activation="relu", output_activation="softmax",
                  lr=0.001, optimizer="adam", adam_beta_1=0.9,
                  adam_beta_2=0.999, sgd_momentum=0.9, decay=0, loss="mse",
-                 batch_size=32, epochs=2, verbose=0):
+                 metrics = [], batch_size=32, epochs=2, verbose=0):
         self.filters = filters
         self.kernel_sizes = [tuple((v,v)) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
@@ -51,7 +60,8 @@ class Conv2DNeuralNetwork(object):
         self.adam_beta_2 = adam_beta_2
         self.sgd_momentum = sgd_momentum
         self.decay = decay
-        self.loss = loss
+        self.loss = loss if loss not in custom_losses else custom_losses[loss]
+        self.metrics = metrics
         self.batch_size = batch_size
         self.epochs = epochs
         self.verbose = verbose
@@ -84,10 +94,14 @@ class Conv2DNeuralNetwork(object):
         elif self.optimizer == "sgd":
             self.optimizer_obj = SGD(lr=self.lr, momentum=self.sgd_momentum,
                                      decay=self.decay)
-        self.model.compile(optimizer=self.optimizer, loss=self.loss)
+        self.model.compile(
+            optimizer=self.optimizer, 
+            loss=self.loss, 
+            metrics=self.metrics
+        )
         self.model.summary()
 
-    def fit(self, x, y, xv=None, yv=None):
+    def fit(self, x, y, xv=None, yv=None, callbacks=None):
         if len(x.shape[1:])==2:
             x = np.expand_dims(x, axis=-1)
         if len(y.shape) == 1:
@@ -97,7 +111,7 @@ class Conv2DNeuralNetwork(object):
         input_shape = x.shape[1:]
         self.build_neural_network(input_shape, output_shape)
         self.model.fit(x, y, batch_size=self.batch_size, epochs=self.epochs,
-                       verbose=self.verbose, validation_data=(xv, yv))
+                       verbose=self.verbose, validation_data=(xv, yv), callbacks=callbacks)
         return self.model.history.history
 
     def predict(self, x):
@@ -108,3 +122,15 @@ class Conv2DNeuralNetwork(object):
     def predict_proba(self, x):
         y_prob = self.model.predict(x, batch_size=self.batch_size)
         return y_prob
+    
+    def load_weights(self, weights):
+        try:
+            self.model.load_weights(weights)
+            self.model.compile(
+                optimizer=self.optimizer, 
+                loss=self.loss, 
+                metrics=self.metrics
+            )
+        except:
+            print("You must first call build_neural_network before loading weights. Exiting.")
+            sys.exit(1)
