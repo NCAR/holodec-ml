@@ -77,6 +77,8 @@ elif settings['loss_function'].lower() == 'kstest':
     loss_func = mldef.ks_test
 elif settings['loss_function'].lower() == 'poisson':
     loss_func = mldef.poisson_nll
+elif settings['loss_function'].lower() == 'cum_poisson':
+    loss_func = mldef.cum_poisson_nll
 else:
     loss_func = settings['loss_function']
 
