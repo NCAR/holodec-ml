@@ -18,6 +18,7 @@ settings = {
             'test_fraction':0.3,    # fraction of data reserved for training
             'loss_function':'kstest',     # loss function
             'h_chunk':128,      # xarray chunk size when loading
+            'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267]  # example outputs
             }
 
 exec_file = 'train_psd_convnet.py'
