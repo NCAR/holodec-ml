@@ -16,7 +16,7 @@ settings = {
             'output_activation':'relu', # output activation function,
             'valid_fraction':0.2,   # fraction of data reserved for validation
             'test_fraction':0.3,    # fraction of data reserved for training
-            'loss_function':'poisson',     # loss function
+            'loss_function':'cum_poisson',     # loss function
             'h_chunk':128,      # xarray chunk size when loading
             'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267]  # example outputs
             }
