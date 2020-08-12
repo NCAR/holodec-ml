@@ -22,7 +22,7 @@ import xarray as xr
 import dask.array as da
 import datetime
 import json
-
+import scipy.signal
 
 # set path to local libraries
 dirP_str = '../../../library'
