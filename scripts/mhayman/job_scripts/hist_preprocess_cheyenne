@@ -23,4 +23,4 @@ module load python
 ncar_pylib
 
 ### Run the executable
-python run_preprocess_cheyenne.py
+python run_preprocess_decimate_cheyenne.py
