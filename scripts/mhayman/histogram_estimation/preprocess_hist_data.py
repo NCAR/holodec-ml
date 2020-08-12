@@ -110,7 +110,7 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
                 # build the Gaussian smoothing kernel
                 pixk_count = np.int(np.round(5*settings['sigk']))
                 pix_dim = np.arange(-pixk_count,pixk_count+1)
-                kernel = np.exp(-((pix_dim[:,np.newaxis])**2+(pix_dim[np.newaxis,:])**2)/['sigk']**2)
+                kernel = np.exp(-((pix_dim[:,np.newaxis])**2+(pix_dim[np.newaxis,:])**2)/settings['sigk']**2)
                 kernel = kernel/np.sum(kernel)
 
                 # apply smoothing
