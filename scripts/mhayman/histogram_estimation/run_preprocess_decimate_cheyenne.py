@@ -14,7 +14,7 @@ settings = {    'data_file':'synthetic_holograms_50-100particle_gamma_training.n
                 'hist_edges':np.logspace(0,3,40),
                 'max_hist_count':10000,
                 'n_decimate':4,  # decimation factor for images
-                'sigk':4,    # smoothing kernel standard deviation in pixels
+                'sigk':4.0,    # smoothing kernel standard deviation in pixels
                 }
 
 exec_file = 'preprocess_hist_data.py'
