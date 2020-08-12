@@ -104,6 +104,20 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
             # FT the image and store the desired operations
             image0 = ds['image'].sel(hologram_number=im)  # select the hologram image
             image_ft0 = FO.OpticsFFT(image0-np.mean(image0))  # FFT the image
+            
+            # decimate the image FT by smoothing and resampling
+            if settings['n_decimate'] > 1:
+                # build the Gaussian smoothing kernel
+                pixk_count = np.int(np.round(5*settings['sigk']))
+                pix_dim = np.arange(-pixk_count,pixk_count+1)
+                kernel = np.exp(-(pix_dim[:,np.newaxis]**2+pix_dim[np.newaxis,:]**2)/['sigk']**2)
+                kernel = kernel/np.sum(kernel)
+
+                # apply smoothing
+                sm_ft = scipy.signal.convolve2d(np.abs(image_ft0),kernel,mode='same')
+                image_ft0 = sm_ft[settings['n_decimate']//2::settings['n_decimate'],
+                                settings['n_decimate']//2::settings['n_decimate']]
+
             # perform requested operations for storage
             image_ft_list = []
             for ik,func in enumerate(settings['input_func'].keys()):
