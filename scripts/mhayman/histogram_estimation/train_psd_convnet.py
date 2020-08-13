@@ -258,6 +258,20 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         plt.savefig(save_file_path+save_file_base+f"_ExampleHist_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
         plt.figure()
+        plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(preds_original.isel(hologram_number=holo_num,output_channels=0).values),
+                np.diff(ds['histogram_bin_edges'].values),
+                facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
+        plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(test_labels.isel(hologram_number=holo_num,output_channels=0).values),
+                np.diff(ds['histogram_bin_edges'].values),
+                facecolor='white',edgecolor='black',fill=False,label='true')
+        # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
+        # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
+        plt.xlabel('Particle Diameter [$\mu m$]')
+        plt.ylabel('Count')
+        plt.xscale('log')
+        plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+
+        plt.figure()
         plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
         plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
         plt.close()
