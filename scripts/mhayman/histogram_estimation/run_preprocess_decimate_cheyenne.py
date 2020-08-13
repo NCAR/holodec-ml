@@ -11,7 +11,7 @@ settings = {    'data_file':'synthetic_holograms_50-100particle_gamma_training.n
                 'input_func':{'abs':np.abs},
                 'input_scale':{'abs':255},
                 'FourierTransform':True,
-                'hist_edges':np.logspace(0,3,40),
+                'hist_edges':np.logspace(0,3,101),
                 'max_hist_count':10000,
                 'n_decimate':4,  # decimation factor for images
                 'sigk':4.0,    # smoothing kernel standard deviation in pixels
