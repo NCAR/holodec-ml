@@ -10,7 +10,7 @@ settings = {
             'num_epochs':50,    # the number of training epochs
             'conv_chan':[32,32],# list length defines number of operations
             'conv_size':[5,5],  # convolution kernel size
-            'max_pool':[4,4],   # maxpool decimation
+            'max_pool':[1,1],   # maxpool decimation
             'nn_size':[128,128,],  # excludes the output layer (set by the input data)
             'batch_size':128,    # training batch size
             'output_activation':'relu', # output activation function,
