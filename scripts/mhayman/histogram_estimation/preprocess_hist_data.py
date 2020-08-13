@@ -134,8 +134,12 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
     print('histogram shape:')
     print(histogram.shape)
 
-    xsize = ds.coords['xsize'].copy()
-    ysize = ds.coords['ysize'].copy()
+    if settings['n_decimate'] <= 1:
+        xsize = ds.coords['xsize'].copy()
+        ysize = ds.coords['ysize'].copy()
+    else:
+        xsize = ds.coords['xsize'][settings['n_decimate']//2::settings['n_decimate']]
+        ysize = ds.coords['ysize'][settings['n_decimate']//2::settings['n_decimate']]
     holo_num = ds.coords['hologram_number'].copy()
     image_dims = ds['image'].dims
     print('image dimensions')
