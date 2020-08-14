@@ -9,7 +9,7 @@ paths = {   'data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
 
 settings = {    'data_file':'synthetic_holograms_50-100particle_gamma_training.nc',
                 'FourierTransform':True,
-                'hist_edges':np.logspace(0,3,101),
+                'hist_edges':np.logspace(0,3,41),
                 'max_hist_count':5000,
                 }
 
