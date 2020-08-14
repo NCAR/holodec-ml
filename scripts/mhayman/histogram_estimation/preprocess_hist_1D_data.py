@@ -108,7 +108,7 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
         # make a histogram of particles and store it in the data set
         hist0 = np.histogram(ds['d'].values[particle_index],
                     bins=histogram_edges)[0]
-        if settings.get('log_hist':False):
+        if settings.get('log_hist',False):
             hist0 = np.log(hist0+1e-12)
         if im == 0:
             histogram = da.array(hist0[np.newaxis,...])
@@ -131,7 +131,7 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
             # for ik,func in enumerate(settings['input_func'].keys()):
             #     image_ft_list+=[(settings['input_func'][func](image_ft0) / settings['input_scale'][func])[np.newaxis,...]]
             #     # image_ft[func][im,:,:] = settings['input_func'][func](image_ft0) / settings['input_scale'][func]
-            if settings.get('log_in':False):
+            if settings.get('log_in',False):
                 mage_ft_list = [np.log(1e-12+image_ft_r_mean)[np.newaxis,...]/np.log(255.0)]
             else:
                 image_ft_list = [image_ft_r_mean[np.newaxis,...]/255.0]
