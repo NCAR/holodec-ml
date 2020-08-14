@@ -9,10 +9,10 @@ paths = {   'data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
 
 settings = {    'data_file':'synthetic_holograms_50-100particle_gamma_training.nc',
                 'FourierTransform':True,
-                'hist_edges':np.logspace(0,3,41),
+                'hist_edges': np.arange(0,200,10)# np.logspace(0,3,41),
                 'max_hist_count':5000,
                 'log_hist':False,
-                'log_in':True
+                'log_in':False
                 }
 
 exec_file = 'preprocess_hist_1D_data.py'
