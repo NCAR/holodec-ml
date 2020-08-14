@@ -154,8 +154,8 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
     print(image_dims)
     print('image shape')
     print(ds['image'].shape)
-    print('xsize:%d'%xsize.size)
-    print('ysize:%d'%ysize.size)
+    # print('xsize:%d'%xsize.size)
+    # print('ysize:%d'%ysize.size)
     # if not settings['FourierTransform']:
     #     in_chan = ['real']
     #     image_ft = ds['image'].values[:,np.newaxis,...]
