@@ -271,10 +271,11 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         plt.xscale('log')
         plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
-        plt.figure()
-        plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
-        plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
-        plt.close()
+        if scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values.ndim == 2:
+            plt.figure()
+            plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
+            plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+            plt.close()
     
 
 # # save the settings in human readable format
