@@ -7,7 +7,7 @@ paths = {   'load_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogra
 
 settings = {
             'data_file': 'histogram_training_data_5000count20200814T133930.nc',# 'histogram_training_data_5000count20200814T075733.nc',     # training data file
-            'num_epochs':500,    # the number of training epochs
+            'num_epochs':1000,    # the number of training epochs
             'conv_chan':[],# list length defines number of operations
             'conv_size':[],  # convolution kernel size
             'max_pool':[],   # maxpool decimation
