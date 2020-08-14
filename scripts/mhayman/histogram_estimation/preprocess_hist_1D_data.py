@@ -129,7 +129,7 @@ with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_numbe
             # for ik,func in enumerate(settings['input_func'].keys()):
             #     image_ft_list+=[(settings['input_func'][func](image_ft0) / settings['input_scale'][func])[np.newaxis,...]]
             #     # image_ft[func][im,:,:] = settings['input_func'][func](image_ft0) / settings['input_scale'][func]
-            image_ft_list = [image_ft_r_mean/255.0]
+            image_ft_list = [image_ft_r_mean[np.newaxis,...]/255.0]
             
             if im == 0:
                 image_ft = da.array(np.concatenate(image_ft_list,axis=0)[np.newaxis,...])
