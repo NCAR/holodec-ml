@@ -13,7 +13,7 @@ settings = {
             'max_pool':[],   # maxpool decimation
             'nn_size':[256,128,],  # excludes the output layer (set by the input data)
             'batch_size':256,    # training batch size
-            'output_activation':'relu', # output activation function,
+            'output_activation':'exponential', # output activation function,
             'valid_fraction':0.2,   # fraction of data reserved for validation
             'test_fraction':0.1,    # fraction of data reserved for training
             'loss_function':'kstest',     # loss function
