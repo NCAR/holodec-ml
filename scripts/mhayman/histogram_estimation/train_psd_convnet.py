@@ -272,7 +272,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
         plt.xlabel('Particle Diameter [$\mu m$]')
         plt.ylabel('Count')
-        plt.xscale('log')
+        if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
+            plt.xscale('log')
         plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
         if scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values.ndim == 2:
