@@ -1,6 +1,6 @@
 #!/bin/bash
 ### Job Name
-#PBS -N pre_hist
+#PBS -N pre_1d_hist
 ### Project code
 #PBS -A NEOL0007
 #PBS -l walltime=12:00:00
