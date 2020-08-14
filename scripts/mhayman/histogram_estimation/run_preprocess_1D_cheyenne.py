@@ -11,6 +11,8 @@ settings = {    'data_file':'synthetic_holograms_50-100particle_gamma_training.n
                 'FourierTransform':True,
                 'hist_edges':np.logspace(0,3,41),
                 'max_hist_count':5000,
+                'log_hist':False,
+                'log_in':True
                 }
 
 exec_file = 'preprocess_hist_1D_data.py'
