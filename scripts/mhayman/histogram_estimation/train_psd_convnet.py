@@ -115,7 +115,11 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     scaled_val_labels = scaled_all_labels.isel(hologram_number=slice(None,valid_index))
 
     # setup the input to be used
-    in_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+    if len(ds[input_variable].dims) == 4:
+        in_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+    elif len(ds[input_variable].dims) == 3:
+        in_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
+    
     train_input = in_data.isel(hologram_number=slice(test_index,None))
     input_scalar = ml.MinMaxScalerX(in_data,dim=in_data.dims[1:])
     scaled_in_data = input_scalar.fit_transform(in_data)
