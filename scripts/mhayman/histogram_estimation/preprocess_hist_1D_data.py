@@ -212,8 +212,8 @@ for fn in data_file_list:
                                     dims=('histogram_bin_edges'))
 
     histogram_moments_da = xr.DataArray(histogram_moments,
-                                    dims = ('histogram_number','moments'),
-                                    coords={'histogram_number':holo_num[:hologram_count],
+                                    dims = ('hologram_number','moments'),
+                                    coords={'hologram_number':holo_num[:hologram_count],
                                             'moments':settings.get('moments',[0,1,2,3,4,5,6])})
 
     histogram = histogram[...,np.newaxis]
