@@ -6,7 +6,9 @@ paths = {   'load_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogra
             'save_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/'}
 
 settings = {
-            'data_file': 'histogram_training_data_5000count20200814T133930.nc', #'histogram_training_data_5000count20200818T100751.nc',# 'histogram_training_data_5000count20200814T075733.nc',     # training data file
+            'data_file': 'histogram_train_data_5000count20200818T120320.nc', #'histogram_training_data_5000count20200818T100751.nc',# 'histogram_training_data_5000count20200814T075733.nc',     # training data file
+            'validation_file':'histogram_valid_data_5000count20200818T120320.nc',
+            'test_file':'histogram_test_data_5000count20200818T120320.nc',
             'num_epochs':1000,    # the number of training epochs
             'scale_labels':False, # Scale the labels - depending on loss function, may not be desirable
             'conv_chan':[],# list length defines number of operations
