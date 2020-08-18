@@ -25,7 +25,7 @@ def get_callbacks(config: Dict[str, str]) -> List[Callback]:
     
     if "ModelCheckpoint" in config:
         callbacks.append(ModelCheckpoint(**config["ModelCheckpoint"]))
-        logger.info("... loaded Checkpointer with params {}")
+        logger.info("... loaded Checkpointer")
         
     if "EarlyStopping" in config:
         callbacks.append(EarlyStopping(**config["EarlyStopping"]))

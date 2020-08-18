@@ -1,5 +1,5 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test"
+path_save: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test2"
 model_name: "cnn"
 num_particles: 3
 random_seed: 328942
@@ -24,22 +24,20 @@ conv2d_network:
   verbose: 1
 callbacks:
   ModelCheckpoint:
-    monitor: "val_accuracy"
-    filepath: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test/model.h5"
+    monitor: "val_loss"
+    filepath: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test2/model.h5"
     save_best_only: True
     save_weights_only: True
   EarlyStopping:
-    monitor: "val_accuracy"
-    patience: 4
+    monitor: "val_loss"
+    patience: 50
   ReduceLROnPlateau: 
-    monitor: "val_accuracy"
+    monitor: "val_loss"
     factor: 0.2
-    patience: 2
-    min_lr: 1e-7
+    patience: 30
+    min_lr: 0.0000001
     mode: "auto"
   CSVLogger:
-    filename: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test/training.txt"
+    filename: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test2/training.txt"
     separator: " "
     append: True
-  
-  
