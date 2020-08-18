@@ -60,150 +60,169 @@ histogram_edges = settings['hist_edges']
 histogram_centers = 0.5*np.diff(histogram_edges) \
                     +histogram_edges[:-1]
 
-# load the dataset file
-with xr.open_dataset(paths['data']+settings['data_file'],chunks={'hologram_number':1}) as ds:
-    # pre-process training data
-    # generate a histogram for each image
-    # initialize the particle property histogram bins
+run_date_str = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 
-    if settings['max_hist_count'] is None:
-        hologram_count = ds['hologram_number'].values.size
-    else:
-        hologram_count = settings['max_hist_count']
-
+if isinstance(settings['data_file'],str):
+    data_file_list = [settings['data_file']]
+else:
+    # assume a list of data files were passed in
+    data_file_list = settings['data_file']
     
-    file_base = 'histogram_training_data_%dcount'%hologram_count+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 
-    print("   histogram bins: ")
-    print("      "+str(histogram_centers.size))
-    print("       ["+str(histogram_centers[0])+', '+str(histogram_centers[-1])+']')
-    print()
-    
-    print('   max particle size: %d'%ds['d'].values.max())
-    print('   min particle size: %d'%ds['d'].values.min())
-    print()
+for fn in data_file_list:
 
-    # define x (columns) and y (rows) coordinates
-    ypix = np.arange(ds.coords['xsize'].size)-ds.coords['xsize'].size//2
-    xpix = np.arange(ds.coords['ysize'].size)-ds.coords['ysize'].size//2
-    rpix = np.sqrt(xpix[np.newaxis,:]**2+ypix[:,np.newaxis]**2)
+    # load the dataset file
+    with xr.open_dataset(paths['data']+fn,chunks={'hologram_number':1}) as ds:
+        # pre-process training data
+        # generate a histogram for each image
+        # initialize the particle property histogram bins
 
-    # define function for calculating radial mean
-    avg_rad = lambda r : np.abs(image_ft0[(rpix >= r-.5) & (rpix < r+.5)]).mean()
-    # define the radial coordinate for the radial mean
-    rad  = np.arange(np.maximum(ypix.size//2,xpix.size//2))
-
-    # store the Fourier Transform and particle size histogram for each hologram
-    print("Performing Fourier Transform")
-    ft_start_time = datetime.datetime.now()
-    for im in ds['hologram_number'].values[slice(None,settings['max_hist_count'])]:
-        # find the particles in this hologram
-        # hologram indexing is base 1
-        particle_index = np.nonzero(ds['hid'].values==im+1)[0]  
-
-        particle_count = ds['d'].values[particle_index].size
-        print(particle_count)
-        # print(f'  found {particle_count} particles')
-        
-        # make a histogram of particles and store it in the data set
-        hist0 = np.histogram(ds['d'].values[particle_index],
-                    bins=histogram_edges)[0]
-        if settings.get('log_hist',False):
-            hist0 = np.log(hist0+1e-12)
-        if im == 0:
-            histogram = da.array(hist0[np.newaxis,...])
+        if settings['max_hist_count'] is None:
+            hologram_count = ds['hologram_number'].values.size
         else:
-            histogram = da.concatenate([histogram,hist0[np.newaxis,...]],axis=0)        
+            hologram_count = settings['max_hist_count']
+
+        if 'training' in fn:
+            file_use = '_training_'
+        elif 'validation' in fn:
+            file_use = '_validation_'
+        elif 'test' in fn:
+            file_use = '_test_'
+        else:
+            file_use = ''
         
-        if settings['FourierTransform']:
-            # in_chan = list(settings['input_func'].keys())
-            
-            # FT the image and store the desired operations
-            image0 = ds['image'].sel(hologram_number=im)  # select the hologram image
-            image_ft0 = FO.OpticsFFT(image0)  # FFT the image
-            
-            # calculate the radial mean of the FT
-            image_ft_r_mean = np.vectorize(avg_rad)(rad)
-            image_ft_r_mean[0] = image_ft_r_mean[0]/(image_ft_r_mean.size) # rescale DC term
+        file_base = 'histogram_training_data_%dcount'%hologram_count+file_use+run_date_str
 
-            # perform requested operations for storage
-            image_ft_list = []
-            # for ik,func in enumerate(settings['input_func'].keys()):
-            #     image_ft_list+=[(settings['input_func'][func](image_ft0) / settings['input_scale'][func])[np.newaxis,...]]
-            #     # image_ft[func][im,:,:] = settings['input_func'][func](image_ft0) / settings['input_scale'][func]
-            if settings.get('log_in',False):
-                mage_ft_list = [np.log(1e-12+image_ft_r_mean)[np.newaxis,...]/np.log(255.0)]
-            else:
-                image_ft_list = [image_ft_r_mean[np.newaxis,...]/255.0]
+        print("   histogram bins: ")
+        print("      "+str(histogram_centers.size))
+        print("       ["+str(histogram_centers[0])+', '+str(histogram_centers[-1])+']')
+        print()
+        
+        print('   max particle size: %d'%ds['d'].values.max())
+        print('   min particle size: %d'%ds['d'].values.min())
+        print()
+
+        # define x (columns) and y (rows) coordinates
+        ypix = np.arange(ds.coords['xsize'].size)-ds.coords['xsize'].size//2
+        xpix = np.arange(ds.coords['ysize'].size)-ds.coords['ysize'].size//2
+        rpix = np.sqrt(xpix[np.newaxis,:]**2+ypix[:,np.newaxis]**2)
+
+        # define function for calculating radial mean
+        avg_rad = lambda r : np.abs(image_ft0[(rpix >= r-.5) & (rpix < r+.5)]).mean()
+        # define the radial coordinate for the radial mean
+        rad  = np.arange(np.maximum(ypix.size//2,xpix.size//2))
+
+        # store the Fourier Transform and particle size histogram for each hologram
+        print("Performing Fourier Transform")
+        ft_start_time = datetime.datetime.now()
+        for im in ds['hologram_number'].values[slice(None,settings['max_hist_count'])]:
+            # find the particles in this hologram
+            # hologram indexing is base 1
+            particle_index = np.nonzero(ds['hid'].values==im+1)[0]  
+
+            particle_count = ds['d'].values[particle_index].size
+            print(particle_count)
+            # print(f'  found {particle_count} particles')
             
+            # make a histogram of particles and store it in the data set
+            hist0 = np.histogram(ds['d'].values[particle_index],
+                        bins=histogram_edges)[0]
+            if settings.get('log_hist',False):
+                hist0 = np.log(hist0+1e-12)
             if im == 0:
-                image_ft = da.array(np.concatenate(image_ft_list,axis=0)[np.newaxis,...])
+                histogram = da.array(hist0[np.newaxis,...])
             else:
-                image_ft = da.concatenate([image_ft,np.concatenate(image_ft_list,axis=0)[np.newaxis,...]],axis=0)
+                histogram = da.concatenate([histogram,hist0[np.newaxis,...]],axis=0)        
+            
+            if settings['FourierTransform']:
+                # in_chan = list(settings['input_func'].keys())
+                
+                # FT the image and store the desired operations
+                image0 = ds['image'].sel(hologram_number=im)  # select the hologram image
+                image_ft0 = FO.OpticsFFT(image0)  # FFT the image
+                
+                # calculate the radial mean of the FT
+                image_ft_r_mean = np.vectorize(avg_rad)(rad)
+                image_ft_r_mean[0] = image_ft_r_mean[0]/(image_ft_r_mean.size) # rescale DC term
 
-        print(f'completed hologram {im} of {hologram_count}') # ,end='\r
-    ft_stop_time = datetime.datetime.now()
+                # perform requested operations for storage
+                image_ft_list = []
+                # for ik,func in enumerate(settings['input_func'].keys()):
+                #     image_ft_list+=[(settings['input_func'][func](image_ft0) / settings['input_scale'][func])[np.newaxis,...]]
+                #     # image_ft[func][im,:,:] = settings['input_func'][func](image_ft0) / settings['input_scale'][func]
+                if settings.get('log_in',False):
+                    mage_ft_list = [np.log(1e-12+image_ft_r_mean)[np.newaxis,...]/np.log(255.0)]
+                else:
+                    image_ft_list = [image_ft_r_mean[np.newaxis,...]/255.0]
+                
+                if im == 0:
+                    image_ft = da.array(np.concatenate(image_ft_list,axis=0)[np.newaxis,...])
+                else:
+                    image_ft = da.concatenate([image_ft,np.concatenate(image_ft_list,axis=0)[np.newaxis,...]],axis=0)
 
-    print('histogram shape:')
+            print(f'completed hologram {im} of {hologram_count}') # ,end='\r
+        ft_stop_time = datetime.datetime.now()
+
+        print('histogram shape:')
+        print(histogram.shape)
+
+        # if settings['n_decimate'] <= 1:
+        #     xsize = ds.coords['xsize'].copy()
+        #     ysize = ds.coords['ysize'].copy()
+        # else:
+        #     xsize = ds.coords['xsize'][settings['n_decimate']//2::settings['n_decimate']]
+        #     ysize = ds.coords['ysize'][settings['n_decimate']//2::settings['n_decimate']]
+        holo_num = ds.coords['hologram_number'].copy()
+        image_dims = ds['image'].dims
+        print('image dimensions')
+        print(image_dims)
+        print('image shape')
+        print(ds['image'].shape)
+        # print('xsize:%d'%xsize.size)
+        # print('ysize:%d'%ysize.size)
+        # if not settings['FourierTransform']:
+        #     in_chan = ['real']
+        #     image_ft = ds['image'].values[:,np.newaxis,...]
+        in_chan = ['abs']
+        
+
+
+
+    image_in_da = xr.DataArray(image_ft,
+                                    coords={'hologram_number':holo_num[:hologram_count],
+                                            'input_channels':in_chan,
+                                            'rsize':rad},
+                                    dims=[image_dims[0]]
+                                        +['input_channels','rsize'])
+
+
+    hist_bin_cent = xr.DataArray(histogram_centers,
+                                    coords={'histogram_bin_centers':histogram_centers},
+                                    dims=('histogram_bin_centers'))
+
+    hist_bin_edges = xr.DataArray(histogram_edges,
+                                    coords={'histogram_bin_edges':histogram_edges},
+                                    dims=('histogram_bin_edges'))
+
+    histogram = histogram[...,np.newaxis]
+    print('histogram shape')
     print(histogram.shape)
+    histogram_da = xr.DataArray(histogram,
+                dims=('hologram_number','histogram_bin_centers','output_channels'),
+                coords={'hologram_number':holo_num[:hologram_count],
+                        'histogram_bin_centers':hist_bin_cent,
+                        'output_channels':['hist']})
 
-    # if settings['n_decimate'] <= 1:
-    #     xsize = ds.coords['xsize'].copy()
-    #     ysize = ds.coords['ysize'].copy()
-    # else:
-    #     xsize = ds.coords['xsize'][settings['n_decimate']//2::settings['n_decimate']]
-    #     ysize = ds.coords['ysize'][settings['n_decimate']//2::settings['n_decimate']]
-    holo_num = ds.coords['hologram_number'].copy()
-    image_dims = ds['image'].dims
-    print('image dimensions')
-    print(image_dims)
-    print('image shape')
-    print(ds['image'].shape)
-    # print('xsize:%d'%xsize.size)
-    # print('ysize:%d'%ysize.size)
-    # if not settings['FourierTransform']:
-    #     in_chan = ['real']
-    #     image_ft = ds['image'].values[:,np.newaxis,...]
-    in_chan = ['abs']
-    
-
-
-
-image_in_da = xr.DataArray(image_ft,
-                                coords={'hologram_number':holo_num[:hologram_count],
-                                        'input_channels':in_chan,
-                                        'rsize':rad},
-                                dims=[image_dims[0]]
-                                    +['input_channels','rsize'])
-
-
-hist_bin_cent = xr.DataArray(histogram_centers,
-                                coords={'histogram_bin_centers':histogram_centers},
-                                dims=('histogram_bin_centers'))
-
-hist_bin_edges = xr.DataArray(histogram_edges,
-                                coords={'histogram_bin_edges':histogram_edges},
-                                dims=('histogram_bin_edges'))
-
-histogram = histogram[...,np.newaxis]
-print('histogram shape')
-print(histogram.shape)
-histogram_da = xr.DataArray(histogram,
-            dims=('hologram_number','histogram_bin_centers','output_channels'),
-            coords={'hologram_number':holo_num[:hologram_count],
+    preproc_ds = xr.Dataset({'histogram':histogram_da,
                     'histogram_bin_centers':hist_bin_cent,
-                    'output_channels':['hist']})
-
-preproc_ds = xr.Dataset({'histogram':histogram_da,
-                'histogram_bin_centers':hist_bin_cent,
-                'histogram_bin_edges':hist_bin_edges,
-                'input_image':image_in_da},
-                attrs={'data_file':settings['data_file']})
+                    'histogram_bin_edges':hist_bin_edges,
+                    'input_image':image_in_da},
+                    attrs={'data_file':settings['data_file']})
 
 
-print("Writing to netcdf")
-print(paths['save']+file_base+".nc")
-preproc_ds.to_netcdf(paths['save']+file_base+".nc")
+    print("Writing to netcdf")
+    print(paths['save']+file_base+".nc")
+    preproc_ds.to_netcdf(paths['save']+file_base+".nc")
 
 # # save the settings in human readable format
 # # with a small file size
