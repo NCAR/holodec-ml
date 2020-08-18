@@ -103,6 +103,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     all_labels = ds[label_variable]
     train_labels = all_labels.isel(hologram_number=slice(test_index,None))
     test_labels = all_labels.isel(hologram_number=slice(valid_index,test_index))
+    test_moments = ds['histogram_moments'].isel(hologram_number=slice(valid_index,test_index))
     # val_labels = all_labels.isel(hologram_number=slice(None,valid_index))
 
     # normalize based on training data
@@ -253,8 +254,13 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         preds_original = preds_out_da
 
     for m in settings.get('moments',[0,1,2,3]):
-        m_pred = (preds_original*preds_original.coords['histogram_bin_centers']**m).sum(dim=('histogram_bin_centers','output_channels'))
-        m_label = (test_labels*test_labels.coords['histogram_bin_centers']**m).sum(dim=('histogram_bin_centers','output_channels'))
+        m_pred = (preds_original*(0.5*preds_original.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
+        try:
+            m_label = test_moments.sel(moments=m)
+        except KeyError:
+            print('No direct moment data')
+            print('Approximating moments from histogram data')
+            m_label = (test_labels*(0.5*test_labels.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
         one_to_one = [m_label.values.min(),m_label.values.max()]
         fig, ax = plt.subplots() # figsize=(4,4)
         ax.scatter(m_pred,m_label,s=1,c='k')
@@ -264,6 +270,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         ax.grid(which='minor',linestyle=':')
         ax.set_xlabel('Predicted')
         ax.set_ylabel('Actual')
+        ax.set_xscale('log')
+        ax.set_yscale('log')
         ax.set_title('%d Moment'%m)
         plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
         plt.close('all')
