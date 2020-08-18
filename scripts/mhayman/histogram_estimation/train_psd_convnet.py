@@ -107,8 +107,11 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
     # normalize based on training data
     
-    output_scaler = ml.MinMaxScalerX(all_labels,dim=all_labels.dims[1:])
-    scaled_all_labels = output_scaler.fit_transform(all_labels)
+    if settings.get('scale_labels',True):
+        output_scaler = ml.MinMaxScalerX(all_labels,dim=all_labels.dims[1:])
+        scaled_all_labels = output_scaler.fit_transform(all_labels)
+    else:
+        scaled_all_labels = all_labels
 
     scaled_train_labels = scaled_all_labels.isel(hologram_number=slice(test_index,None))
     scaled_test_labels = scaled_all_labels.isel(hologram_number=slice(valid_index,test_index))
@@ -244,7 +247,10 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','histogram_bin_centers','output_channels'),
                                 coords=scaled_test_labels.coords)
 
-    preds_original = output_scaler.inverse_transform(preds_out_da)
+    if settings.get('scale_labels',True):
+        preds_original = output_scaler.inverse_transform(preds_out_da)
+    else:
+        preds_original = preds_out_da
 
     for holo_num in settings['holo_examples']:
         plt.figure()
