@@ -89,9 +89,9 @@ for fn in data_file_list:
         elif 'test' in fn:
             file_use = '_test_'
         else:
-            file_use = ''
+            file_use = '_'
         
-        file_base = 'histogram_training_data_%dcount'%hologram_count+file_use+run_date_str
+        file_base = 'histogram'+file_use+'data_%dcount'%hologram_count+run_date_str
 
         print("   histogram bins: ")
         print("      "+str(histogram_centers.size))
