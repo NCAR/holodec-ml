@@ -252,6 +252,23 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     else:
         preds_original = preds_out_da
 
+    for m in settings.get('moments',[0,1,2,3]):
+        m_pred = (preds_original[label_variable]**m).sum(dim=('histogram_bin_centers','output_channels'))
+        m_label = (test_labels[label_variable]**m).sum(dim=('histogram_bin_centers','output_channels'))
+        one_to_one = [m_label.values.min(),m_label.values.max()]
+        fig, ax = plt.subplots() # figsize=(4,4)
+        ax.scatter(m_pred,m_label,s=1,c='k')
+        ax.plot(one_to_one,one_to_one,color='tab:red',linewidth=0.5)
+        ax.minorticks_on()
+        ax.grid(b=True)
+        ax.grid(which='minor',linestyle=':')
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('Actual')
+        ax.set_title('%d Moment'%m)
+        plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
+        plt.close('all')
+
+
     for holo_num in settings['holo_examples']:
         plt.figure()
         plt.bar(ds['histogram_bin_edges'].values[:-1],preds_original.isel(hologram_number=holo_num,output_channels=0).values,
