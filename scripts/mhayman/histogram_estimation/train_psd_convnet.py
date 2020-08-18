@@ -253,8 +253,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         preds_original = preds_out_da
 
     for m in settings.get('moments',[0,1,2,3]):
-        m_pred = (preds_original**m).sum(dim=('histogram_bin_centers','output_channels'))
-        m_label = (test_labels**m).sum(dim=('histogram_bin_centers','output_channels'))
+        m_pred = (preds_original*preds_original.coords['histogram_bin_centers']**m).sum(dim=('histogram_bin_centers','output_channels'))
+        m_label = (test_labels*test_labels.coords['histogram_bin_centers']**m).sum(dim=('histogram_bin_centers','output_channels'))
         one_to_one = [m_label.values.min(),m_label.values.max()]
         fig, ax = plt.subplots() # figsize=(4,4)
         ax.scatter(m_pred,m_label,s=1,c='k')
