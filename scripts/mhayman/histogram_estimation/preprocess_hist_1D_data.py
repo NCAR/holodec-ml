@@ -127,7 +127,8 @@ for fn in data_file_list:
             h_moments = []
             for m in settings.get('moments',[0,1,2,3,4,5,6]):
                 h_moments += [np.sum((ds['d'].values[particle_index]/2)**m)]
-            
+            h_moments = np.array(h_moments)
+
             # make a histogram of particles and store it in the data set
             hist0 = np.histogram(ds['d'].values[particle_index],
                         bins=histogram_edges)[0]
@@ -138,7 +139,7 @@ for fn in data_file_list:
                 histogram_moments = da.array(h_moments[np.newaxis,:])
             else:
                 histogram = da.concatenate([histogram,hist0[np.newaxis,...]],axis=0)     
-                histogram_moments = da.concatenate([histogram_moments,da.array(h_moments[np.newaxis,:])])   
+                histogram_moments = da.concatenate([histogram_moments,h_moments[np.newaxis,:]],axis=0)   
             
             if settings['FourierTransform']:
                 # in_chan = list(settings['input_func'].keys())
