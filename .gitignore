@@ -1,4 +1,6 @@
 *.pyc
 *.DS_Store
 **/.ipynb_checkpoints
-*.out
+*.out.*
+batch**.sh
+*.o*
