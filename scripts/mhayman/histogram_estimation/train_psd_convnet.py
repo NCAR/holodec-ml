@@ -166,7 +166,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         # scaled_all_labels = output_scaler.fit_transform(all_labels)
     else:
         scaled_train_labels = train_labels
-        scaled_val_labels = val_labels
+        scaled_val_labels = valid_labels
         scaled_test_labels = test_labels
         # scaled_all_labels = all_labels
 
