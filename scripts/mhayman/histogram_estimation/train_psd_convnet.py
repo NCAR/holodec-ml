@@ -112,6 +112,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     # assign test and validation based on datasets used
     all_labels = ds[label_variable]
     if separate_files:
+        train_labels = ds[label_variable]
+        train_moments = ds['histogram_moments']
         if len(ds[input_variable].dims) == 4:
             train_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
         elif len(ds[input_variable].dims) == 3:
