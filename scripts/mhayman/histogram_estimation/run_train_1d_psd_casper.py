@@ -10,7 +10,7 @@ settings = {
             'validation_file':'histogram_validation_data_5000count20200819T094342.nc',
             'test_file':'histogram_test_data_5000count20200819T094342.nc',
             'num_epochs':3000,    # the number of training epochs
-            'scale_labels':True, # Scale the labels - depending on loss function, may not be desirable
+            'scale_labels':False, # Scale the labels - depending on loss function, may not be desirable
             'conv_chan':[],# list length defines number of operations
             'conv_size':[],  # convolution kernel size
             'max_pool':[],   # maxpool decimation
@@ -19,7 +19,7 @@ settings = {
             'output_activation':'exponential', # output activation function,
             'valid_fraction':0.1,   # fraction of data reserved for validation
             'test_fraction':0.1,    # fraction of data reserved for training
-            'loss_function':'kstest',     # loss function
+            'loss_function':'cum_poisson',     # loss function
             'h_chunk':128,      # xarray chunk size when loading
             'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267]  # example outputs
             }
