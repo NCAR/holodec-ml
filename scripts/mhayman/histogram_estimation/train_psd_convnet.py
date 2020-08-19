@@ -328,7 +328,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         ax.set_ylabel('Actual')
         ax.set_xscale('log')
         ax.set_yscale('log')
-        ax.set_title('%d Moment'%m)
+        ax.set_title('Moment %d'%m)
         plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
         plt.close('all')
 
