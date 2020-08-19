@@ -159,9 +159,9 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     if settings.get('scale_labels',True):
         # normalize based on training data
         output_scaler = ml.MinMaxScalerX(train_labels)
-        scaled_train_labels = output.scaler.fit_transform(train_labels)
-        scaled_val_labels = output.scaler.fit_transform(valid_labels)
-        scaled_test_labels = output.scaler.fit_transform(test_labels)
+        scaled_train_labels = output_scaler.fit_transform(train_labels)
+        scaled_val_labels = output_scaler.fit_transform(valid_labels)
+        scaled_test_labels = output_scaler.fit_transform(test_labels)
         # output_scaler = ml.MinMaxScalerX(all_labels,dim=all_labels.dims[1:])
         # scaled_all_labels = output_scaler.fit_transform(all_labels)
     else:
