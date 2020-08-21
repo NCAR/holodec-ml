@@ -112,6 +112,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     # assign test and validation based on datasets used
     all_labels = ds[label_variable]
     if separate_files:
+        train_labels = ds[label_variable]
+        train_moments = ds['histogram_moments']
         if len(ds[input_variable].dims) == 4:
             train_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
         elif len(ds[input_variable].dims) == 3:
@@ -157,14 +159,14 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     if settings.get('scale_labels',True):
         # normalize based on training data
         output_scaler = ml.MinMaxScalerX(train_labels)
-        scaled_train_labels = output.scaler.fit_transform(train_labels)
-        scaled_val_labels = output.scaler.fit_transform(valid_labels)
-        scaled_test_labels = output.scaler.fit_transform(test_labels)
+        scaled_train_labels = output_scaler.fit_transform(train_labels)
+        scaled_val_labels = output_scaler.fit_transform(valid_labels)
+        scaled_test_labels = output_scaler.fit_transform(test_labels)
         # output_scaler = ml.MinMaxScalerX(all_labels,dim=all_labels.dims[1:])
         # scaled_all_labels = output_scaler.fit_transform(all_labels)
     else:
         scaled_train_labels = train_labels
-        scaled_val_labels = val_labels
+        scaled_val_labels = valid_labels
         scaled_test_labels = test_labels
         # scaled_all_labels = all_labels
 
@@ -187,20 +189,20 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     # scaled_valid_input = scaled_in_data.isel(hologram_number=slice(None,valid_index))
 
     print('input data shape')
-    print(in_data.dims)
-    print(in_data.shape)
+    print(train_data.dims)
+    print(train_data.shape)
 
     print('input scaled data shape')
-    print(scaled_in_data.dims)
-    print(scaled_in_data.shape)
+    print(scaled_train_labels.dims)
+    print(scaled_train_labels.shape)
 
     print('output label shape')
-    print(all_labels.dims)
-    print(all_labels.shape)
+    print(train_labels.dims)
+    print(train_labels.shape)
 
     print('output scaled label shape')
-    print(scaled_all_labels.dims)
-    print(scaled_all_labels.shape)
+    print(scaled_train_labels.dims)
+    print(scaled_train_labels.shape)
 
 
     print('input training data shape')
@@ -212,7 +214,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
     # build conv NN model
     mod = Sequential()
-    mod.add(Input(shape=scaled_in_data.shape[1:]))
+    mod.add(Input(shape=scaled_train_input.shape[1:]))
 
     # add convolutional layers
     for ai,n_filters in enumerate(settings['conv_chan']):
@@ -228,7 +230,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         mod.add(Dense(n_dense,activation='relu'))
     
     # add the output layer
-    mod.add(Dense(np.prod(scaled_all_labels.shape[1:]),activation=settings['output_activation']))
+    mod.add(Dense(np.prod(scaled_train_labels.shape[1:]),activation=settings['output_activation']))
 
     mod.compile(optimizer="adam", loss=loss_func, metrics=['acc'])
     mod.summary()
@@ -326,7 +328,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         ax.set_ylabel('Actual')
         ax.set_xscale('log')
         ax.set_yscale('log')
-        ax.set_title('%d Moment'%m)
+        ax.set_title('Moment %d'%m)
         plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
         plt.close('all')
 
