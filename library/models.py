@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from tensorflow.keras.layers import Input, Conv2D, Dense, Flatten, MaxPool2D
+from tensorflow.keras.layers import Input, Conv2D, Dense, Flatten, MaxPool2D, AveragePooling2D, Activation, \
+    Reshape, Attention
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.optimizers import Adam, SGD
 
@@ -108,3 +109,70 @@ class Conv2DNeuralNetwork(object):
     def predict_proba(self, x):
         y_prob = self.model.predict(x, batch_size=self.batch_size)
         return y_prob
+
+
+class ParticleAttentionNet(Model):
+    def __init__(self, attention_neurons=100, hidden_layers=1, hidden_neurons=100, activation="relu",
+                 min_filters=4, filter_width=5, pooling="mean", pooling_width=4, filter_growth_rate=2):
+        super(ParticleAttentionNet, self).__init__()
+        self.attention_neurons = attention_neurons
+        self.hidden_layers = hidden_layers
+        self.hidden_neurons = hidden_neurons
+        self.activation = activation
+        self.min_filters = min_filters
+        self.pooling = pooling
+        self.pooling_width = pooling_width
+        self.filter_growth_rate = filter_growth_rate
+        self.filter_width = filter_width
+        return
+
+    def particle_encoder(self, input_dim=4):
+        input_layer = Input(shape=(None, input_dim), name="particle_encoder_input")
+        pe = input_layer
+        for h in range(self.hidden_layers):
+            pe = Dense(self.hidden_neurons, activation=self.activation, name=f"particle_encoder_hidden_{h:d}")(pe)
+        pe = Dense(self.attention_neurons, activation=self.activation, name="particle_encoder_output")(pe)
+        pe_model = Model(input_layer, pe)
+        return pe_model
+
+    def particle_decoder(self, output_dim=5):
+        input_layer = Input(shape=(None, self.attention_neurons), name="particle_decoder_input")
+        pd = input_layer
+        for h in range(self.hidden_layers):
+            pd = Dense(self.hidden_neurons, activation=self.activation, name=f"particle_decoder_hidden_{h:d}")(pd)
+        pd = Dense(output_dim, activation=self.activation, name="particle_decoder_output")(pd)
+        pd_model = Model(input_layer, pd)
+        return pd_model
+
+    def hologram_encoder(self, input_shape):
+        input_layer = Input(shape=input_shape, name="hologram_input")
+        num_conv_layers = int(np.round((np.log(input_shape[1]) - np.log(self.min_data_width))
+                                       / np.log(self.pooling_width)))
+        num_filters = self.min_filters
+        h_cnn = input_layer
+        for c in range(num_conv_layers):
+            h_cnn = Conv2D(num_filters, (self.filter_width, self.filter_width),
+                               padding="same", name="conv_{0:02d}".format(c))(h_cnn)
+            h_cnn = Activation(self.activation, name="hidden_activation_{0:02d}".format(c))(h_cnn)
+            num_filters = int(num_filters * self.filter_growth_rate)
+            if self.pooling.lower() == "max":
+                h_cnn = MaxPool2D(pool_size=(self.pooling_width, self.pooling_width),
+                                      data_format=self.data_format, name="pooling_{0:02d}".format(c))(h_cnn)
+            else:
+                h_cnn = AveragePooling2D(pool_size=(self.pooling_width, self.pooling_width),
+                                             data_format=self.data_format, name="pooling_{0:02d}".format(c))(h_cnn)
+        h_cnn = Conv2D(self.attention_neurons, (self.filter_width, self.filter_width), padding="same")(h_cnn)
+        h_cnn = Activation(self.activation, name="holo_attention_activation")(h_cnn)
+        h_cnn = Reshape((h_cnn.shape[1] * h_cnn.shape[2], h_cnn.shape[3]))(h_cnn)
+        h_model = Model(input_layer, h_cnn)
+        return h_model
+
+    def full_attention_model(self, particle_encoder, hologram_encoder):
+        att = Attention()([particle_encoder, hologram_encoder])
+
+    def build_network(self, particle_input_shape, hologram_input_shape, particle_output_shape):
+
+        return
+
+
+
