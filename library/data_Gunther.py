@@ -3,7 +3,10 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import multiprocessing as mp
+import threading as th
 import time
+import traceback
 
 
 num_particles_dict = {
@@ -58,7 +61,7 @@ def open_dataset(path_data, num_particles, split):
     ds = xr.open_dataset(path_data)
     return ds
 
-def load_raw_datasets(path_data, num_particles, split, output_cols, subset):
+def load_raw_datasets(path_data, num_particles, split, subset, output_cols):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns raw inputs and outputs. Can specify
@@ -77,7 +80,7 @@ def load_raw_datasets(path_data, num_particles, split, output_cols, subset):
     """
     
     ds = open_dataset(path_data, num_particles, split)
-    if subset:
+    if subset is False:
         print("subset =",subset)
         print("ds['image'].shape[0]",ds['image'].shape[0])
         in_ix = int(subset * ds['image'].shape[0])
@@ -112,6 +115,7 @@ def scale_images(images, scaler_in=None):
 
     return images_scaled, scaler_in
 
+
 def calc_z_relative_mass(outputs, num_z_bins=20, z_bins=None):
     """
     Calculate z-relative mass from particle data.
@@ -125,7 +129,7 @@ def calc_z_relative_mass(outputs, num_z_bins=20, z_bins=None):
         z_mass: (np array) Particle mass distribution by hologram along z-axis
         z_bins: (np array) Bin linspace along the z-axis
     """
-    
+    pool = mp.Pool(mp.cpu_count())
     if z_bins is None:
         z_bins = np.linspace(outputs["z"].min() - 100,
                              outputs["z"].max() + 100,
@@ -134,11 +138,18 @@ def calc_z_relative_mass(outputs, num_z_bins=20, z_bins=None):
         num_z_bins = z_bins.size
     holograms = len(outputs["hid"].unique())
     z_mass = np.zeros((holograms, num_z_bins), dtype=np.float32)
-    for i in range(outputs.shape[0]):
+    def find_z_mass(i):
         z_pos = np.searchsorted(z_bins, outputs.loc[i, "z"], side="right") - 1
         mass = 4 / 3 * np.pi * (outputs.loc[i, "d"]/2)**3
         z_mass[int(outputs.loc[i, "hid"]) - 1, z_pos] += mass
-    z_mass /= np.expand_dims(z_mass.sum(axis=1), -1)
+        return
+    length = range(outputs.shape[0])
+    try:
+        holder = pool.map(find_z_mass, length) 
+        z_mass /= np.expand_dims(z_mass.sum(axis=1), -1)
+    except:
+        traceback.print_exception()
+        
     return z_mass, z_bins
 
 def calc_z_dist(outputs, num_z_bins=20, z_bins=None):
@@ -184,7 +195,8 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     z_min = np.minimum(train_outputs["z"].min(), valid_outputs["z"].min())
     z_max = np.maximum(train_outputs["z"].max(), valid_outputs["z"].max())
     z_bins = np.linspace(z_min, z_max, num_z_bins)
-    return z_bins
+    return z_bins    
+
 
 def load_scaled_datasets(path_data, num_particles, output_cols,
                          scaler_out=False, subset=False, num_z_bins=False,

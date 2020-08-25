@@ -1,0 +1,8 @@
+Time to get train inputs: 287.2621829509735
+Time to get validation inputs: 336.8629820346832
+Time to get train outputs: 386.74897480010986
+Time to get validation outputs: 387.4775764942169
+(50000, 600, 400, 1)
+(50000, 5)
+(10000, 600, 400, 1)
+(10000, 5)
