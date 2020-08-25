@@ -3,8 +3,8 @@
 %Each set will contain training, test, validation, and private files.
 
 %Set up parameters for the datasets
-NParticles=[1,1,1,1, 3,3,3,3];
-NHolograms=[50000,10000,10000,10000, 50000,10000,10000,10000];
+NParticles=[1,1,1,1, 3,3,3,3, 3,3,3,3];
+NHolograms=[50000,10000,10000,10000, 50000,10000,10000,10000, 50000,10000,10000,10000];
 fn=["synthetic_holograms_1particle_training.nc"
     "synthetic_holograms_1particle_test.nc"
     "synthetic_holograms_1particle_validation.nc"
@@ -12,12 +12,16 @@ fn=["synthetic_holograms_1particle_training.nc"
     "synthetic_holograms_3particle_training.nc"
     "synthetic_holograms_3particle_test.nc"
     "synthetic_holograms_3particle_validation.nc"
-    "synthetic_holograms_3particle_private.nc"];
+    "synthetic_holograms_3particle_private.nc"
+    "synthetic_holograms_variable-particle_training.nc"
+    "synthetic_holograms_variable-particle_test.nc"
+    "synthetic_holograms_variable-particle_validation.nc"
+    "synthetic_holograms_variable-particle_private.nc"];
 
 rng('shuffle');   %Set random seed
 
 %Create each dataset
-for i = 6:length(NParticles)
+for i = 1:length(NHolograms)
     op = Fraunhofer();    %This needs to be re-initialized each time
     op.nHolograms = NHolograms(i);  %Number of holograms to make
     op.NParticles = NParticles(i);  %Particles per hologram
@@ -26,5 +30,11 @@ for i = 6:length(NParticles)
     op.Dpmin = 20e-6;     %Particle size min/max
     op.Dpmax = 70e-6;
 
+    %Set op.NParticles as a 2-element min/max array for variable number of particles
+    if strfind(fn(i), 'variable')
+        op.NParticles = [1, NParticles(i)];
+    end
+    
     x = syntheticHoloScript(op, fn(i));
 end
+
