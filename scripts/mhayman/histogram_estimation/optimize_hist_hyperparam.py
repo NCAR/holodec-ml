@@ -13,7 +13,8 @@ from skopt.space import Real, Categorical, Integer
 # import keras
 # from keras.models import Sequential
 # from keras.layers import Dense, Input
-import tensorflow.v1
+import tensorflow
+import tensorflow.compat.v1
 from tensorflow.python.keras import backend as K
 
 
@@ -285,7 +286,7 @@ def fitness(learning_rate, num_dense_layers, num_input_nodes,
     # models to the same TensorFlow graph each time we create
     # a model with a different set of hyper-parameters.
     K.clear_session()
-    tensorflow.v1.reset_default_graph()
+    tensorflow.compat.v1.reset_default_graph()
     
     # the optimizer aims for the lowest score, so we return our negative accuracy
     return -accuracy
@@ -293,7 +294,7 @@ def fitness(learning_rate, num_dense_layers, num_input_nodes,
 # Run this code before every hyperparameter or anything that 
 # makes a new Keras/Tensorflow model.
 K.clear_session()
-tensorflow.v1.reset_default_graph()
+tensorflow.compat.v1.reset_default_graph()
 
 # minimize the fitness by tuning the hyper-parameters
 gp_result = gp_minimize(func=fitness,
