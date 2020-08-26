@@ -31,7 +31,7 @@ from tensorflow.keras.layers import Input, Conv2D, Dense, Flatten, Activation, M
 from tensorflow.keras.models import Model, save_model, load_model, Sequential
 from tensorflow.keras.utils import plot_model
 import tensorflow.keras.losses
-from keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
