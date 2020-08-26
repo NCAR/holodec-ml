@@ -13,7 +13,7 @@ from skopt.space import Real, Categorical, Integer
 # import keras
 # from keras.models import Sequential
 # from keras.layers import Dense, Input
-import tensorflow
+import tensorflow.v1
 from tensorflow.python.keras import backend as K
 
 
