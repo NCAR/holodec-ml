@@ -7,7 +7,7 @@
 ###SBATCH --cpus-per-task=16
 #SBATCH --time=04:00:00
 #SBATCH --gres=gpu:v100:1
-#SBATCH --output=hist.o.%j
+#SBATCH --output=hypopt.o.%j
 
 export TMPDIR=/glade/scratch/$USER/temp
 mkdir -p $TMPDIR

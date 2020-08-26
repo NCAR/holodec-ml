@@ -18,5 +18,5 @@ settings = {
             'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267]  # example outputs
             }
 
-exec_file = 'train_psd_convnet.py'
+exec_file = 'optimize_hist_hyperparam.py'
 exec(compile(open(exec_file,'rb').read(),exec_file,'exec'))
