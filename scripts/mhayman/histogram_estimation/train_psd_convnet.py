@@ -212,167 +212,167 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     print(scaled_train_labels.dims)
     print(scaled_train_labels.shape)
 
-    # build conv NN model
-    mod = Sequential()
-    mod.add(Input(shape=scaled_train_input.shape[1:]))
+# build conv NN model
+mod = Sequential()
+mod.add(Input(shape=scaled_train_input.shape[1:]))
 
-    # add convolutional layers
-    for ai,n_filters in enumerate(settings['conv_chan']):
-        mod.add(Conv2D(n_filters,
-                (settings['conv_size'][ai],settings['conv_size'][ai]),
-                padding="same",kernel_initializer = "he_normal"))
-        mod.add(Activation("relu"))
-        mod.add(MaxPool2D(pool_size=(settings['max_pool'][ai],settings['max_pool'][ai])))
+# add convolutional layers
+for ai,n_filters in enumerate(settings['conv_chan']):
+    mod.add(Conv2D(n_filters,
+            (settings['conv_size'][ai],settings['conv_size'][ai]),
+            padding="same",kernel_initializer = "he_normal"))
+    mod.add(Activation("relu"))
+    mod.add(MaxPool2D(pool_size=(settings['max_pool'][ai],settings['max_pool'][ai])))
 
-    # flatten the convolution output for Dense Layers
-    mod.add(Flatten())
-    for ai,n_dense in enumerate(settings['nn_size']):
-        mod.add(Dense(n_dense,activation='relu'))
-    
-    # add the output layer
-    mod.add(Dense(np.prod(scaled_train_labels.shape[1:]),activation=settings['output_activation']))
+# flatten the convolution output for Dense Layers
+mod.add(Flatten())
+for ai,n_dense in enumerate(settings['nn_size']):
+    mod.add(Dense(n_dense,activation='relu'))
 
-    mod.compile(optimizer="adam", loss=loss_func, metrics=['acc'])
-    mod.summary()
+# add the output layer
+mod.add(Dense(np.prod(scaled_train_labels.shape[1:]),activation=settings['output_activation']))
 
-    # save a visualization
-    plot_model(mod,show_shapes=True,to_file=save_file_path+save_file_base+"_diagram.png")
+mod.compile(optimizer="adam", loss=loss_func, metrics=['acc'])
+mod.summary()
 
-    history = mod.fit(scaled_train_input.values,
-                  scaled_train_labels.values, 
-                  batch_size=settings['batch_size'], epochs=settings['num_epochs'], verbose=1,
-                  validation_data=(scaled_valid_input.values,scaled_val_labels.values))
+# save a visualization
+plot_model(mod,show_shapes=True,to_file=save_file_path+save_file_base+"_diagram.png")
 
-    ### Save the Training History ###
-    epochs = np.arange(len(history.history['loss']))+1
-    fig, ax = plt.subplots(1, 1, figsize=(8, 4))
-    ax.plot(epochs,history.history['loss'],'bo-',alpha=0.5,label='Training')
-    ax.plot(epochs,history.history['val_loss'],'rs-',alpha=0.5,label='Validation')
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Loss')
-    if np.sum(np.array(history.history['loss'])<=0) == 0:
-        ax.set_yscale('log')
+history = mod.fit(scaled_train_input.values,
+                scaled_train_labels.values, 
+                batch_size=settings['batch_size'], epochs=settings['num_epochs'], verbose=1,
+                validation_data=(scaled_valid_input.values,scaled_val_labels.values))
+
+### Save the Training History ###
+epochs = np.arange(len(history.history['loss']))+1
+fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+ax.plot(epochs,history.history['loss'],'bo-',alpha=0.5,label='Training')
+ax.plot(epochs,history.history['val_loss'],'rs-',alpha=0.5,label='Validation')
+ax.set_xlabel('Epoch')
+ax.set_ylabel('Loss')
+if np.sum(np.array(history.history['loss'])<=0) == 0:
+    ax.set_yscale('log')
+ax.grid(b=True)
+plt.legend()
+plt.savefig(save_file_path+save_file_base+"_LossHistory.png", dpi=200, bbox_inches="tight")
+
+fig, bx = plt.subplots(1, 1, figsize=(8, 4))
+bx.plot(epochs,history.history['acc'],'bo-',alpha=0.5,label='Training')
+bx.plot(epochs,history.history['val_acc'],'rs-',alpha=0.5,label='Validation')
+bx.set_xlabel('Epoch')
+bx.set_ylabel('Accuracy')
+bx.grid(b=True)
+plt.legend()
+plt.savefig(save_file_path+save_file_base+"_AccuracyHistory.png", dpi=200, bbox_inches="tight")
+
+### Save the Model ### 
+model_name = save_file_base+".h5"
+save_model(mod, save_file_path+model_name, save_format="h5")
+print('saved model as')
+print(save_file_path+model_name)
+
+# Save the training history
+res_ds = xr.Dataset({
+                    'epochs':epochs,
+                    'Training_Loss':history.history['loss'],
+                    'Validation_Loss':history.history['val_loss'],
+                    'Training_Accuracy':history.history['acc'],
+                    'Validation_Accuracy':history.history['val_acc'],
+                    'test_index':test_index,
+                    'valid_index':valid_index,
+                    'input_variable':input_variable
+                    })
+res_ds.attrs['batch_size'] = settings['batch_size']
+res_ds.attrs['training_data'] = settings['data_file']
+res_ds.attrs['training_path'] = paths['load_data']
+res_ds.attrs['output_path'] = paths['save_data']
+res_ds.attrs['model'] = model_name
+res_ds.to_netcdf(save_file_path+save_file_base+"_TrainingHistory.nc")
+
+
+# evaluate the test data
+print("Evaluating test data...")
+cnn_start = datetime.datetime.now()
+preds_out = mod.predict(scaled_test_input.values, batch_size=settings['batch_size'])
+cnn_stop = datetime.datetime.now()
+print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
+print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
+
+if len(preds_out.shape)==2:
+    preds_out = preds_out[...,np.newaxis]
+
+preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','histogram_bin_centers','output_channels'),
+                            coords=scaled_test_labels.coords)
+
+if settings.get('scale_labels',True):
+    preds_original = output_scaler.inverse_transform(preds_out_da)
+else:
+    preds_original = preds_out_da
+
+for m in settings.get('moments',[0,1,2,3]):
+    m_pred = (preds_original*(0.5*preds_original.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
+    try:
+        m_label = test_moments.sel(moments=m)
+    except KeyError:
+        print('No direct moment data')
+        print('Approximating moments from histogram data')
+        m_label = (test_labels*(0.5*test_labels.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
+    one_to_one = [m_label.values.min(),m_label.values.max()]
+    fig, ax = plt.subplots() # figsize=(4,4)
+    ax.scatter(m_pred,m_label,s=1,c='k')
+    ax.plot(one_to_one,one_to_one,color='tab:red',linewidth=0.5)
+    ax.minorticks_on()
     ax.grid(b=True)
-    plt.legend()
-    plt.savefig(save_file_path+save_file_base+"_LossHistory.png", dpi=200, bbox_inches="tight")
-
-    fig, bx = plt.subplots(1, 1, figsize=(8, 4))
-    bx.plot(epochs,history.history['acc'],'bo-',alpha=0.5,label='Training')
-    bx.plot(epochs,history.history['val_acc'],'rs-',alpha=0.5,label='Validation')
-    bx.set_xlabel('Epoch')
-    bx.set_ylabel('Accuracy')
-    bx.grid(b=True)
-    plt.legend()
-    plt.savefig(save_file_path+save_file_base+"_AccuracyHistory.png", dpi=200, bbox_inches="tight")
-
-    ### Save the Model ### 
-    model_name = save_file_base+".h5"
-    save_model(mod, save_file_path+model_name, save_format="h5")
-    print('saved model as')
-    print(save_file_path+model_name)
-
-    # Save the training history
-    res_ds = xr.Dataset({
-                        'epochs':epochs,
-                        'Training_Loss':history.history['loss'],
-                        'Validation_Loss':history.history['val_loss'],
-                        'Training_Accuracy':history.history['acc'],
-                        'Validation_Accuracy':history.history['val_acc'],
-                        'test_index':test_index,
-                        'valid_index':valid_index,
-                        'input_variable':input_variable
-                        })
-    res_ds.attrs['batch_size'] = settings['batch_size']
-    res_ds.attrs['training_data'] = settings['data_file']
-    res_ds.attrs['training_path'] = paths['load_data']
-    res_ds.attrs['output_path'] = paths['save_data']
-    res_ds.attrs['model'] = model_name
-    res_ds.to_netcdf(save_file_path+save_file_base+"_TrainingHistory.nc")
+    ax.grid(which='minor',linestyle=':')
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('Actual')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_title('Moment %d'%m)
+    plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
+    plt.close('all')
 
 
-    # evaluate the test data
-    print("Evaluating test data...")
-    cnn_start = datetime.datetime.now()
-    preds_out = mod.predict(scaled_test_input.values, batch_size=settings['batch_size'])
-    cnn_stop = datetime.datetime.now()
-    print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
-    print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
+for holo_num in settings['holo_examples']:
+    plt.figure()
+    plt.bar(ds['histogram_bin_edges'].values[:-1],preds_original.isel(hologram_number=holo_num,output_channels=0).values,
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
+    plt.bar(ds['histogram_bin_edges'].values[:-1],test_labels.isel(hologram_number=holo_num,output_channels=0).values,
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='white',edgecolor='black',fill=False,label='true')
+    # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
+    # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
+    plt.xlabel('Particle Diameter [$\mu m$]')
+    plt.ylabel('Count')
+    if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
+        plt.xscale('log')
+    plt.savefig(save_file_path+save_file_base+f"_ExampleHist_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
-    if len(preds_out.shape)==2:
-        preds_out = preds_out[...,np.newaxis]
+    plt.figure()
+    plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(preds_original.isel(hologram_number=holo_num,output_channels=0).values),
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
+    plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(test_labels.isel(hologram_number=holo_num,output_channels=0).values),
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='white',edgecolor='black',fill=False,label='true')
+    # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
+    # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
+    plt.xlabel('Particle Diameter [$\mu m$]')
+    plt.ylabel('Count')
+    if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
+        plt.xscale('log')
+    plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
-    preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','histogram_bin_centers','output_channels'),
-                                coords=scaled_test_labels.coords)
-
-    if settings.get('scale_labels',True):
-        preds_original = output_scaler.inverse_transform(preds_out_da)
+    if scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values.ndim == 2:
+        plt.figure()
+        plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
+        plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")     
     else:
-        preds_original = preds_out_da
-
-    for m in settings.get('moments',[0,1,2,3]):
-        m_pred = (preds_original*(0.5*preds_original.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
-        try:
-            m_label = test_moments.sel(moments=m)
-        except KeyError:
-            print('No direct moment data')
-            print('Approximating moments from histogram data')
-            m_label = (test_labels*(0.5*test_labels.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
-        one_to_one = [m_label.values.min(),m_label.values.max()]
-        fig, ax = plt.subplots() # figsize=(4,4)
-        ax.scatter(m_pred,m_label,s=1,c='k')
-        ax.plot(one_to_one,one_to_one,color='tab:red',linewidth=0.5)
-        ax.minorticks_on()
-        ax.grid(b=True)
-        ax.grid(which='minor',linestyle=':')
-        ax.set_xlabel('Predicted')
-        ax.set_ylabel('Actual')
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-        ax.set_title('Moment %d'%m)
-        plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
-        plt.close('all')
-
-
-    for holo_num in settings['holo_examples']:
         plt.figure()
-        plt.bar(ds['histogram_bin_edges'].values[:-1],preds_original.isel(hologram_number=holo_num,output_channels=0).values,
-                np.diff(ds['histogram_bin_edges'].values),
-                facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
-        plt.bar(ds['histogram_bin_edges'].values[:-1],test_labels.isel(hologram_number=holo_num,output_channels=0).values,
-                np.diff(ds['histogram_bin_edges'].values),
-                facecolor='white',edgecolor='black',fill=False,label='true')
-        # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
-        # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
-        plt.xlabel('Particle Diameter [$\mu m$]')
-        plt.ylabel('Count')
-        if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
-            plt.xscale('log')
-        plt.savefig(save_file_path+save_file_base+f"_ExampleHist_ih{holo_num}.png", dpi=200, bbox_inches="tight")
-
-        plt.figure()
-        plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(preds_original.isel(hologram_number=holo_num,output_channels=0).values),
-                np.diff(ds['histogram_bin_edges'].values),
-                facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
-        plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(test_labels.isel(hologram_number=holo_num,output_channels=0).values),
-                np.diff(ds['histogram_bin_edges'].values),
-                facecolor='white',edgecolor='black',fill=False,label='true')
-        # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
-        # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
-        plt.xlabel('Particle Diameter [$\mu m$]')
-        plt.ylabel('Count')
-        if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
-            plt.xscale('log')
-        plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
-
-        if scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values.ndim == 2:
-            plt.figure()
-            plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
-            plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")     
-        else:
-            plt.figure()
-            plt.plot(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
-            plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
-        plt.close()
+        plt.plot(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
+        plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+    plt.close()
 
 
 # # save the settings in human readable format
