@@ -17,11 +17,6 @@ import tensorflow
 from tensorflow.python.keras import backend as K
 
 
-
-
-
-
-
 import sys
 import numpy as np
 import xarray as xr
@@ -100,9 +95,10 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     test_index = np.int((settings['valid_fraction']+settings['test_fraction'])*ds.sizes['hologram_number'])  # number of training+validation points
     valid_index = np.int(settings['valid_fraction']*ds.sizes['hologram_number'])  # number of validation points
     
-    print('test index: %d'%test_index)
-    print('validation index: %d'%valid_index)
-    print('hologram count: %d'%ds.sizes['hologram_number'])
+    if not separate_files:
+        print('test index: %d'%test_index)
+        print('validation index: %d'%valid_index)
+        print('hologram count: %d'%ds.sizes['hologram_number'])
 
     # assign test and validation based on datasets used
     all_labels = ds[label_variable]
@@ -289,7 +285,7 @@ def fitness(learning_rate, num_dense_layers, num_input_nodes,
     # models to the same TensorFlow graph each time we create
     # a model with a different set of hyper-parameters.
     K.clear_session()
-    tensorflow.reset_default_graph()
+    tensorflow.v1.reset_default_graph()
     
     # the optimizer aims for the lowest score, so we return our negative accuracy
     return -accuracy
@@ -297,7 +293,7 @@ def fitness(learning_rate, num_dense_layers, num_input_nodes,
 # Run this code before every hyperparameter or anything that 
 # makes a new Keras/Tensorflow model.
 K.clear_session()
-tensorflow.reset_default_graph()
+tensorflow.v1.reset_default_graph()
 
 # minimize the fitness by tuning the hyper-parameters
 gp_result = gp_minimize(func=fitness,
