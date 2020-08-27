@@ -1,6 +1,8 @@
 """
 Functions for defining machine learning
 architectures
+
+
 Created Mar. 13, 2020
 Matthew Hayman
 mhayman@ucar.edu
@@ -26,6 +28,7 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
     nPool - number of points in each max-pool operation
     activation - activation function to use.  Typically 'relu'.
     cat - concatenate the feedforward onto the other side of the UNET
+
     Example use:
     # UNET parameter definitions
     nFilters = 16
@@ -35,16 +38,21 @@ def add_unet_layers(input_node,n_layers,n_filters,nConv=5,
     loss_fun = "mse"
     out_act = "linear" 
     
+
     # define the input based on input data dimensions
     cnn_input = Input(shape=scaled_in_data.shape[1:])  
+
     # create the unet
     unet_out = add_unet_layers(cnn_input,nLayers,nFilters,nConv=nConv,nPool=nPool,activation="relu")
+
     # add the output layer
     out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
+
     # build and compile the model
     mod = Model(cnn_input, unet_out)
     mod.compile(optimizer="adam", loss=loss_fun,metrics=['acc'])
     mod.summary()
+
     """
     
     if n_layers > 1:
@@ -95,6 +103,8 @@ def add_unet_dense(input_node,n_layers,n_filters,nConv=5,
     nConv - number of points in each convolution kernel
     nPool - number of points in each max-pool operation
     activation - activation function to use.  Typically 'relu'.
+
+
     Example use:
     # UNET parameter definitions
     nFilters = 16
@@ -103,16 +113,21 @@ def add_unet_dense(input_node,n_layers,n_filters,nConv=5,
     nLayers = 4
     loss_fun = "mse"
     out_act = "linear" 
+
     # define the input based on input data dimensions
     cnn_input = Input(shape=scaled_in_data.shape[1:])  
+
     # create the unet
     unet_out = add_unet_layers(cnn_input,nLayers,nFilters,nConv=nConv,nPool=nPool,activation="relu")
+
     # add the output layer
     out = Conv2D(scaled_train_labels.sizes['type'],(1,1),padding="same",activation=out_act)(unet_out)
+
     # build and compile the model
     mod = Model(cnn_input, unet_out)
     mod.compile(optimizer="adam", loss=loss_fun,metrics=['acc'])
     mod.summary()
+
     """
     
     if n_layers > 1:
@@ -164,12 +179,14 @@ def filtered_mae(y_true,y_pred):
     """
     Calculate mean absolute error for particle amplitude
     and position.
+
     Custom loss function for unet trained to identify
     particle images and positions.
     
     This function calculates mean absolute error of all
     amplitude pixels but calculates mean absolute error of
     only particle pixels on the z pixels.
+
     This assumes that the first channel is the z data and
     the second channel is the amplitude data.
     """
@@ -194,12 +211,14 @@ def filtered_mse(y_true,y_pred):
     """
     Calculate mean square error for particle amplitude
     and position.
+
     Custom loss function for unet trained to identify
     particle images and positions.
     
     This function calculates mean absolute error of all
     amplitude pixels but calculates mean absolute error of
     only particle pixels on the z pixels.
+
     This assumes that the first channel is the z data and
     the second channel is the amplitude data.
     """
