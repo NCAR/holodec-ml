@@ -1,0 +1,32 @@
+path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+path_save: "hidden_100_leaky"
+num_particles: "multi"
+maxnum_particles: 100
+output_cols: ["x", "y", "z", "d"]
+subset: False
+workers: 24
+batch_size: 128
+epochs: 100
+test_image: "/glade/work/schreck/repos/holodec-ml/holodecml/scripts/schreck/vae_torch/src/image.pkl"
+retrain: False
+transforms:
+  Rescale: 384
+  Normalize: True
+  ToTensor: True
+model:
+  image_channels: 1
+  h_dim: 50176
+  z_dim: 100
+callbacks:
+  EarlyStopping:
+    verbose: True
+    patience: 10
+  ReduceLROnPlateau: 
+    mode: "min"
+    factor: 0.5
+    patience: 5
+    min_lr: 0.000000000000001
+    verbose: True
+optimizer: 
+  type: "lookahead-diffgrad"
+  lr: 0.001
