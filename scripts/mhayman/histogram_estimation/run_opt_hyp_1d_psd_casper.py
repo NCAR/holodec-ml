@@ -15,7 +15,23 @@ settings = {
             'test_fraction':0.1,    # fraction of data reserved for training
             'loss_function':'cum_poisson',     # loss function
             'h_chunk':128,      # xarray chunk size when loading
-            'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267]  # example outputs
+            'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267],  # example outputs
+
+            # optimization definitions: high, low and initial value
+            'learning_rate':[1e-5,1e-1,1e-3], 
+            'num_dense_layers':[0,5,1],
+            'num_input_nodes':[1,1024,128],
+            'num_dense_nodes':[1,1024,128],
+            'activation':['relu', 'sigmoid','relu'], # categorical list, last is initial value
+            'batch_size':[1,256,64],
+            'adam_decay':[1e-6,1e-2],
+            'epoch_count':[500,5000],
+
+            # gp_minimize arguments
+            'n_calls':12,
+            'noise':0.01,
+            'n_jobs':-1,
+            'kappa':5
             }
 
 exec_file = 'optimize_hist_hyperparam.py'

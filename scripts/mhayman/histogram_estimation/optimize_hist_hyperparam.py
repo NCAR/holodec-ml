@@ -163,16 +163,30 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
 
 # setup the dimensions for hyperparameter optimization
-dim_learning_rate = Real(low=1e-4, high=1e-2, prior='log-uniform',
-                         name='learning_rate')
-dim_num_dense_layers = Integer(low=0, high=5, name='num_dense_layers')
-dim_num_input_nodes = Integer(low=1, high=512, name='num_input_nodes')
-dim_num_dense_nodes = Integer(low=1, high=512, name='num_dense_nodes')
-dim_activation = Categorical(categories=['relu', 'sigmoid'],
+dim_learning_rate = Real(low=settings['learning_rate'][0], 
+                        high=settings['learning_rate'][1], 
+                        prior='log-uniform',
+                        name='learning_rate')
+dim_num_dense_layers = Integer(low=settings['num_dense_layers'][0], 
+                        high=settings['num_dense_layers'][1], 
+                        name='num_dense_layers')
+dim_num_input_nodes = Integer(low=settings['num_input_nodes'][0], 
+                        high=settings['num_input_nodes'][1], 
+                        name='num_input_nodes')
+dim_num_dense_nodes = Integer(low=settings['num_dense_nodes'][0], 
+                        high=settings['num_dense_nodes'][1], 
+                        name='num_dense_nodes')
+dim_activation = Categorical(categories=settings['activation'][:-1],
                              name='activation')
-dim_batch_size = Integer(low=1, high=256, name='batch_size')
-dim_adam_decay = Real(low=1e-6,high=1e-2,name="adam_decay")
-dim_epoch_count = Integer(low=500,high=2000,name="epoch_count")
+dim_batch_size = Integer(low=settings['batch_size'][0], 
+                        high=settings['batch_size'][1], 
+                        name='batch_size')
+dim_adam_decay = Real(low=settings['adam_decay'][0],
+                        high=settings['adam_decay'][1],
+                        name="adam_decay")
+dim_epoch_count = Integer(low=settings['epoch_count'][0],
+                        high=settings['epoch_count'][1],
+                        name="epoch_count")
 
 dimensions = [dim_learning_rate,
               dim_num_dense_layers,
@@ -184,7 +198,14 @@ dimensions = [dim_learning_rate,
               dim_epoch_count
              ]
 
-default_parameters = [1e-3, 1, 512, 128, 'relu', 64, 1e-3, 1000]
+default_parameters = [  settings['learning_rate'][2], 
+                        settings['num_dense_layers'][2], 
+                        settings['num_input_nodes'][2], 
+                        settings['num_dense_nodes'][2], 
+                        settings['activation'][-1], 
+                        settings['batch_size'][2],
+                        settings['adam_decay'][2], 
+                        settings['epoch_count'][2]]
 
 
 
@@ -299,10 +320,10 @@ tensorflow.compat.v1.reset_default_graph()
 # minimize the fitness by tuning the hyper-parameters
 gp_result = gp_minimize(func=fitness,
                             dimensions=dimensions,
-                            n_calls=12,
-                            noise= 0.01,
-                            n_jobs=-1,
-                            kappa = 5,
+                            n_calls=settings['n_calls'],
+                            noise= settings['noise'],
+                            n_jobs=settings['n_jobs'],
+                            kappa = settings['kappa'],
                             x0=default_parameters)
 
 
@@ -310,13 +331,43 @@ print(gp_result.x)
 
 # evaluate on test data
 mod = create_model(gp_result.x[0],gp_result.x[1],gp_result.x[2],gp_result.x[3],gp_result.x[4],gp_result.x[6],scaled_train_input.shape[1:])
-mod.fit(scaled_train_input.values,scaled_train_labels.values,batch_size=gp_result.x[5], epochs=gp_result.x[7])
-# model.evaluate(X_test,y_test)
+# save a visualization
+plot_model(mod,show_shapes=True,to_file=save_file_path+save_file_base+"_diagram.png")
+# train optimal model
+history = mod.fit(scaled_train_input.values,scaled_train_labels.values,batch_size=gp_result.x[5], epochs=gp_result.x[7])
+
+### Save the Training History ###
+epochs = np.arange(len(history.history['loss']))+1
+fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+ax.plot(epochs,history.history['loss'],'bo-',alpha=0.5,label='Training')
+ax.plot(epochs,history.history['val_loss'],'rs-',alpha=0.5,label='Validation')
+ax.set_xlabel('Epoch')
+ax.set_ylabel('Loss')
+if np.sum(np.array(history.history['loss'])<=0) == 0:
+    ax.set_yscale('log')
+ax.grid(b=True)
+plt.legend()
+plt.savefig(save_file_path+save_file_base+"_LossHistory.png", dpi=200, bbox_inches="tight")
+
+fig, bx = plt.subplots(1, 1, figsize=(8, 4))
+bx.plot(epochs,history.history['acc'],'bo-',alpha=0.5,label='Training')
+bx.plot(epochs,history.history['val_acc'],'rs-',alpha=0.5,label='Validation')
+bx.set_xlabel('Epoch')
+bx.set_ylabel('Accuracy')
+bx.grid(b=True)
+plt.legend()
+plt.savefig(save_file_path+save_file_base+"_AccuracyHistory.png", dpi=200, bbox_inches="tight")
+
+### Save the Model ### 
+model_name = save_file_base+".h5"
+save_model(mod, save_file_path+model_name, save_format="h5")
+print('saved model as')
+print(save_file_path+model_name)
 
 # evaluate the test data
 print("Evaluating test data...")
 cnn_start = datetime.datetime.now()
-preds_out = mod.predict(scaled_test_input.values, batch_size=settings['batch_size'])
+preds_out = mod.predict(scaled_test_input.values, batch_size=gp_result.x[5])
 cnn_stop = datetime.datetime.now()
 print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
 print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
