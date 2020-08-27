@@ -98,9 +98,11 @@ class MetricsLogger:
         for key, value in data.items():
             self.metrics[key].append(value)
         self.save()
+        
     
     def to_pandas(self) -> pd.DataFrame:
         return pd.DataFrame.from_dict(self.metrics)
+    
     
     def save(self) -> None:
         self.to_pandas().to_csv(
@@ -110,9 +112,10 @@ class MetricsLogger:
             index = None
         )
         
+        
     def load(self) -> None:
         self.metrics = pd.read_csv(
             self.path_save, 
             sep = ',', 
             encoding = 'utf-8'
-        )
+        ).to_dict()

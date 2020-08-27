@@ -95,12 +95,6 @@ class Trainer:
         return loss, bce, kld
 
 
-    def compare(self, epoch, x):
-        x = x.to(self.device)
-        recon_x, _, _ = self.model(x)
-        compare_x = torch.cat([x, recon_x])
-        save_image(compare_x.data.cpu(), f'{self.path_save}/image_epoch_{epoch}.png')
-
     def test(self, epoch):
 
         self.model.eval()
@@ -137,12 +131,19 @@ class Trainer:
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
 
-        if os.path.isfile(self.test_image):
-            with open(self.test_image, "rb") as fid:
-                pic = pickle.load(fid)
-            self.compare(epoch, pic)
+            if os.path.isfile(self.test_image):
+                with open(self.test_image, "rb") as fid:
+                    pic = pickle.load(fid)
+                self.compare(epoch, pic)
 
         return loss, bce, kld
+    
+    
+    def compare(self, epoch, x):
+        x = x.to(self.device)
+        recon_x, _, _ = self.model(x)
+        compare_x = torch.cat([x, recon_x])
+        save_image(compare_x.data.cpu(), f'{self.path_save}/image_epoch_{epoch}.png')
 
 
     
@@ -210,7 +211,7 @@ if __name__ == '__main__':
     test_image = config["test_image"]
     
     batch_size = config["batch_size"]
-    workers = config["workers"]
+    workers = min(config["workers"], cpu_count())
     epochs = config["epochs"]
     retrain = False if "retrain" not in config else config["retrain"]
     
@@ -307,9 +308,9 @@ if __name__ == '__main__':
     
     if retrain:
         vae = vae.load_state_dict(
-            saved_model_optimizer["model_state_dict"]
+            saved_model_optimizer["model_state_dict"], map_location=device
         )
-        logger.info(f"Loaded model weights from {model_save_path}")
+        logging.info(f"Loaded model weights from {model_save_path}")
         
     
     ############################################################
@@ -335,7 +336,7 @@ if __name__ == '__main__':
     elif optimizer_type == "sgd":
         optimizer = torch.optim.SGD(vae.parameters(), lr=learning_rate)
     else:
-        logger.warning(
+        logging.warning(
             f"Optimzer type {optimizer_type} is unknown. Exiting with error."
         )
         sys.exit(1)
@@ -346,9 +347,9 @@ if __name__ == '__main__':
     
     if retrain:
         optimizer = optimizer.load_state_dict(
-            saved_model_optimizer["optimizer_state_dict"]
+            saved_model_optimizer["optimizer_state_dict"], map_location=device
         )
-        logger.info(f"Loaded optimizer weights from {model_save_path}")
+        logging.info(f"Loaded optimizer weights from {model_save_path}")
     
     ############################################################
     #
