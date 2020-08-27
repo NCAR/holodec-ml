@@ -24,8 +24,8 @@ settings = {
             'num_dense_nodes':[1,1024,128],
             'activation':['relu', 'sigmoid','relu'], # categorical list, last is initial value
             'batch_size':[1,256,64],
-            'adam_decay':[1e-6,1e-2],
-            'epoch_count':[500,5000],
+            'adam_decay':[1e-6,1e-2,1e-3],
+            'epoch_count':[500,5000,1000],
 
             # gp_minimize arguments
             'n_calls':12,
