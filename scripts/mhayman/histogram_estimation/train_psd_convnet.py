@@ -66,10 +66,19 @@ save_file_base = settings['data_file'].replace('.nc','')+'_ConvNet_'+start_time.
 save_file_path = paths['save_data']+save_file_base+'/'
 ml.ensure_path(save_file_path)
 
+
+separate_files = False # flag indicating how to obtain test and validation data
 print('Training UNET on')
 print(settings['data_file'])
 print('located in')
 print(paths['load_data'])
+# check if we are using separate files for training, test and validation
+if len(settings.get('test_file','')) > 0 and len(settings.get('validation_file','')) > 0:
+    separate_files = True
+    print('Validating with')
+    print(settings['validation_file'])
+    print('Testing with')
+    print(settings['test_file'])
 
 if settings['loss_function'].lower() == 'kldivergence':
     loss_func = tensorflow.keras.losses.KLDivergence()
@@ -100,52 +109,100 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     print('validation index: %d'%valid_index)
     print('hologram count: %d'%ds.sizes['hologram_number'])
 
+    # assign test and validation based on datasets used
     all_labels = ds[label_variable]
-    train_labels = all_labels.isel(hologram_number=slice(test_index,None))
-    test_labels = all_labels.isel(hologram_number=slice(valid_index,test_index))
-    # val_labels = all_labels.isel(hologram_number=slice(None,valid_index))
+    if separate_files:
+        train_labels = ds[label_variable]
+        train_moments = ds['histogram_moments']
+        if len(ds[input_variable].dims) == 4:
+            train_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+        elif len(ds[input_variable].dims) == 3:
+            train_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
+        input_scaler = ml.MinMaxScalerX(train_data)
+        scaled_train_input = input_scaler.fit_transform(train_data)
 
-    # normalize based on training data
-    
-    if settings.get('scale_labels',True):
-        output_scaler = ml.MinMaxScalerX(all_labels,dim=all_labels.dims[1:])
-        scaled_all_labels = output_scaler.fit_transform(all_labels)
+        with xr.open_dataset(paths['load_data']+settings['test_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_test:
+            test_labels = ds_test[label_variable]
+            test_moments = ds_test['histogram_moments']
+            if len(ds_test[input_variable].dims) == 4:
+                test_input = ds_test[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+            elif len(ds_test[input_variable].dims) == 3:
+                test_data = ds_test[input_variable].transpose('hologram_number','rsize','input_channels')
+            scaled_test_input = input_scaler.fit_transform(test_data)
+        with xr.open_dataset(paths['load_data']+settings['validation_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_valid:
+            valid_labels = ds_valid[label_variable]
+            valid_moments = ds_valid['histogram_moments']
+            if len(ds_valid[input_variable].dims) == 4:
+                valid_input = ds_valid[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+            elif len(ds_valid[input_variable].dims) == 3:
+                valid_data = ds_valid[input_variable].transpose('hologram_number','rsize','input_channels')
+            scaled_valid_input = input_scaler.fit_transform(valid_data)
+
     else:
-        scaled_all_labels = all_labels
+        train_labels = all_labels.isel(hologram_number=slice(test_index,None))
+        test_labels = all_labels.isel(hologram_number=slice(valid_index,test_index))
+        test_moments = ds['histogram_moments'].isel(hologram_number=slice(valid_index,test_index))
+        val_labels = all_labels.isel(hologram_number=slice(None,valid_index))
+        
+        if len(ds[input_variable].dims) == 4:
+            in_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+        elif len(ds[input_variable].dims) == 3:
+            in_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
+        
+        # input scaling is not totally proper on this branch
+        input_scaler = ml.MinMaxScalerX(in_data,dim=in_data.dims[1:])
+        scaled_in_data = input_scaler.fit_transform(in_data)
+        scaled_train_input = scaled_in_data.isel(hologram_number=slice(test_index,None))
+        scaled_test_input = scaled_in_data.isel(hologram_number=slice(valid_index,test_index))
+        scaled_valid_input = scaled_in_data.isel(hologram_number=slice(None,valid_index))
+        
+    if settings.get('scale_labels',True):
+        # normalize based on training data
+        output_scaler = ml.MinMaxScalerX(train_labels)
+        scaled_train_labels = output_scaler.fit_transform(train_labels)
+        scaled_val_labels = output_scaler.fit_transform(valid_labels)
+        scaled_test_labels = output_scaler.fit_transform(test_labels)
+        # output_scaler = ml.MinMaxScalerX(all_labels,dim=all_labels.dims[1:])
+        # scaled_all_labels = output_scaler.fit_transform(all_labels)
+    else:
+        scaled_train_labels = train_labels
+        scaled_val_labels = valid_labels
+        scaled_test_labels = test_labels
+        # scaled_all_labels = all_labels
 
-    scaled_train_labels = scaled_all_labels.isel(hologram_number=slice(test_index,None))
-    scaled_test_labels = scaled_all_labels.isel(hologram_number=slice(valid_index,test_index))
-    scaled_val_labels = scaled_all_labels.isel(hologram_number=slice(None,valid_index))
+    # scaled_train_labels = scaled_all_labels.isel(hologram_number=slice(test_index,None))
+    # scaled_test_labels = scaled_all_labels.isel(hologram_number=slice(valid_index,test_index))
+    # scaled_val_labels = scaled_all_labels.isel(hologram_number=slice(None,valid_index))
 
-    # setup the input to be used
-    if len(ds[input_variable].dims) == 4:
-        in_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
-    elif len(ds[input_variable].dims) == 3:
-        in_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
+    # # setup the input to be used
+    # if len(ds[input_variable].dims) == 4:
+    #     in_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+    # elif len(ds[input_variable].dims) == 3:
+    #     in_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
     
-    train_input = in_data.isel(hologram_number=slice(test_index,None))
-    input_scalar = ml.MinMaxScalerX(in_data,dim=in_data.dims[1:])
-    scaled_in_data = input_scalar.fit_transform(in_data)
+    # train_input = in_data.isel(hologram_number=slice(test_index,None))
+    # input_scalar = ml.MinMaxScalerX(in_data,dim=in_data.dims[1:])
+    # scaled_in_data = input_scalar.fit_transform(in_data)
 
-    scaled_train_input = scaled_in_data.isel(hologram_number=slice(test_index,None))
-    scaled_test_input = scaled_in_data.isel(hologram_number=slice(valid_index,test_index))
-    scaled_valid_input = scaled_in_data.isel(hologram_number=slice(None,valid_index))
+    # scaled_train_input = scaled_in_data.isel(hologram_number=slice(test_index,None))
+    # scaled_test_input = scaled_in_data.isel(hologram_number=slice(valid_index,test_index))
+    # scaled_valid_input = scaled_in_data.isel(hologram_number=slice(None,valid_index))
 
     print('input data shape')
-    print(in_data.dims)
-    print(in_data.shape)
+    print(train_data.dims)
+    print(train_data.shape)
 
     print('input scaled data shape')
-    print(scaled_in_data.dims)
-    print(scaled_in_data.shape)
+    print(scaled_train_labels.dims)
+    print(scaled_train_labels.shape)
 
     print('output label shape')
-    print(all_labels.dims)
-    print(all_labels.shape)
+    print(train_labels.dims)
+    print(train_labels.shape)
 
     print('output scaled label shape')
-    print(scaled_all_labels.dims)
-    print(scaled_all_labels.shape)
+    print(scaled_train_labels.dims)
+    print(scaled_train_labels.shape)
 
 
     print('input training data shape')
@@ -157,7 +214,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
     # build conv NN model
     mod = Sequential()
-    mod.add(Input(shape=scaled_in_data.shape[1:]))
+    mod.add(Input(shape=scaled_train_input.shape[1:]))
 
     # add convolutional layers
     for ai,n_filters in enumerate(settings['conv_chan']):
@@ -173,7 +230,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         mod.add(Dense(n_dense,activation='relu'))
     
     # add the output layer
-    mod.add(Dense(np.prod(scaled_all_labels.shape[1:]),activation=settings['output_activation']))
+    mod.add(Dense(np.prod(scaled_train_labels.shape[1:]),activation=settings['output_activation']))
 
     mod.compile(optimizer="adam", loss=loss_func, metrics=['acc'])
     mod.summary()
@@ -253,8 +310,13 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         preds_original = preds_out_da
 
     for m in settings.get('moments',[0,1,2,3]):
-        m_pred = (preds_original*preds_original.coords['histogram_bin_centers']**m).sum(dim=('histogram_bin_centers','output_channels'))
-        m_label = (test_labels*test_labels.coords['histogram_bin_centers']**m).sum(dim=('histogram_bin_centers','output_channels'))
+        m_pred = (preds_original*(0.5*preds_original.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
+        try:
+            m_label = test_moments.sel(moments=m)
+        except KeyError:
+            print('No direct moment data')
+            print('Approximating moments from histogram data')
+            m_label = (test_labels*(0.5*test_labels.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
         one_to_one = [m_label.values.min(),m_label.values.max()]
         fig, ax = plt.subplots() # figsize=(4,4)
         ax.scatter(m_pred,m_label,s=1,c='k')
@@ -264,7 +326,9 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         ax.grid(which='minor',linestyle=':')
         ax.set_xlabel('Predicted')
         ax.set_ylabel('Actual')
-        ax.set_title('%d Moment'%m)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_title('Moment %d'%m)
         plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
         plt.close('all')
 

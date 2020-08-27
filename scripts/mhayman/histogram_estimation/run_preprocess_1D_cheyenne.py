@@ -7,11 +7,11 @@ import numpy as np
 paths = {   'data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
             'save':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/'}
 
-settings = {    'data_file':['synthetic_holograms_50-100particle_monodisperse_training.nc',
-                            'synthetic_holograms_50-100particle_monodisperse_validation.nc',
-                            'synthetic_holograms_50-100particle_monodisperse_test.nc'],
+settings = {    'data_file':['synthetic_holograms_50-100particle_bidisperse_training.nc',
+                            'synthetic_holograms_50-100particle_bidisperse_validation.nc',
+                            'synthetic_holograms_50-100particle_bidisperse_test.nc'],
                 'FourierTransform':True,
-                'hist_edges': np.arange(0,200,10),# np.logspace(0,3,41),
+                'hist_edges': np.arange(0,200,5),# np.logspace(0,3,41),
                 'max_hist_count':5000,
                 'log_hist':False,
                 'log_in':False
