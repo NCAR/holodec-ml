@@ -123,12 +123,16 @@ for fn in data_file_list:
             particle_count = ds['d'].values[particle_index].size
             print(particle_count)
             # print(f'  found {particle_count} particles')
+<<<<<<< HEAD
 
             h_moments = []
             for m in settings.get('moments',[0,1,2,3,4,5,6]):
                 h_moments += [np.sum((ds['d'].values[particle_index]/2)**m)]
             h_moments = np.array(h_moments)
 
+=======
+            
+>>>>>>> origin
             # make a histogram of particles and store it in the data set
             hist0 = np.histogram(ds['d'].values[particle_index],
                         bins=histogram_edges)[0]
@@ -136,10 +140,15 @@ for fn in data_file_list:
                 hist0 = np.log(hist0+1e-12)
             if im == 0:
                 histogram = da.array(hist0[np.newaxis,...])
+<<<<<<< HEAD
                 histogram_moments = da.array(h_moments[np.newaxis,:])
             else:
                 histogram = da.concatenate([histogram,hist0[np.newaxis,...]],axis=0)     
                 histogram_moments = da.concatenate([histogram_moments,h_moments[np.newaxis,:]],axis=0)   
+=======
+            else:
+                histogram = da.concatenate([histogram,hist0[np.newaxis,...]],axis=0)        
+>>>>>>> origin
             
             if settings['FourierTransform']:
                 # in_chan = list(settings['input_func'].keys())
@@ -211,11 +220,14 @@ for fn in data_file_list:
                                     coords={'histogram_bin_edges':histogram_edges},
                                     dims=('histogram_bin_edges'))
 
+<<<<<<< HEAD
     histogram_moments_da = xr.DataArray(histogram_moments,
                                     dims = ('hologram_number','moments'),
                                     coords={'hologram_number':holo_num[:hologram_count],
                                             'moments':settings.get('moments',[0,1,2,3,4,5,6])})
 
+=======
+>>>>>>> origin
     histogram = histogram[...,np.newaxis]
     print('histogram shape')
     print(histogram.shape)
@@ -228,8 +240,12 @@ for fn in data_file_list:
     preproc_ds = xr.Dataset({'histogram':histogram_da,
                     'histogram_bin_centers':hist_bin_cent,
                     'histogram_bin_edges':hist_bin_edges,
+<<<<<<< HEAD
                     'input_image':image_in_da,
                     'histogram_moments':histogram_moments_da},
+=======
+                    'input_image':image_in_da},
+>>>>>>> origin
                     attrs={'data_file':settings['data_file']})
 
 
