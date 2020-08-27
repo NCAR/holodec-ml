@@ -7,7 +7,7 @@ subset: False
 workers: 24
 batch_size: 128
 epochs: 100
-test_image: "/glade/work/schreck/repos/holodec-ml/holodecml/scripts/schreck/vae_torch/src/image.pkl"
+test_image: "/glade/work/schreck/repos/holodec-ml/holodecml/vae/image.pkl"
 retrain: False
 transforms:
   Rescale: 384

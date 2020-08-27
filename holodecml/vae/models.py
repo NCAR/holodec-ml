@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+# some pytorch examples - https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +32,17 @@ class CNN_VAE(nn.Module):
         
         self.encoder = nn.Sequential(
             nn.Conv2d(image_channels, 32, kernel_size=(3,2), stride=(3,2)),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(),
             nn.Conv2d(64, 128, kernel_size=4, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(),
             nn.Conv2d(128, 256, kernel_size=4, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(),
             Flatten()
         )
         
@@ -47,21 +53,28 @@ class CNN_VAE(nn.Module):
         self.decoder = nn.Sequential(
             UnFlatten(),
             nn.ConvTranspose2d(1024, 384, kernel_size=(3,2), stride=(3,2)),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(384),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(384, 256, kernel_size=2, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(16),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(16, 8, kernel_size=2, stride=2),
-            nn.LeakyReLU(negative_slope=0.05),
+            nn.BatchNorm2d(8),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(8, image_channels, kernel_size=2, stride=2),
-            nn.Sigmoid(),
+            nn.Sigmoid()
         )
         
         logger.info("Loaded a CNN-VAE model")
@@ -92,3 +105,4 @@ class CNN_VAE(nn.Module):
         z, mu, logvar = self.encode(x)
         z = self.decode(z)
         return z, mu, logvar
+    

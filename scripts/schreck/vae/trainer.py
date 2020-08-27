@@ -17,13 +17,13 @@ from typing import List, Dict
 from multiprocessing import cpu_count
 
 # custom
-from src.checkpointer import *
-from src.data_loader import *
-from src.optimizers import *
-from src.transforms import *
-from src.models import *
-from src.visual import *
-from src.losses import *
+from holodecml.vae.checkpointer import *
+from holodecml.vae.data_loader import *
+from holodecml.vae.optimizers import *
+from holodecml.vae.transforms import *
+from holodecml.vae.models import *
+from holodecml.vae.visual import *
+from holodecml.vae.losses import *
 
 
 logger = logging.getLogger(__name__)
@@ -315,7 +315,7 @@ if __name__ == '__main__':
     
     ############################################################
     #
-    # Load the optimizer (after model gets mounted onto GPU)
+    # Load the optimizer (after the model gets mounted onto GPU)
     #
     ############################################################
     
@@ -438,7 +438,7 @@ if __name__ == '__main__':
     
     ############################################################
     #
-    # Make a video of the progress
+    # Make a video of the results
     #
     ############################################################
 
