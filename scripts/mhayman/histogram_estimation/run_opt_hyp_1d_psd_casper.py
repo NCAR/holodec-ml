@@ -18,7 +18,7 @@ settings = {
             'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267],  # example outputs
 
             # optimization definitions: high, low and initial value
-            'learning_rate':[1e-5,1e-1,1e-3], 
+            'learning_rate':[1e-4,1e-2,1e-3], 
             'num_dense_layers':[0,5,1],
             'num_input_nodes':[1,1024,512],
             'num_dense_nodes':[1,1024,512],
