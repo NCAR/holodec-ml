@@ -19,11 +19,11 @@ settings = {
 
             # optimization definitions: high, low and initial value
             'learning_rate':[1e-4,1e-2,1e-3], 
-            'num_dense_layers':[0,5,1],
+            'num_dense_layers':[0,3,1],
             'num_input_nodes':[1,1024,512],
             'num_dense_nodes':[1,1024,512],
             'activation':['relu', 'sigmoid','relu'], # categorical list, last is initial value
-            'batch_size':[1,256,64],
+            'batch_size':[64,256,128],
             'adam_decay':[1e-6,1e-2,1e-3],
             'epoch_count':[500,5000,1000],
 
