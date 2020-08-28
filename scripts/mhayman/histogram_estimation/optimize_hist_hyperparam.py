@@ -327,14 +327,21 @@ gp_result = gp_minimize(func=fitness,
                             x0=default_parameters)
 
 
-print(gp_result.x)
-
 # evaluate on test data
 mod = create_model(gp_result.x[0],gp_result.x[1],gp_result.x[2],gp_result.x[3],gp_result.x[4],gp_result.x[6],scaled_train_input.shape[1:])
 # save a visualization
 plot_model(mod,show_shapes=True,to_file=save_file_path+save_file_base+"_diagram.png")
 # train optimal model
-history = mod.fit(scaled_train_input.values,scaled_train_labels.values,batch_size=gp_result.x[5], epochs=gp_result.x[7])
+# history = mod.fit(scaled_train_input.values,scaled_train_labels.values,batch_size=gp_result.x[5], epochs=gp_result.x[7])
+history = mod.fit(scaled_train_input.values,
+                scaled_train_labels.values, 
+                batch_size=gp_result.x[5], epochs=gp_result.x[7], verbose=1,
+                validation_data=(scaled_valid_input.values,scaled_val_labels.values))
+
+print()
+print('Solution Results')
+print(gp_result.x)
+print()
 
 ### Save the Training History ###
 epochs = np.arange(len(history.history['loss']))+1
