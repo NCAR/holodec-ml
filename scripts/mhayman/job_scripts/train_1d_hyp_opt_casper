@@ -5,7 +5,7 @@
 #SBATCH --account=NEOL0007
 #SBATCH --ntasks=1
 ###SBATCH --cpus-per-task=16
-#SBATCH --time=08:00:00
+#SBATCH --time=12:00:00
 #SBATCH --gres=gpu:v100:1
 #SBATCH --output=hypopt.o.%j
 
