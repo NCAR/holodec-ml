@@ -26,7 +26,7 @@ settings = {
             'activation':['relu', 'sigmoid','relu'], # categorical list, last is initial value
             'batch_size':[64,256,128],
             'adam_decay':[1e-6,1e-2,1e-3],
-            'epoch_count':[500,2000,1000],
+            'epoch_count':[500,2000,3000],
 
             # gp_minimize arguments
             'n_calls':12,
