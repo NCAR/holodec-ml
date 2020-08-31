@@ -460,6 +460,9 @@ for holo_num in settings['holo_examples']:
         plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")     
     else:
         plt.figure()
-        plt.plot(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
+        for i_chan in range(scaled_test_input.coords['input_channels'].size):
+            plt.plot(scaled_test_input.isel(hologram_number=holo_num,input_channels=i_chan).values,label='channel %d'%i_chan)
+        plt.legend()
         plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+
     plt.close('all')
