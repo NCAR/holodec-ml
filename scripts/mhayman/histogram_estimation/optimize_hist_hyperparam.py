@@ -115,7 +115,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         if settings.get('log_input',False):
             train_data = xr.concat((train_data,np.log(train_data)),dim='input_channels')
         
-        input_scaler = ml.MinMaxScalerX(train_data,dim=('input_channels'))
+        input_scaler = ml.MinMaxScalerX(train_data,dim=train_data.dims[:-1])
         scaled_train_input = input_scaler.fit_transform(train_data)
 
         with xr.open_dataset(paths['load_data']+settings['test_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_test:
