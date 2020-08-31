@@ -113,7 +113,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         elif len(ds[input_variable].dims) == 3:
             train_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
         if settings.get('log_input',False):
-            train_data = train_data.concat((train_data,np.log(train_data)),dim='input_channels')
+            train_data = xr.concat((train_data,np.log(train_data)),dim='input_channels')
         
         input_scaler = ml.MinMaxScalerX(train_data,dim=('input_channels'))
         scaled_train_input = input_scaler.fit_transform(train_data)
@@ -126,7 +126,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
             elif len(ds_test[input_variable].dims) == 3:
                 test_data = ds_test[input_variable].transpose('hologram_number','rsize','input_channels')
             if settings.get('log_input',False):
-                test_data = test_data.concat((test_data,np.log(test_data)),dim='input_channels')
+                test_data = xr.concat((test_data,np.log(test_data)),dim='input_channels')
             scaled_test_input = input_scaler.fit_transform(test_data)
         with xr.open_dataset(paths['load_data']+settings['validation_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_valid:
             valid_labels = ds_valid[label_variable]
@@ -136,7 +136,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
             elif len(ds_valid[input_variable].dims) == 3:
                 valid_data = ds_valid[input_variable].transpose('hologram_number','rsize','input_channels')
             if settings.get('log_input',False):
-                valid_data = valid_data.concat((valid_data,np.log(valid_data)),dim='input_channels')
+                valid_data = xr.concat((valid_data,np.log(valid_data)),dim='input_channels')
             scaled_valid_input = input_scaler.fit_transform(valid_data)
 
     else:
