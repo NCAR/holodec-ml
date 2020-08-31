@@ -28,6 +28,7 @@ from tensorflow.keras.models import Model, save_model, load_model, Sequential
 from tensorflow.keras.utils import plot_model
 import tensorflow.keras.losses
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -70,6 +71,13 @@ if len(settings.get('test_file','')) > 0 and len(settings.get('validation_file',
 """
 Load the input data
 """
+fit_kwargs = {}
+
+if settings.get('early_stopping',False):
+    # implement early stopping in fit routine
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50)
+    fit_kwargs['callbacks'] =[es]     #model.fit(..., callbacks=cb_list)
+
 
 if settings['loss_function'].lower() == 'kldivergence':
     loss_func = tensorflow.keras.losses.KLDivergence()
@@ -288,7 +296,8 @@ def fitness(learning_rate, num_dense_layers, num_input_nodes,
     blackbox = model.fit(scaled_train_input.values,
                 scaled_train_labels.values, 
                 batch_size=batch_size, epochs=epoch_count, verbose=1,
-                validation_data=(scaled_valid_input.values,scaled_val_labels.values))
+                validation_data=(scaled_valid_input.values,scaled_val_labels.values),
+                **fit_kwargs)
 
     # #named blackbox becuase it represents the structure
     # blackbox = model.fit(x=X_train,
@@ -345,7 +354,8 @@ plot_model(mod,show_shapes=True,to_file=save_file_path+save_file_base+"_diagram.
 history = mod.fit(scaled_train_input.values,
                 scaled_train_labels.values, 
                 batch_size=gp_result.x[5], epochs=gp_result.x[7], verbose=1,
-                validation_data=(scaled_valid_input.values,scaled_val_labels.values))
+                validation_data=(scaled_valid_input.values,scaled_val_labels.values),
+                **fit_kwargs)
 
 print()
 print('Solution Results')
