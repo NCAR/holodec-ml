@@ -14,6 +14,7 @@ settings = {
             'valid_fraction':0.1,   # fraction of data reserved for validation
             'test_fraction':0.1,    # fraction of data reserved for training
             'loss_function':'cum_poisson',     # loss function
+            'log_input':True,     # include log of the input data as input
             'h_chunk':128,      # xarray chunk size when loading
             'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267],  # example outputs
 

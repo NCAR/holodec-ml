@@ -91,12 +91,14 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     print(ds.dims)
     print(ds.sizes)
 
-    # split data into training, validation and test data
-    # ordered as (validation, test, train)
-    test_index = np.int((settings['valid_fraction']+settings['test_fraction'])*ds.sizes['hologram_number'])  # number of training+validation points
-    valid_index = np.int(settings['valid_fraction']*ds.sizes['hologram_number'])  # number of validation points
+    
     
     if not separate_files:
+        # split data into training, validation and test data
+        # ordered as (validation, test, train)
+        test_index = np.int((settings['valid_fraction']+settings['test_fraction'])*ds.sizes['hologram_number'])  # number of training+validation points
+        valid_index = np.int(settings['valid_fraction']*ds.sizes['hologram_number'])  # number of validation points
+
         print('test index: %d'%test_index)
         print('validation index: %d'%valid_index)
         print('hologram count: %d'%ds.sizes['hologram_number'])
@@ -110,7 +112,10 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
             train_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
         elif len(ds[input_variable].dims) == 3:
             train_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
-        input_scaler = ml.MinMaxScalerX(train_data)
+        if settings.get('log_input',False):
+            train_data = train_data.concat((train_data,np.log(train_data)),dim='input_channels')
+        
+        input_scaler = ml.MinMaxScalerX(train_data,dim=('input_channels'))
         scaled_train_input = input_scaler.fit_transform(train_data)
 
         with xr.open_dataset(paths['load_data']+settings['test_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_test:
@@ -120,6 +125,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
                 test_input = ds_test[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
             elif len(ds_test[input_variable].dims) == 3:
                 test_data = ds_test[input_variable].transpose('hologram_number','rsize','input_channels')
+            if settings.get('log_input',False):
+                test_data = test_data.concat((test_data,np.log(test_data)),dim='input_channels')
             scaled_test_input = input_scaler.fit_transform(test_data)
         with xr.open_dataset(paths['load_data']+settings['validation_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_valid:
             valid_labels = ds_valid[label_variable]
@@ -128,6 +135,8 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
                 valid_input = ds_valid[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
             elif len(ds_valid[input_variable].dims) == 3:
                 valid_data = ds_valid[input_variable].transpose('hologram_number','rsize','input_channels')
+            if settings.get('log_input',False):
+                valid_data = valid_data.concat((valid_data,np.log(valid_data)),dim='input_channels')
             scaled_valid_input = input_scaler.fit_transform(valid_data)
 
     else:
@@ -220,10 +229,10 @@ def create_model(learning_rate, num_dense_layers,num_input_nodes,
     mod = Sequential()
     mod.add(Input(shape=input_shape)) # input_shape=scaled_train_input.shape[1:]
 
-    mod.add(Dense(num_dense_nodes,activation=activation))
-
     # flatten the convolution output for Dense Layers
     mod.add(Flatten())
+
+    mod.add(Dense(num_dense_nodes,activation=activation))
     for _ in range(num_dense_layers):
         mod.add(Dense(num_dense_nodes,activation=activation))
 
