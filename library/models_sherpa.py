@@ -34,12 +34,13 @@ class Conv2DNeuralNetwork(object):
         verbose: Level of detail to provide during training
         model: Keras Model object
     """
-    def __init__(self, filters=(8,), kernel_sizes=(5,),
+    def __init__(self, layers = 1, filters=(8,), kernel_sizes=(5,),
                  conv2d_activation="relu", pool_sizes=(4,), dense_sizes=(64,),
                  dense_activation="relu", output_activation="softmax",
                  lr=0.001, optimizer="adam", adam_beta_1=0.9,
                  adam_beta_2=0.999, sgd_momentum=0.9, decay=0, loss="mse",
-                 batch_size=32, epochs=2, verbose=0):
+                 batch_size=32, epochs=2, verbose=0, study=None, trial=None):
+        self.layers = layers
         self.filters = filters
         self.kernel_sizes = [tuple((v,v)) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
@@ -58,6 +59,8 @@ class Conv2DNeuralNetwork(object):
         self.batch_size = batch_size
         self.epochs = epochs
         self.verbose = verbose
+        self.study = study
+        self.trial = trial
         self.model = None
 
     def build_neural_network(self, input_shape, output_shape):
@@ -104,7 +107,8 @@ class Conv2DNeuralNetwork(object):
         self.build_neural_network(input_shape, output_shape)
         print(type(self.model))
         self.model.fit(x, y, batch_size=self.batch_size, epochs=self.epochs,
-                       verbose=self.verbose, validation_data=(xv, yv))
+                       verbose=self.verbose, validation_data=(xv, yv),
+                       callbacks=[self.study.keras_callback(self.trial, objective_name='val_loss')])
         return self.model.history.history
 
     def predict(self, x):

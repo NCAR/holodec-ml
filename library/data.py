@@ -8,7 +8,8 @@ from datetime import datetime
 num_particles_dict = {
     1 : '1particle',
     3 : '3particle',
-    'multi': 'multiparticle'}
+    'multi': 'multiparticle',
+    'large': '50-100particle_gamma'}
 
 split_dict = {
     'train' : 'training',
@@ -28,7 +29,7 @@ def dataset_name(num_particles, split, file_extension='nc'):
         ds_name: (str) Dataset name
     """
     
-    valid = [1,3,'multi']
+    valid = [1,3,'multi','large']
     if num_particles not in valid:
         raise ValueError("results: num_particles must be one of %r." % valid)
     num_particles = num_particles_dict[num_particles]
