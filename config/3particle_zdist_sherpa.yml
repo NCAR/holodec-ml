@@ -1,5 +1,5 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/zdist_sherpa_large_100_mp/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/zdist_sherpa_large_100_test/"
 model_name: "cnn"
 num_particles: "large"
 random_seed: 328942
@@ -22,7 +22,8 @@ conv2d_network:
   optimizer: "adam"
   loss: "categorical_crossentropy"
   batch_size: 256
-  epochs: 40
+  epochs: 2
   verbose: 1
+  sherpa: True
   study: False
   trial: False
