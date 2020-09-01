@@ -22,7 +22,7 @@ conv2d_network:
   optimizer: "adam"
   loss: "categorical_crossentropy"
   batch_size: 256
-  epochs: 2
+  epochs: 3
   verbose: 1
   sherpa: True
   study: False
