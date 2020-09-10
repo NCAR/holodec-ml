@@ -4,6 +4,7 @@
 * Matthew Hayman
 * John Shreck 
 * Gabrielle Gantos
+* Gunther Wallach
 
 ## Requirments
 The code is designed to run on Python 3.7. It reqires the following Pythong libraries:
@@ -57,8 +58,6 @@ cd holodec-ml
 ```bash
 pip install .
 ```
-
-
 
 
 

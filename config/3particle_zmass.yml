@@ -1,17 +1,27 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+<<<<<<< HEAD
 path_save: "/glade/p/cisl/aiml/ggantos/holodec/zmass_3_new/base1/"
+=======
+path_save: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test2"
+>>>>>>> origin
 model_name: "cnn"
 num_particles: 3
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]
 scaler_out: "MinMaxScaler"
+<<<<<<< HEAD
 num_z_bins: 20
 subset: False
 metric: "mae"
+=======
+num_z_bins: 100
+subset: False
+>>>>>>> origin
 conv2d_network:
   filters: [8, 12, 16]
   kernel_sizes: [5, 5, 5]
   conv2d_activation: "relu"
+<<<<<<< HEAD
   pool_sizes: [4, 4, 4]
   dense_sizes: [64, 32]
   dense_activation: "elu"
@@ -22,3 +32,35 @@ conv2d_network:
   batch_size: 256
   epochs: 20
   verbose: 1
+=======
+  pool_sizes: [5, 5, 5]
+  dense_sizes: [64, 32]
+  dense_activation: "elu"
+  lr: 0.001
+  decay: 0.1
+  optimizer: "adam"
+  loss: "sce"
+  metrics: ["accuracy"]
+  batch_size: 256
+  epochs: 1000
+  verbose: 1
+callbacks:
+  ModelCheckpoint:
+    monitor: "val_loss"
+    filepath: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test2/model.h5"
+    save_best_only: True
+    save_weights_only: True
+  EarlyStopping:
+    monitor: "val_loss"
+    patience: 50
+  ReduceLROnPlateau: 
+    monitor: "val_loss"
+    factor: 0.2
+    patience: 30
+    min_lr: 0.0000001
+    mode: "auto"
+  CSVLogger:
+    filename: "/glade/p/cisl/aiml/schreck/holodec/zmass_3particle/test2/training.txt"
+    separator: " "
+    append: True
+>>>>>>> origin
