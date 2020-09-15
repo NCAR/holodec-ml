@@ -171,7 +171,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
 
 # load the model
 mod = load_model(paths['model_data']+settings['model_file'],compile=False)
-mod.compile(optimizer="adam", loss=loss_fun, metrics=['acc'])
+mod.compile(optimizer="adam", loss=loss_func, metrics=['acc'])
 
 # evaluate the test data
 print("Evaluating test data...")
