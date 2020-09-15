@@ -8,7 +8,7 @@ paths = {   'load_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogra
 
 settings = {
             'data_file': 'histogram_training_data_5000count20200819T091551.nc',
-            'test_file':'histogram_training_data_5000count20200814T075733.nc',
+            'test_file':'histogram_test_data_5000count20200915T124649.nc',
             'model_file':'histogram_training_data_5000count20200819T091551_HypOpt_NN_20200831T093951.h5',
             'scale_labels':False, # Scale the labels - depending on loss function, may not be desirable
             'loss_function':'cum_poisson',     # loss function
