@@ -174,80 +174,80 @@ print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_s
 print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
 
 if len(preds_out.shape)==2:
-preds_out = preds_out[...,np.newaxis]
+    preds_out = preds_out[...,np.newaxis]
 
 preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','histogram_bin_centers','output_channels'),
                         coords=scaled_test_labels.coords)
 
 if settings.get('scale_labels',True):
-preds_original = output_scaler.inverse_transform(preds_out_da)
+    preds_original = output_scaler.inverse_transform(preds_out_da)
 else:
-preds_original = preds_out_da
+    preds_original = preds_out_da
 
 for m in settings.get('moments',[0,1,2,3]):
-m_pred = (preds_original*(0.5*preds_original.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
-try:
-    m_label = test_moments.sel(moments=m)
-except KeyError:
-    print('No direct moment data')
-    print('Approximating moments from histogram data')
-    m_label = (test_labels*(0.5*test_labels.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
-one_to_one = [m_label.values.min(),m_label.values.max()]
-fig, ax = plt.subplots() # figsize=(4,4)
-ax.scatter(m_pred,m_label,s=1,c='k')
-ax.plot(one_to_one,one_to_one,color='tab:red',linewidth=0.5)
-ax.minorticks_on()
-ax.grid(b=True)
-ax.grid(which='minor',linestyle=':')
-ax.set_xlabel('Predicted')
-ax.set_ylabel('Actual')
-ax.set_xscale('log')
-ax.set_yscale('log')
-ax.set_title('Moment %d'%m)
-plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
-plt.close('all')
+    m_pred = (preds_original*(0.5*preds_original.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
+    try:
+        m_label = test_moments.sel(moments=m)
+    except KeyError:
+        print('No direct moment data')
+        print('Approximating moments from histogram data')
+        m_label = (test_labels*(0.5*test_labels.coords['histogram_bin_centers'])**m).sum(dim=('histogram_bin_centers','output_channels'))
+    one_to_one = [m_label.values.min(),m_label.values.max()]
+    fig, ax = plt.subplots() # figsize=(4,4)
+    ax.scatter(m_pred,m_label,s=1,c='k')
+    ax.plot(one_to_one,one_to_one,color='tab:red',linewidth=0.5)
+    ax.minorticks_on()
+    ax.grid(b=True)
+    ax.grid(which='minor',linestyle=':')
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('Actual')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_title('Moment %d'%m)
+    plt.savefig(save_file_path+save_file_base+f"_{m}MomentScatter.png", dpi=200, bbox_inches="tight")
+    plt.close('all')
 
 
 for holo_num in settings['holo_examples']:
-plt.figure()
-plt.bar(ds['histogram_bin_edges'].values[:-1],preds_original.isel(hologram_number=holo_num,output_channels=0).values,
-        np.diff(ds['histogram_bin_edges'].values),
-        facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
-plt.bar(ds['histogram_bin_edges'].values[:-1],test_labels.isel(hologram_number=holo_num,output_channels=0).values,
-        np.diff(ds['histogram_bin_edges'].values),
-        facecolor='white',edgecolor='black',fill=False,label='true')
-# plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
-# plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
-plt.xlabel('Particle Diameter [$\mu m$]')
-plt.ylabel('Count')
-if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
-    plt.xscale('log')
-plt.savefig(save_file_path+save_file_base+f"_ExampleHist_ih{holo_num}.png", dpi=200, bbox_inches="tight")
-
-plt.figure()
-plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(preds_original.isel(hologram_number=holo_num,output_channels=0).values),
-        np.diff(ds['histogram_bin_edges'].values),
-        facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
-plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(test_labels.isel(hologram_number=holo_num,output_channels=0).values),
-        np.diff(ds['histogram_bin_edges'].values),
-        facecolor='white',edgecolor='black',fill=False,label='true')
-# plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
-# plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
-plt.xlabel('Particle Diameter [$\mu m$]')
-plt.ylabel('Count')
-if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
-    plt.xscale('log')
-plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
-
-if scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values.ndim == 2:
     plt.figure()
-    plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
-    plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")     
-else:
+    plt.bar(ds['histogram_bin_edges'].values[:-1],preds_original.isel(hologram_number=holo_num,output_channels=0).values,
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
+    plt.bar(ds['histogram_bin_edges'].values[:-1],test_labels.isel(hologram_number=holo_num,output_channels=0).values,
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='white',edgecolor='black',fill=False,label='true')
+    # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
+    # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
+    plt.xlabel('Particle Diameter [$\mu m$]')
+    plt.ylabel('Count')
+    if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
+        plt.xscale('log')
+    plt.savefig(save_file_path+save_file_base+f"_ExampleHist_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+
     plt.figure()
-    plt.plot(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
-    plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
-plt.close()
+    plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(preds_original.isel(hologram_number=holo_num,output_channels=0).values),
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='blue',edgecolor='white',label='predicted',alpha=0.5)
+    plt.bar(ds['histogram_bin_edges'].values[:-1],np.cumsum(test_labels.isel(hologram_number=holo_num,output_channels=0).values),
+            np.diff(ds['histogram_bin_edges'].values),
+            facecolor='white',edgecolor='black',fill=False,label='true')
+    # plt.plot(ds['histogram_bin_centers'].values,test_labels.isel(hologram_number=holo_num,output_channels=0).values,'.')
+    # plt.plot(ds['histogram_bin_centers'].values,preds_original.isel(hologram_number=holo_num,output_channels=0).values,'.-')
+    plt.xlabel('Particle Diameter [$\mu m$]')
+    plt.ylabel('Count')
+    if np.mean(np.diff(ds['histogram_bin_edges'].values)) != np.diff(ds['histogram_bin_edges'].values[0:2])[0]:
+        plt.xscale('log')
+    plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+
+    if scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values.ndim == 2:
+        plt.figure()
+        plt.imshow(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
+        plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")     
+    else:
+        plt.figure()
+        plt.plot(scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values)
+        plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+    plt.close('all')
 
 
 # # save the settings in human readable format
