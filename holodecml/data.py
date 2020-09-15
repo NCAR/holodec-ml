@@ -9,7 +9,8 @@ import time
 num_particles_dict = {
     1 : '1particle',
     3 : '3particle',
-    'multi': 'multiparticle'}
+    'multi': 'multiparticle',
+    'large': '50-100particle_gamma'}
 
 split_dict = {
     'train' : 'training',
@@ -29,7 +30,7 @@ def dataset_name(num_particles, split, file_extension='nc'):
         ds_name: (str) Dataset name
     """
     
-    valid = [1,3,'multi']
+    valid = [1,3,'multi','large']
     if num_particles not in valid:
         raise ValueError("results: num_particles must be one of %r." % valid)
     num_particles = num_particles_dict[num_particles]
@@ -78,12 +79,19 @@ def load_raw_datasets(path_data, num_particles, split, output_cols, subset):
     
     ds = open_dataset(path_data, num_particles, split)
     if subset:
+<<<<<<< HEAD:holodecml/data.py
         print("subset =",subset)
         print("ds['image'].shape[0]",ds['image'].shape[0])
         in_ix = int(subset * ds['image'].shape[0])
         out_ix = int(in_ix * (ds['hid'].shape[0]/ds['image'].shape[0]))
         inputs = ds['image'][:in_ix].values
         outputs = ds[output_cols].sel(particle=slice(0,out_ix)).to_dataframe()
+=======
+        ix = int(subset * ds['image'].shape[0])
+        inputs = ds['image'][:ix].values
+        outputs = ds[output_cols].to_dataframe()
+        outputs = outputs[outputs["hid"] < (ix+1)]
+>>>>>>> 3795991209113fa672539e8d70fd420efdd7aeb8:library/data.py
     else:
         inputs = ds["image"].values
         outputs = ds[output_cols].to_dataframe()
@@ -238,17 +246,19 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
             print(f'Time to get train outputs: {time.time()-start}')
             valid_outputs, _ = calc_z_dist(outputs=valid_outputs,
                                            z_bins=z_bins)    
+<<<<<<< HEAD:holodecml/data.py
             print(f'Time to get validation outputs: {time.time()-start}')
+=======
+>>>>>>> 3795991209113fa672539e8d70fd420efdd7aeb8:library/data.py
     else:
+        train_outputs.drop(['hid'], axis=1)
         train_outputs = scaler_out.fit_transform(train_outputs)
+<<<<<<< HEAD:holodecml/data.py
         print(f'Time to get training outputs: {time.time()-start}')
+=======
+        valid_outputs.drop(['hid'], axis=1)
+>>>>>>> 3795991209113fa672539e8d70fd420efdd7aeb8:library/data.py
         valid_outputs = scaler_out.transform(valid_outputs)
         print(f'Time to get validation outputs: {time.time()-start}')
-        
-    if train_inputs.shape[0] != train_outputs.shape[0]:
-        factor = int(train_outputs.shape[0]/train_inputs.shape[0])
-        train_inputs = np.repeat(train_inputs, factor, axis=0)
-        factor = int(valid_outputs.shape[0]/valid_inputs.shape[0])
-        valid_inputs = np.repeat(valid_inputs, factor, axis=0)
         
     return train_inputs, train_outputs, valid_inputs, valid_outputs
