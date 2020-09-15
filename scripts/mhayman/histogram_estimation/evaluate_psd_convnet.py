@@ -176,7 +176,7 @@ mod.compile(optimizer="adam", loss=loss_func, metrics=['acc'])
 # evaluate the test data
 print("Evaluating test data...")
 cnn_start = datetime.datetime.now()
-preds_out = mod.predict(scaled_test_input.values, batch_size=settings['batch_size'])
+preds_out = mod.predict(scaled_test_input.values, batch_size=settings.get('batch_size',64))
 cnn_stop = datetime.datetime.now()
 print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
 print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
@@ -269,5 +269,5 @@ json_dct = {'settings':settings,'paths':paths}
 #             if hasattr(json_dct['settings'][k][j], '__call__'):
 #                 json_dct['settings'][k][j] = json_dct['settings'][k][j].__name__
     
-# with open(save_file_path+save_file_base+"_run_settings.json", 'w') as fp:
-#     json.dump(json_dct, fp, indent=4)
+with open(save_file_path+save_file_base+"_run_settings.json", 'w') as fp:
+    json.dump(json_dct, fp, indent=4)
