@@ -87,28 +87,37 @@ print(paths['load_data'])
 print('Testing with')
 print(settings['test_file'])
 
-if settings['loss_function'].lower() == 'kldivergence':
-    loss_func = tensorflow.keras.losses.KLDivergence()
-elif settings['loss_function'].lower() == 'kstest':
-    loss_func = mldef.ks_test
-elif settings['loss_function'].lower() == 'poisson':
-    loss_func = mldef.poisson_nll
-elif settings['loss_function'].lower() == 'cum_poisson':
-    loss_func = mldef.cum_poisson_nll
-else:
-    loss_func = settings['loss_function']
+with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_number':settings['h_chunk']}) as ds:
+    print('Training dataset attributes')
+    for att in ds.attrs:
+        print('  '+att+': '+str(ds.attrs[att]))
 
-train_labels = ds[label_variable]
-train_moments = ds['histogram_moments']
-if len(ds[input_variable].dims) == 4:
-    train_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
-elif len(ds[input_variable].dims) == 3:
-    train_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
-if settings.get('log_input',False):
-    train_data = xr.concat((train_data,np.log(train_data)),dim='input_channels')
+    print('dataset dimensions')
+    print(ds.dims)
+    print(ds.sizes)
 
-input_scaler = ml.MinMaxScalerX(train_data,dim=train_data.dims[:-1])
-scaled_train_input = input_scaler.fit_transform(train_data)
+    if settings['loss_function'].lower() == 'kldivergence':
+        loss_func = tensorflow.keras.losses.KLDivergence()
+    elif settings['loss_function'].lower() == 'kstest':
+        loss_func = mldef.ks_test
+    elif settings['loss_function'].lower() == 'poisson':
+        loss_func = mldef.poisson_nll
+    elif settings['loss_function'].lower() == 'cum_poisson':
+        loss_func = mldef.cum_poisson_nll
+    else:
+        loss_func = settings['loss_function']
+
+    train_labels = ds[label_variable]
+    train_moments = ds['histogram_moments']
+    if len(ds[input_variable].dims) == 4:
+        train_data = ds[input_variable].transpose('hologram_number','xsize','ysize','input_channels')
+    elif len(ds[input_variable].dims) == 3:
+        train_data = ds[input_variable].transpose('hologram_number','rsize','input_channels')
+    if settings.get('log_input',False):
+        train_data = xr.concat((train_data,np.log(train_data)),dim='input_channels')
+
+    input_scaler = ml.MinMaxScalerX(train_data,dim=train_data.dims[:-1])
+    scaled_train_input = input_scaler.fit_transform(train_data)
 
 with xr.open_dataset(paths['load_data']+settings['test_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_test:
     test_labels = ds_test[label_variable]
