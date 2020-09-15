@@ -64,7 +64,7 @@ input_variable = 'input_image'  # data variable used as an input
 label_variable = 'histogram'  # data variable used labels for training
 
 save_file_base = settings['data_file'].replace('.nc','')+'_ConvNet_'+start_time.strftime('%Y%m%dT%H%M%S')
-save_file_path = settings['model_file_path']+settings['test_file'].replace('.nc','/')
+save_file_path = paths['model_data']+settings['test_file'].replace('.nc','/')
 
 # save_file_path = paths['save_data']+save_file_base+'/'
 ml.ensure_path(save_file_path)

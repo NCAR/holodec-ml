@@ -4,7 +4,7 @@ Train ConvNet to estimate PSD on Casper
 
 paths = {   'load_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/',
             'save_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/',
-            'model_path':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/histogram_training_data_5000count20200819T091551_HypOpt_NN_20200831T093951/'}
+            'model_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/histogram/histogram_training_data_5000count20200819T091551_HypOpt_NN_20200831T093951/'}
 
 settings = {
             'data_file': 'histogram_training_data_5000count20200819T091551.nc',
