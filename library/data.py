@@ -230,7 +230,7 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
             train_outputs, _ = calc_z_dist(outputs=train_outputs,
                                            z_bins=z_bins)
             valid_outputs, _ = calc_z_dist(outputs=valid_outputs,
-                                           z_bins=z_bins)            
+                                           z_bins=z_bins)    
     else:
         train_outputs.drop(['hid'], axis=1)
         train_outputs = scaler_out.fit_transform(train_outputs)

@@ -40,7 +40,7 @@ class Conv2DNeuralNetwork(object):
                  lr=0.001, optimizer="adam", adam_beta_1=0.9,
                  adam_beta_2=0.999, sgd_momentum=0.9, decay=0, loss="mse",
                  batch_size=32, epochs=2, verbose=0, sherpa=False, study=None,
-                 trial=False):
+                 trial=False, **kwargs):
         self.filters = filters
         self.kernel_sizes = [tuple((v,v)) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
@@ -74,8 +74,10 @@ class Conv2DNeuralNetwork(object):
                               padding="same",
                               activation=self.conv2d_activation,
                               name=f"conv2D_{h:02d}")(nn_model)
-            nn_model = MaxPool2D(self.pool_sizes[h],
-                                 name=f"maxpool2D_{h:02d}")(nn_model)
+            print(self.pool_sizes[h])
+            if self.pool_sizes[h][0] > 0:
+                nn_model = MaxPool2D(self.pool_sizes[h],
+                                     name=f"maxpool2D_{h:02d}")(nn_model)
         nn_model = Flatten()(nn_model)
         for h in range(len(self.dense_sizes)):
             nn_model = Dense(self.dense_sizes[h],

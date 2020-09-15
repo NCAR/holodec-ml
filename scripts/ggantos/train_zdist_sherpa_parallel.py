@@ -15,7 +15,6 @@ import tensorflow as tf
 import sherpa.algorithms.bayesian_optimization as bayesian_optimization
 from sherpa.schedulers import LocalScheduler
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
 sys.path.append('../../')
     
 from library.data import load_scaled_datasets
@@ -68,18 +67,18 @@ if not exists(path_save_i):
     os.makedirs(path_save_i)
 
 lr = trial.parameters['lr']
-layers = int(trial.parameters['layers'])
+conv_layers = int(trial.parameters['conv_layers'])
 kernel_size = int(trial.parameters["kernel_size"])
 pool_size = int(trial.parameters["pool_size"])
 filters = []
-for layer in range(layers):
-    filters.append(trial.parameters['filter'] * (layer + 1))
-kernel_sizes = [kernel_size for i in range(layers)]
-pool_sizes = [pool_size for i in range(layers)] 
+for conv_layer in range(conv_layers):
+    filters.append(trial.parameters['filter_size'] * (layer + 1))
+kernel_sizes = [kernel_size for i in range(conv_layers)]
+pool_sizes = [pool_size for i in range(conv_layers)] 
 dense_layers = int(trial.parameters["dense_layers"])
 dense_sizes = []
 for dense_layer in range(dense_layers):
-    dense_sizes.append(int(trial.parameters['dense'] / (2 ** dense_layer)))
+    dense_sizes.append(int(trial.parameters['dense_size_0'] / (2 ** dense_layer)))
 
 config_i["path_save"] = path_save_i
 config_i["conv2d_network"]["lr"] = lr
@@ -87,7 +86,6 @@ config_i["conv2d_network"]["filters"] = filters
 config_i["conv2d_network"]["kernel_sizes"] = kernel_sizes
 config_i["conv2d_network"]["pool_sizes"] = pool_sizes
 config_i["conv2d_network"]["dense_sizes"] = dense_sizes
-# config_i["conv2d_network"]["study"] = study
 config_i["conv2d_network"]["trial"] = trial
 
 model_start = datetime.now()
@@ -108,7 +106,6 @@ np.savetxt(join(path_save_i, "valid_outputs_pred.csv"), valid_outputs_pred)
 for k in hist.keys():
     np.savetxt(join(path_save_i, k+".csv"), hist[k])
 print(join(path_save_i, 'config.yml'))
-# del config_i["conv2d_network"]["study"]
 del config_i["conv2d_network"]["trial"]
 with open(join(path_save_i, 'config.yml'), 'w') as f:
     yaml.dump(config_i, f)

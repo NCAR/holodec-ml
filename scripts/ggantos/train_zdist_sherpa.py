@@ -60,15 +60,27 @@ def main():
     print(f"Loading datasets took {datetime.now() - load_start} time")
     
     # set up sherpa variables
+    
+    max_num_trials = int(config["max_num_trials"])
+    lrs = config["conv2d_network"]["lrs"]
+    conv_layers = config["conv2d_network"]["conv_layers"]
+    kernel_size = config["conv2d_network"]["kernel_size"]
+    pool_size = config["conv2d_network"]["pool_size"]
+    filter_size = config["conv2d_network"]["filter_size"]
+    dense_layers = config["conv2d_network"]["dense_layers"]
+    dense_size_0 = config["conv2d_network"]["dense_size_0"]
+    
+    
     lrs = [1e-5, 1e-4, 1e-3, 3e-5, 3e-4, 3e-3]
     parameters = [sherpa.Choice('lr', lrs),
-                  sherpa.Discrete('layers', [2,5]),
-                  sherpa.Discrete('kernel_size', [3,6]),
-                  sherpa.Discrete('pool_size', [1,5]),
-                  sherpa.Choice('filter', [2, 4, 8, 16, 32]),
-                  sherpa.Choice('dense', [16, 32, 64]),
-                  sherpa.Discrete('dense_layers',[1, 5])]
-    alg = sherpa.algorithms.bayesian_optimization.GPyOpt(max_num_trials=50,
+                  sherpa.Discrete('conv_layers', conv_layers),
+                  sherpa.Discrete('kernel_size', kernel_size),
+                  sherpa.Discrete('pool_size', pool_size),
+                  sherpa.Choice('filter_size', filter_size),
+                  sherpa.Discrete('dense_layers', dense_layers),
+                  sherpa.Choice('dense_size_0', dense_size_0)]
+    
+    alg = sherpa.algorithms.bayesian_optimization.GPyOpt(max_num_trials=max_num_trials,
                                                          num_initial_data_points=100)
     study = sherpa.Study(parameters=parameters,
                          algorithm=alg,
@@ -82,18 +94,18 @@ def main():
             os.makedirs(path_save_i)
 
         lr = trial.parameters['lr']
-        layers = int(trial.parameters['layers'])
+        conv_layers = int(trial.parameters['conv_layers'])
         kernel_size = int(trial.parameters["kernel_size"])
         pool_size = int(trial.parameters["pool_size"])
         filters = []
-        for layer in range(layers):
-            filters.append(trial.parameters['filter'] * (layer + 1))
-        kernel_sizes = [kernel_size for i in range(layers)]
-        pool_sizes = [pool_size for i in range(layers)] 
+        for layer in range(conv_layers):
+            filters.append(trial.parameters['filter_size'] * (layer + 1))
+        kernel_sizes = [kernel_size for i in range(conv_layers)]
+        pool_sizes = [pool_size for i in range(conv_layers)] 
         dense_layers = int(trial.parameters["dense_layers"])
         dense_sizes = []
         for dense_layer in range(dense_layers):
-            dense_sizes.append(int(trial.parameters['dense'] / (2 ** dense_layer)))
+            dense_sizes.append(int(trial.parameters['dense_size_0'] / (2 ** dense_layer)))
 
         config_i["path_save"] = path_save_i
         config_i["conv2d_network"]["lr"] = lr

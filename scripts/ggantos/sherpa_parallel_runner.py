@@ -44,7 +44,7 @@ def run_sherpa(args):
     
     scheduler = LocalScheduler()
     
-    command = 'python train_conv2d_zdist_sherpa_parallel.py'
+    command = 'python train_zdist_sherpa_parallel.py'
     path_save_dir = os.path.join(path_save,
                                  time.strftime("%Y-%m-%d--%H-%M-%S"))
     
