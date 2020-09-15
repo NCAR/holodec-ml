@@ -122,6 +122,7 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
     scaled_train_input = input_scaler.fit_transform(train_data)
 
     with xr.open_dataset(paths['load_data']+settings['test_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_test:
+        print(ds_test.data_vars)
         test_labels = ds_test[label_variable]
         test_moments = ds_test['histogram_moments']
         if len(ds_test[input_variable].dims) == 4:
