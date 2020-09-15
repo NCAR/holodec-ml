@@ -476,3 +476,9 @@ for holo_num in settings['holo_examples']:
         plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
     plt.close('all')
+
+
+json_dct = {'settings':settings,'paths':paths}
+    
+with open(save_file_path+save_file_base+"_run_settings.json", 'w') as fp:
+    json.dump(json_dct, fp, indent=4)
