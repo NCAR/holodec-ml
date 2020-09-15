@@ -69,12 +69,12 @@ save_file_path = settings['model_file_path']+settings['test_file'].replace('.nc'
 # save_file_path = paths['save_data']+save_file_base+'/'
 ml.ensure_path(save_file_path)
 
-# read the json file with the original training information
-run_config_json = settings['model_file'].replace('.h5','')+"_run_settings.json"
-with open(settings['model_file_path']+'run_config.json') as f:
-    train_settings = json.load(f)
+# # read the json file with the original training information
+# run_config_json = settings['model_file'].replace('.h5','')+"_run_settings.json"
+# with open(settings['model_file_path']+'run_config.json') as f:
+#     train_settings = json.load(f)
 
-settings['data_file'] = train_settings['data_file']
+# settings['data_file'] = train_settings['data_file']
 
 
 
@@ -269,5 +269,5 @@ json_dct = {'settings':settings,'paths':paths}
 #             if hasattr(json_dct['settings'][k][j], '__call__'):
 #                 json_dct['settings'][k][j] = json_dct['settings'][k][j].__name__
     
-with open(save_file_path+save_file_base+"_run_settings.json", 'w') as fp:
-    json.dump(json_dct, fp, indent=4)
+# with open(save_file_path+save_file_base+"_run_settings.json", 'w') as fp:
+#     json.dump(json_dct, fp, indent=4)
