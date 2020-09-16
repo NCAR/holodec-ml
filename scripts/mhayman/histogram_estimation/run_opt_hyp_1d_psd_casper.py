@@ -13,7 +13,7 @@ settings = {
             'output_activation':'exponential', # output activation function,
             'valid_fraction':0.1,   # fraction of data reserved for validation
             'test_fraction':0.1,    # fraction of data reserved for training
-            'loss_function':'cum_poisson',     # loss function
+            'loss_function':'kstest',     # loss function 'cum_poisson', 'kstest'
             'log_input':True,     # include log of the input data as input
             'early_stopping':True,  # implement early stopping
             'h_chunk':128,      # xarray chunk size when loading
