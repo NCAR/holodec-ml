@@ -3,3 +3,6 @@
 **/.ipynb_checkpoints
 *.out
 *.o
+*.out.*
+batch**.sh
+*.o*

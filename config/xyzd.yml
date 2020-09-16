@@ -20,5 +20,6 @@ conv2d_network:
   optimizer: "adam"
   loss: "mae"
   batch_size: 256
+  metrics: ["TP","FP","TN","FN"]
   epochs: 2
   verbose: 1

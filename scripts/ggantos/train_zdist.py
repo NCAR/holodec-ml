@@ -13,8 +13,8 @@ import tensorflow as tf
 
 sys.path.append('../../')
     
-from library.data import load_scaled_datasets
-from library.models import Conv2DNeuralNetwork
+from holodecml.data import load_scaled_datasets
+from holodecml.models import Conv2DNeuralNetwork
 
 
 scalers = {"MinMaxScaler": MinMaxScaler,
