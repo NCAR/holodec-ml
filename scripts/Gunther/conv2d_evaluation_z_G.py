@@ -12,10 +12,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler, minmax_scale
 from datetime import datetime
-
-sys.path.append('../../library/')
-
-from data_Gunther import load_scaled_datasets, load_raw_datasets, calc_z_bins
+from holodecml.data import load_scaled_datasets, load_raw_datasets, calc_z_bins
 
 
 # In[2]:

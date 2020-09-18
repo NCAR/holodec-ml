@@ -2,19 +2,22 @@
 * David John Gagne
 * Aaron Bansemer
 * Matthew Hayman
-* John Shreck 
+* John Schreck 
 * Gabrielle Gantos
 * Gunther Wallach
 
 ## Requirments
-The code is designed to run on Python 3.7. It reqires the following Pythong libraries:
-* os
+The code is designed to run on Python 3.7. It reqires the following external Python libraries:
 * xarray
-* numpy 
+* numpy<1.19
+* scipy
 * pandas
-* typing
+* scikit-learn
 * tensorflow>=2.0.0
+* torch
 * netcdf4
+* tqdm
+* Pillow
 
 ## Setup from Scratch
 
@@ -24,19 +27,20 @@ The code is designed to run on Python 3.7. It reqires the following Pythong libr
 * Create a conda environment for holodec:  `conda create -n holodec python=3.7`
 
 * Activate the environment on your machine:  
-`source activate goes16`
+`source activate holodec`
 
 * Install the Python libraries through conda:
 
 ```bash
 conda install -c conda-forge --yes \
     pip \
-    os \
+    tqdm \
     xarray \
-    numpy \
+    "numpy<1.19" \
     pandas \
-    typing \
     netcdf4 \
+    scikit-learn
+
 ```
 
 * Ensure that CUDA kernel and CUDA toolkit are installed on your system, and the path and versions 
@@ -46,6 +50,7 @@ visit the [tensorflow website](https://www.tensorflow.org/install/gpu).
 ```bash
 pip install tensorflow
 ```
+* Install Pytorch using the instructions on the [PyTorch website](https://pytorch.org/). 
 
 * Clone the holodec library into your directory
 ```bash
@@ -58,7 +63,4 @@ cd holodec-ml
 ```bash
 pip install .
 ```
-
-
-
 
