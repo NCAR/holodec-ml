@@ -8,19 +8,28 @@ from scipy.ndimage import gaussian_filter
 from tensorflow.keras.layers import (Input, Conv2D, Dense, Flatten, MaxPool2D,
                                      AveragePooling2D, Activation,
                                      Reshape, Attention, Layer)
+import tensorflow as tf
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.optimizers import Adam, SGD
 
 from holodecml.losses import *
+from holodecml.metrics import *
 
 logger = logging.getLogger(__name__)
 
 custom_losses = {
     "sce": SymmetricCrossEntropy(0.5, 0.5),
+    "weighted_mse": wmse,
     "rmse": rmse,
     "r2": R2
 }
 
+custom_metrics = {
+    "TP": TruePositives,
+    "FP": FalsePositives,
+    "TN": TrueNegatives,
+    "FN": FalseNegatives
+} 
 
 class Conv2DNeuralNetwork(object):
     """
@@ -53,7 +62,7 @@ class Conv2DNeuralNetwork(object):
                  dense_activation="relu", output_activation="softmax",
                  lr=0.001, optimizer="adam", adam_beta_1=0.9,
                  adam_beta_2=0.999, sgd_momentum=0.9, decay=0, loss="mse",
-                 metrics=None, batch_size=32, epochs=2, verbose=0):
+                 metrics=None, batch_size=32, epochs=2, verbose=0, **kwargs):
         self.filters = filters
         self.kernel_sizes = [tuple((v, v)) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
@@ -69,7 +78,7 @@ class Conv2DNeuralNetwork(object):
         self.sgd_momentum = sgd_momentum
         self.decay = decay
         self.loss = loss if loss not in custom_losses else custom_losses[loss]
-        self.metrics = metrics
+        self.metrics = [custom_metrics[m]() for m in metrics]
         self.batch_size = batch_size
         self.epochs = epochs
         self.verbose = verbose
@@ -85,8 +94,10 @@ class Conv2DNeuralNetwork(object):
                               padding="same",
                               activation=self.conv2d_activation,
                               name=f"conv2D_{h:02d}")(nn_model)
-            nn_model = MaxPool2D(self.pool_sizes[h],
-                                 name=f"maxpool2D_{h:02d}")(nn_model)
+            print(self.metrics, type(self.metrics))
+            if self.pool_sizes[h][0] > 0:
+                nn_model = MaxPool2D(self.pool_sizes[h],
+                                     name=f"maxpool2D_{h:02d}")(nn_model)
         nn_model = Flatten()(nn_model)
         for h in range(len(self.dense_sizes)):
             nn_model = Dense(self.dense_sizes[h],
@@ -118,12 +129,13 @@ class Conv2DNeuralNetwork(object):
             output_shape = y.shape[1]
         input_shape = x.shape[1:]
         self.build_neural_network(input_shape, output_shape)
-        self.model.fit(x, y, batch_size=self.batch_size, epochs=self.epochs,
-                       verbose=self.verbose, validation_data=(xv, yv), callbacks=callbacks)
+        self.model.fit(x, y, batch_size=self.batch_size,
+                       epochs=self.epochs, verbose=self.verbose,
+                       validation_data=(xv, yv), callbacks=callbacks)
         return self.model.history.history
 
     def predict(self, x):
-        y_out = self.model.predict(np.expand_dims(x, axis=-1),
+        y_out = self.model.predict(x,
                                    batch_size=self.batch_size)
         return y_out
 
@@ -143,6 +155,44 @@ class Conv2DNeuralNetwork(object):
             print("You must first call build_neural_network before loading weights. Exiting.")
             sys.exit(1)
 
+    def saliency(self, x, layer_index=-3, ref_activation=10):
+        """
+        Output the gradient of input field with respect to each neuron in the specified layer.
+        Args:
+            x:
+            layer_index:
+            ref_activation: Reference activation value for loss function.
+        Returns:
+        """
+        saliency_values = np.zeros((self.model.layers[layer_index].output.shape[-1],
+                                    x.shape[0], x.shape[1],
+                                    x.shape[2], x.shape[3]),
+                                   dtype=np.float32)
+        for s in trange(self.model.layers[layer_index].output.shape[-1], desc="neurons"):
+            sub_model = Model(self.model.input, self.model.layers[layer_index].output[:, s])
+            batch_indices = np.append(np.arange(0, x.shape[0], self.batch_size), x.shape[0])
+            for b, batch_index in enumerate(tqdm(batch_indices[:-1], desc="batch examples", leave=False)):
+                x_case = tf.Variable(x[batch_index:batch_indices[b + 1]])
+                with tf.GradientTape() as tape:
+                    tape.watch(x_case)
+                    act_out = sub_model(x_case)
+                    loss = (ref_activation - act_out) ** 2
+                saliency_values[s, batch_index:batch_indices[b + 1]] = tape.gradient(loss, x_case)
+
+        return saliency_values
+    
+    def output_hidden_layer(self, x, batch_size=1024, layer_index=-3):
+        """
+        Chop the end off the neural network and capture the output from the specified layer index
+        Args:
+            x: input data
+            layer_index (int): list index of the layer being output.
+        Returns:
+            output: array containing output of that layer for each example.
+        """
+        sub_model = Model(self.model.input, self.model.layers[layer_index].output)
+        output = sub_model.predict(x, batch_size=batch_size)
+        return output            
 
 class ParticleEncoder(Layer):
     def __init__(self, hidden_layers=1, hidden_neurons=10, activation="relu", attention_neurons=100, **kwargs):

@@ -21,6 +21,9 @@ class SymmetricCrossEntropy:
 def rmse(y_true, y_pred):
     return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
 
+def wmse(y_true, y_pred):
+    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
+
 def R2(y_true, y_pred):
     """ Is actually 1 - R2
     """
