@@ -1,4 +1,3 @@
-import sherpa
 import sys 
 import logging
 import numpy as np
@@ -60,8 +59,7 @@ class Conv2DNeuralNetwork(object):
                  dense_activation="relu", output_activation="softmax",
                  lr=0.001, optimizer="adam", adam_beta_1=0.9,
                  adam_beta_2=0.999, sgd_momentum=0.9, decay=0, loss="mse",
-                 metrics=None, batch_size=32, epochs=2, verbose=0,
-                 sherpa=False, study=None, trial=False, **kwargs):
+                 metrics=None, batch_size=32, epochs=2, verbose=0, **kwargs):
         self.filters = filters
         self.kernel_sizes = [tuple((v,v)) for v in kernel_sizes]
         self.conv2d_activation = conv2d_activation
@@ -81,9 +79,6 @@ class Conv2DNeuralNetwork(object):
         self.batch_size = batch_size
         self.epochs = epochs
         self.verbose = verbose
-        self.sherpa = sherpa
-        self.study = study
-        self.trial = trial
         self.model = None
 
     def build_neural_network(self, input_shape, output_shape):
@@ -131,17 +126,9 @@ class Conv2DNeuralNetwork(object):
             output_shape = y.shape[1]
         input_shape = x.shape[1:]
         self.build_neural_network(input_shape, output_shape)
-        if self.sherpa:
-            sherpa_cb = self.study.keras_callback(self.trial,
-                                                  objective_name='val_loss')
-            self.model.fit(x, y, batch_size=self.batch_size,
-                           epochs=self.epochs, verbose=self.verbose,
-                           validation_data=(xv, yv),
-                           callbacks=[sherpa_cb])            
-        else:
-            self.model.fit(x, y, batch_size=self.batch_size,
-                           epochs=self.epochs, verbose=self.verbose,
-                           validation_data=(xv, yv), callbacks=callbacks)
+        self.model.fit(x, y, batch_size=self.batch_size,
+                       epochs=self.epochs, verbose=self.verbose,
+                       validation_data=(xv, yv), callbacks=callbacks)
         return self.model.history.history
 
     def predict(self, x):
