@@ -186,7 +186,7 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
 
 def load_scaled_datasets(path_data, num_particles, output_cols,
                          scaler_out=False, subset=False, num_z_bins=False,
-                         mass=False):
+                         mass=False, attention=False):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns scaled inputs and raw outputs.
