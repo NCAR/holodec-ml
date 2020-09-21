@@ -283,9 +283,13 @@ class ParticleAttentionNet(Model):
 
     def call(self, inputs, **kwargs):
         particle_enc = self.particle_encoder(inputs[0])
+        # particle_enc.shape = batch_size x proposed_num_particles x self.attention_neurons 
         holo_enc = self.hologram_encoder(inputs[1])
+        # holo_enc.shape = batch_size x area_of_final_conv_layer x self.attention_neurons
         attention_out = self.particle_attention([particle_enc, holo_enc])
+        # attention_out.shape = batch_size x proposed_num_particles x self.attention_neurons
         particle_dec = self.particle_decoder(attention_out)
+        # particle_dec.shape = batch_size x proposed_num_particles x num_coordinates (x,y,z,d,p(particle_is_real)<optional)
         return particle_dec
 
 
