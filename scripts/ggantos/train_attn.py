@@ -18,7 +18,7 @@ from holodecml.models import ParticleAttentionNet
 def main():
         
     # parse arguments from config/yaml file
-    parser = argparse.ArgumentParser(description='Describe an Attebtion nn')
+    parser = argparse.ArgumentParser(description='Describe a Conv2D nn')
     parser.add_argument("config", help="Path to config file")
     args = parser.parse_args()
     with open(args.config) as config_file:
@@ -38,6 +38,7 @@ def main():
     # load data
     scaler_out = scalers[config["scaler_out"]]()
     load_start = datetime.now()
+    #TODO: implement 3D data loading for multiple particles per image
     train_inputs,\
     train_outputs,\
     valid_inputs,\
@@ -46,7 +47,15 @@ def main():
                                          output_cols,
                                          scaler_out,
                                          config["subset"])
-    print(f"Loading datasets took {datetime.now() - load_start} time")
     
     # train and save the model
     model_start = datetime.now()
+    train_outputs_noisy = train_outputs * (1 + np.random.normal(0, config['noisy_sd'], train_outputs.shape))
+    valid_outputs_noisy = valid_outputs * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs.shape))
+    
+    net = ParticleAttentionNet()
+    net.compile(optimizer=config['optimizer'], loss=config['loss'])
+    net.fit([train_outputs_noisy, train_inputs], train_outputs, epochs=config['epochs'],
+            batch_size=config['batch_size'], verbose=config['verbose'])
+    
+    
