@@ -56,6 +56,9 @@ settings = {    'data_file':'synthetic_holograms_1particle_gamma_training.nc'
 
 """
 
+func_list = [np.abs,np.angle,np.real,np.imag]
+in_chan = ['abs','angle','real','imag']
+
 histogram_edges = settings['hist_edges']
 histogram_centers = 0.5*np.diff(histogram_edges) \
                     +histogram_edges[:-1]
@@ -108,7 +111,7 @@ for fn in data_file_list:
         rpix = np.sqrt(xpix[np.newaxis,:]**2+ypix[:,np.newaxis]**2)
 
         # define function for calculating radial mean
-        avg_rad = lambda r : np.abs(image_ft0[(rpix >= r-.5) & (rpix < r+.5)]).mean()
+        avg_rad = lambda r,fun: fun(image_ft0[(rpix >= r-.5) & (rpix < r+.5)]).mean()
         # define the radial coordinate for the radial mean
         rad  = np.arange(np.maximum(ypix.size//2,xpix.size//2))
 
@@ -149,18 +152,24 @@ for fn in data_file_list:
                 image_ft0 = FO.OpticsFFT(image0)  # FFT the image
                 
                 # calculate the radial mean of the FT
-                image_ft_r_mean = np.vectorize(avg_rad)(rad)
-                image_ft_r_mean[0] = image_ft_r_mean[0]/(image_ft_r_mean.size) # rescale DC term
+                image_ft_list = []
+                for func in func_list:
+                    image_ft_r_mean = np.vectorize(avg_rad)(rad,func)
+                    image_ft_r_mean[0] = image_ft_r_mean[0]/(image_ft_r_mean.size) # rescale DC term
+                    image_ft_list+=[image_ft_r_mean[np.newaxis,...]/255]
+                
+
+                
 
                 # perform requested operations for storage
-                image_ft_list = []
-                # for ik,func in enumerate(settings['input_func'].keys()):
-                #     image_ft_list+=[(settings['input_func'][func](image_ft0) / settings['input_scale'][func])[np.newaxis,...]]
-                #     # image_ft[func][im,:,:] = settings['input_func'][func](image_ft0) / settings['input_scale'][func]
-                if settings.get('log_in',False):
-                    mage_ft_list = [np.log(1e-12+image_ft_r_mean)[np.newaxis,...]/np.log(255.0)]
-                else:
-                    image_ft_list = [image_ft_r_mean[np.newaxis,...]/255.0]
+                # image_ft_list = []
+                # # for ik,func in enumerate(settings['input_func'].keys()):
+                # #     image_ft_list+=[(settings['input_func'][func](image_ft0) / settings['input_scale'][func])[np.newaxis,...]]
+                # #     # image_ft[func][im,:,:] = settings['input_func'][func](image_ft0) / settings['input_scale'][func]
+                # if settings.get('log_in',False):
+                #     image_ft_list = [np.log(1e-12+image_ft_r_mean)[np.newaxis,...]/np.log(255.0)]
+                # else:
+                #     image_ft_list = [image_ft_r_mean[np.newaxis,...]/255.0]
                 
                 if im == 0:
                     image_ft = da.array(np.concatenate(image_ft_list,axis=0)[np.newaxis,...])
@@ -190,7 +199,7 @@ for fn in data_file_list:
         # if not settings['FourierTransform']:
         #     in_chan = ['real']
         #     image_ft = ds['image'].values[:,np.newaxis,...]
-        in_chan = ['abs']
+        # in_chan = ['abs']
         
 
 
