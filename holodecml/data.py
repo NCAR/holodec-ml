@@ -1,4 +1,5 @@
 import os
+import random
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -84,7 +85,7 @@ def load_raw_datasets(path_data, num_particles, split, output_cols, subset):
         outputs = outputs[outputs["hid"] < (ix+1)]
     else:
         inputs = ds["image"].values
-        outputs = ds[output_cols].to_dataframe()
+        outputs = ds[output_cols].to_dataframe()    
     ds.close()
     return inputs, outputs
 
@@ -184,6 +185,29 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     z_bins = np.linspace(z_min, z_max, num_z_bins)
     return z_bins
 
+def make_template(df):
+    np.random.seed(random.randint(0,1e6))
+    size = (df['hid'].value_counts().max(), 1)
+    x = np.random.uniform(low=df['x'].min(), high=df['x'].max(), size=size)
+    y = np.random.uniform(low=df['y'].min(), high=df['y'].max(), size=size)
+    z = np.random.uniform(low=df['z'].min(), high=df['z'].max(), size=size)
+    d = np.random.uniform(low=df['d'].min(), high=df['d'].max(), size=size)
+    prob = np.random.uniform(low=0.0, high=0.10, size=(100,1))
+    template = np.hstack((x, y ,z ,d ,prob))
+    
+    return template
+
+def outputs_3d(outputs):
+    outputs_array = []
+    for hid in outputs["hid"].unique():
+        outputs_hid = outputs.loc[outputs['hid'] == hid].to_numpy()
+        outputs_hid[:, -1] = 1
+        template = make_template(outputs)
+        template[:outputs_hid.shape[0],:] = outputs_hid
+        outputs_array.append(template)
+    outputs_array = np.stack(outputs_array, axis=0)
+    return outputs_array
+
 def load_scaled_datasets(path_data, num_particles, output_cols,
                          scaler_out=False, subset=False, num_z_bins=False,
                          mass=False, attention=False):
@@ -230,11 +254,15 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
             train_outputs, _ = calc_z_dist(outputs=train_outputs,
                                            z_bins=z_bins)
             valid_outputs, _ = calc_z_dist(outputs=valid_outputs,
-                                           z_bins=z_bins)    
+                                           z_bins=z_bins)        
     else:
-        train_outputs.drop(['hid'], axis=1)
-        train_outputs = scaler_out.fit_transform(train_outputs)
-        valid_outputs.drop(['hid'], axis=1)
-        valid_outputs = scaler_out.transform(valid_outputs)
+        if train_inputs.shape[0] != train_outputs.shape[0]:
+            train_outputs = outputs_3d(train_outputs)
+            valid_outputs = outputs_3d(valid_outputs)
+        else:
+            train_outputs.drop(['hid'], axis=1)
+            train_outputs = scaler_out.fit_transform(train_outputs)
+            valid_outputs.drop(['hid'], axis=1)
+            valid_outputs = scaler_out.transform(valid_outputs)
         
     return train_inputs, train_outputs, valid_inputs, valid_outputs
