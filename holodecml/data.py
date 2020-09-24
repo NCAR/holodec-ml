@@ -185,31 +185,33 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     z_bins = np.linspace(z_min, z_max, num_z_bins)
     return z_bins
 
-def make_template(df):
-    np.random.seed(random.randint(0,1e6))
-    size = (df['hid'].value_counts().max(), 1)
+# updated function to create the entire dataset template at one time to
+# decrease overhead and eliminate setting random seeds
+def make_template(df, num_images):
+    max_particles = df['hid'].value_counts().max()
+    size = (max_particles * num_images, 1) 
     x = np.random.uniform(low=df['x'].min(), high=df['x'].max(), size=size)
     y = np.random.uniform(low=df['y'].min(), high=df['y'].max(), size=size)
     z = np.random.uniform(low=df['z'].min(), high=df['z'].max(), size=size)
     d = np.random.uniform(low=df['d'].min(), high=df['d'].max(), size=size)
-    prob = np.random.uniform(low=0.0, high=0.10, size=(100,1))
-    template = np.hstack((x, y ,z ,d ,prob))    
+    prob = np.zeros(d.shape)
+    template = np.hstack((x, y ,z ,d ,prob))
+    template = template.reshape((num_images, max_particles, -1))
     return template
 
-def outputs_3d(outputs):
-    outputs_array = []
+# cycles through dataset by "hid" to overwrite random data generated in
+# make_template with actual data and classification of 1
+def outputs_3d(outputs, num_images):
+    outputs_array = make_template(outputs, num_images)
     for hid in outputs["hid"].unique():
         outputs_hid = outputs.loc[outputs['hid'] == hid].to_numpy()
         outputs_hid[:, -1] = 1
-        template = make_template(outputs)
-        template[:outputs_hid.shape[0],:] = outputs_hid
-        outputs_array.append(template)
-    outputs_array = np.stack(outputs_array, axis=0)
+        outputs_array[int(hid-1), :outputs_hid.shape[0], :] = outputs_hid
     return outputs_array
 
 def load_scaled_datasets(path_data, num_particles, output_cols,
                          scaler_out=False, subset=False, num_z_bins=False,
-                         mass=False, attention=False):
+                         mass=False):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns scaled inputs and raw outputs.
