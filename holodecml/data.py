@@ -193,8 +193,7 @@ def make_template(df):
     z = np.random.uniform(low=df['z'].min(), high=df['z'].max(), size=size)
     d = np.random.uniform(low=df['d'].min(), high=df['d'].max(), size=size)
     prob = np.random.uniform(low=0.0, high=0.10, size=(100,1))
-    template = np.hstack((x, y ,z ,d ,prob))
-    
+    template = np.hstack((x, y ,z ,d ,prob))    
     return template
 
 def outputs_3d(outputs):
@@ -257,7 +256,10 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
                                            z_bins=z_bins)        
     else:
         if train_inputs.shape[0] != train_outputs.shape[0]:
+            col = [c for c in output_cols if c != 'hid']
+            train_outputs[col] = scaler_out.fit_transform(train_outputs[col])
             train_outputs = outputs_3d(train_outputs)
+            valid_outputs[col] = scaler_out.transform(valid_outputs[col])
             valid_outputs = outputs_3d(valid_outputs)
         else:
             train_outputs.drop(['hid'], axis=1)
