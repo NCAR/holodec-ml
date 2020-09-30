@@ -6,3 +6,5 @@
 *.out.*
 batch**.sh
 *.o*
+.idea
+holodecml.egg-info/
