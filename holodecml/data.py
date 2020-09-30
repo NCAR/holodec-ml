@@ -197,7 +197,7 @@ def make_template(df, num_images):
     prob = np.zeros(d.shape)
     template = np.hstack((x, y ,z ,d ,prob))
     template = template.reshape((num_images, max_particles, -1))
-    return template
+    return template    
 
 # cycles through dataset by "hid" to overwrite random data generated in
 # make_template with actual data and classification of 1
@@ -260,9 +260,9 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
         if train_inputs.shape[0] != train_outputs.shape[0]:
             col = [c for c in output_cols if c != 'hid']
             train_outputs[col] = scaler_out.fit_transform(train_outputs[col])
-            train_outputs = outputs_3d(train_outputs)
+            train_outputs = outputs_3d(train_outputs, train_inputs.shape[0])
             valid_outputs[col] = scaler_out.transform(valid_outputs[col])
-            valid_outputs = outputs_3d(valid_outputs)
+            valid_outputs = outputs_3d(valid_outputs, valid_inputs.shape[0])
         else:
             train_outputs.drop(['hid'], axis=1)
             train_outputs = scaler_out.fit_transform(train_outputs)

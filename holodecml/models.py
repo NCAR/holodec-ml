@@ -11,6 +11,7 @@ from tensorflow.keras.layers import (Input, Conv2D, Dense, Flatten, MaxPool2D,
 import tensorflow as tf
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.optimizers import Adam, SGD
+from tensorflow.keras.losses import mean_absolute_error, binary_crossentropy
 
 from holodecml.losses import *
 from holodecml.metrics import *
@@ -342,7 +343,17 @@ class ParticleAttentionNet(Model):
         # particle_dec.shape = batch_size x proposed_num_particles x num_coordinates (x,y,z,d,p(particle_is_real)<optional)
         return particle_dec
 
+    
+def attention_net_loss(y_true, y_pred):
+    # y_true and y_pred will have shape (batch_size x max_num_particles x 5)
+    loss_real = tf.reduce_mean(tf.abs(y_true[y_true[:, :, -1] > 0] - y_pred[y_true[:, :, -1] > 0]))
+    
+    loss_bce = binary_crossentropy(tf.reshape(y_true[:,:,-1], (y_true.shape[0]*y_true.shape[1])),
+                                   tf.reshape(y_pred[:,:,-1], (y_true.shape[0]*y_true.shape[1])))
+    loss_total = loss_real + loss_bce
+    return loss_total
 
+    
 def generate_gaussian_particles(num_images=1000, num_particles=5, image_size_pixels=100,
                                 gaussian_sd=3, random_seed=124):
     np.random.seed(random_seed)
@@ -366,7 +377,7 @@ def run_particleeattentionnet():
     particle_pos, holo = generate_gaussian_particles(num_images=num_images, num_particles=num_particles,
                                 image_size_pixels=image_size_pixels, gaussian_sd=filter_size)
     particle_pos_noisy = particle_pos * (1 + np.random.normal(0, noise_sd, particle_pos.shape))
-    net.compile(optimizer="adam", loss="mae")
+    net.compile(optimizer="adam", loss=attention_net_loss)
     net.fit([particle_pos_noisy, holo], particle_pos, epochs=15, batch_size=32, verbose=1)
     pred_particle_pos = net.predict([particle_pos_noisy, holo], batch_size=128)
     import matplotlib.pyplot as plt
