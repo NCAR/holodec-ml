@@ -37,15 +37,6 @@ metrics = {"mae": mean_absolute_error,
            "max_error": max_error}
 
 
-def attention_net_loss(y_true, y_pred):
-    # y_true and y_pred will have shape (batch_size x max_num_particles x 5)
-    loss_real = tf.reduce_mean(tf.abs(y_true[y_true[:, :, -1] > 0] - y_pred[y_true[:, :, -1] > 0]))
-    batch_size = tf.shape(y_true)[0]
-    column_count = tf.shape(y_true)[1]
-    loss_bce = binary_crossentropy(y_true[:,:,-1], 
-                                   y_pred[:,:,-1])
-    loss_total = loss_real + loss_bce
-    return loss_total
 
 def main():
     
