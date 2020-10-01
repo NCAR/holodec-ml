@@ -33,3 +33,12 @@ def R2(y_true, y_pred):
 
 def keras_mse(y_true, y_pred):
     return K.mean(K.square(y_pred - y_true))
+
+def attention_net_loss(y_true, y_pred):
+    # y_true and y_pred will have shape (batch_size x max_num_particles x 5)
+    loss_real = tf.reduce_mean(tf.abs(y_true[y_true[:, :, -1] > 0] - y_pred[y_true[:, :, -1] > 0]))
+    
+    loss_bce = tf.keras.losses.binary_crossentropy(tf.reshape(y_true[:,:,-1], (y_true.shape[0]*y_true.shape[1])),
+                                                   tf.reshape(y_pred[:,:,-1], (y_true.shape[0]*y_true.shape[1])))
+    loss_total = loss_real + loss_bce
+    return loss_total

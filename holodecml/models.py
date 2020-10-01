@@ -20,9 +20,10 @@ logger = logging.getLogger(__name__)
 
 custom_losses = {
     "sce": SymmetricCrossEntropy(0.5, 0.5),
-    "weighted_mse": wmse,
     "rmse": rmse,
-    "r2": R2
+    "weighted_mse": wmse,
+    "r2": R2,
+    "attn": attention_net_loss
 }
 
 custom_metrics = {
@@ -95,7 +96,6 @@ class Conv2DNeuralNetwork(object):
                               padding="same",
                               activation=self.conv2d_activation,
                               name=f"conv2D_{h:02d}")(nn_model)
-            print(self.metrics, type(self.metrics))
             if self.pool_sizes[h][0] > 0:
                 nn_model = MaxPool2D(self.pool_sizes[h],
                                      name=f"maxpool2D_{h:02d}")(nn_model)
@@ -342,17 +342,6 @@ class ParticleAttentionNet(Model):
         particle_dec = self.particle_decoder(attention_out)
         # particle_dec.shape = batch_size x proposed_num_particles x num_coordinates (x,y,z,d,p(particle_is_real)<optional)
         return particle_dec
-
-    
-def attention_net_loss(y_true, y_pred):
-    # y_true and y_pred will have shape (batch_size x max_num_particles x 5)
-    loss_real = tf.reduce_mean(tf.abs(y_true[y_true[:, :, -1] > 0] - y_pred[y_true[:, :, -1] > 0]))
-    
-    loss_bce = binary_crossentropy(tf.reshape(y_true[:,:,-1], (y_true.shape[0]*y_true.shape[1])),
-                                   tf.reshape(y_pred[:,:,-1], (y_true.shape[0]*y_true.shape[1])))
-    loss_total = loss_real + loss_bce
-    return loss_total
-
     
 def generate_gaussian_particles(num_images=1000, num_particles=5, image_size_pixels=100,
                                 gaussian_sd=3, random_seed=124):
@@ -377,7 +366,7 @@ def run_particleeattentionnet():
     particle_pos, holo = generate_gaussian_particles(num_images=num_images, num_particles=num_particles,
                                 image_size_pixels=image_size_pixels, gaussian_sd=filter_size)
     particle_pos_noisy = particle_pos * (1 + np.random.normal(0, noise_sd, particle_pos.shape))
-    net.compile(optimizer="adam", loss=attention_net_loss)
+    net.compile(optimizer="adam", loss="attn")
     net.fit([particle_pos_noisy, holo], particle_pos, epochs=15, batch_size=32, verbose=1)
     pred_particle_pos = net.predict([particle_pos_noisy, holo], batch_size=128)
     import matplotlib.pyplot as plt
