@@ -356,7 +356,7 @@ def generate_gaussian_particles(num_images=1000, num_particles=5, image_size_pix
     return particle_pos, holo
 
 
-def run_particleeattentionnet():
+def run_particleattentionnet():
     net = ParticleAttentionNet()
     num_images = 1000
     num_particles = 5
@@ -366,7 +366,7 @@ def run_particleeattentionnet():
     particle_pos, holo = generate_gaussian_particles(num_images=num_images, num_particles=num_particles,
                                 image_size_pixels=image_size_pixels, gaussian_sd=filter_size)
     particle_pos_noisy = particle_pos * (1 + np.random.normal(0, noise_sd, particle_pos.shape))
-    net.compile(optimizer="adam", loss="attn")
+    net.compile(optimizer="adam", loss=losses["attn"])
     net.fit([particle_pos_noisy, holo], particle_pos, epochs=15, batch_size=32, verbose=1)
     pred_particle_pos = net.predict([particle_pos_noisy, holo], batch_size=128)
     import matplotlib.pyplot as plt
@@ -380,4 +380,4 @@ def run_particleeattentionnet():
     return
 
 if __name__ == "__main__":
-    run_particleeattentionnet()
+    run_particleattentionnet()
