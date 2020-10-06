@@ -1,6 +1,10 @@
 *.pyc
 *.DS_Store
 **/.ipynb_checkpoints
+*.out
+*.o
 *.out.*
 batch**.sh
 *.o*
+.idea
+holodecml.egg-info/

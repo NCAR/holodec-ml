@@ -1,4 +1,5 @@
 import os
+import random
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -8,7 +9,8 @@ from datetime import datetime
 num_particles_dict = {
     1 : '1particle',
     3 : '3particle',
-    'multi': 'multiparticle'}
+    'multi': 'multiparticle',
+    'large': '50-100particle_gamma'}
 
 split_dict = {
     'train' : 'training',
@@ -28,7 +30,7 @@ def dataset_name(num_particles, split, file_extension='nc'):
         ds_name: (str) Dataset name
     """
     
-    valid = [1,3,'multi']
+    valid = [1,3,'multi','large']
     if num_particles not in valid:
         raise ValueError("results: num_particles must be one of %r." % valid)
     num_particles = num_particles_dict[num_particles]
@@ -57,7 +59,7 @@ def open_dataset(path_data, num_particles, split):
     ds = xr.open_dataset(path_data)
     return ds
 
-def load_raw_datasets(path_data, num_particles, split, subset, output_cols):
+def load_raw_datasets(path_data, num_particles, split, output_cols, subset):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns raw inputs and outputs. Can specify
@@ -77,13 +79,13 @@ def load_raw_datasets(path_data, num_particles, split, subset, output_cols):
     
     ds = open_dataset(path_data, num_particles, split)
     if subset:
-        in_ix = int(subset * ds['image'].shape[0])
-        out_ix = int(in_ix * (ds['hid'].shape[0]/ds['image'].shape[0]))
-        inputs = ds['image'][:in_ix].values
-        outputs = ds[output_cols].sel(particle=slice(0,out_ix)).to_dataframe()
+        ix = int(subset * ds['image'].shape[0])
+        inputs = ds['image'][:ix].values
+        outputs = ds[output_cols].to_dataframe()
+        outputs = outputs[outputs["hid"] < (ix+1)]
     else:
         inputs = ds["image"].values
-        outputs = ds[output_cols].to_dataframe()
+        outputs = ds[output_cols].to_dataframe()    
     ds.close()
     return inputs, outputs
 
@@ -138,6 +140,34 @@ def calc_z_relative_mass(outputs, num_z_bins=20, z_bins=None):
     z_mass /= np.expand_dims(z_mass.sum(axis=1), -1)
     return z_mass, z_bins
 
+def calc_z_dist(outputs, num_z_bins=20, z_bins=None):
+    """
+    Calculate z distribution
+    
+    Args: 
+        outputs: (df) Output data specified by output_col 
+        num_z_bins: (int) Number of bins for z-axis linspace
+        z_bins: (np array) Bin linspace along the z-axis
+    
+    Returns:
+        z_dist: (np array) Particle z distribution by hologram along z-axis
+        z_bins: (np array) Bin linspace along the z-axis
+    """
+    
+    if z_bins is None:
+        z_bins = np.linspace(outputs["z"].min() - 100,
+                             outputs["z"].max() + 100,
+                             num_z_bins)
+    else:
+        num_z_bins = z_bins.size
+    holograms = len(outputs["hid"].unique())
+    z_dist = np.zeros((holograms, num_z_bins), dtype=np.float32)
+    for i in range(outputs.shape[0]):
+        z_pos = np.searchsorted(z_bins, outputs.loc[i, "z"], side="right") - 1
+        z_dist[int(outputs.loc[i, "hid"]) - 1, z_pos] += 1
+    z_dist /= np.expand_dims(z_dist.sum(axis=1), -1)
+    return z_dist, z_bins
+
 def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     """
     Calculate z-axis linspace.
@@ -153,19 +183,35 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     z_min = np.minimum(train_outputs["z"].min(), valid_outputs["z"].min())
     z_max = np.maximum(train_outputs["z"].max(), valid_outputs["z"].max())
     z_bins = np.linspace(z_min, z_max, num_z_bins)
-    return z_bins    
+    return z_bins
 
-def flatten_coordinate(outputs, hids, output_col):
-    outputs = pd.DataFrame({output_col: outputs, 'hid': hids})
-    outputs_flattened = []
-    for h in np.unique(hids):
-        outputs_flattened.append(outputs[outputs.hid == h][output_col].values)
-    outputs = np.array(outputs_flattened, dtype=object)
-    return outputs
+# updated function to create the entire dataset template at one time to
+# decrease overhead and eliminate setting random seeds
+def make_template(df, num_images):
+    max_particles = df['hid'].value_counts().max()
+    size = (max_particles * num_images, 1) 
+    x = np.random.uniform(low=df['x'].min(), high=df['x'].max(), size=size)
+    y = np.random.uniform(low=df['y'].min(), high=df['y'].max(), size=size)
+    z = np.random.uniform(low=df['z'].min(), high=df['z'].max(), size=size)
+    d = np.random.uniform(low=df['d'].min(), high=df['d'].max(), size=size)
+    prob = np.zeros(d.shape)
+    template = np.hstack((x, y ,z ,d ,prob))
+    template = template.reshape((num_images, max_particles, -1))
+    return template    
+
+# cycles through dataset by "hid" to overwrite random data generated in
+# make_template with actual data and classification of 1
+def outputs_3d(outputs, num_images):
+    outputs_array = make_template(outputs, num_images)
+    for hid in outputs["hid"].unique():
+        outputs_hid = outputs.loc[outputs['hid'] == hid].to_numpy()
+        outputs_hid[:, -1] = 1
+        outputs_array[int(hid-1), :outputs_hid.shape[0], :] = outputs_hid
+    return outputs_array
 
 def load_scaled_datasets(path_data, num_particles, output_cols,
                          scaler_out=False, subset=False, num_z_bins=False,
-                         flatten_coord=False):
+                         mass=False):
     """
     Given a path to training or validation datset, the number of particles per
     hologram, and output columns, returns scaled inputs and raw outputs.
@@ -177,7 +223,7 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
         scaler_out: (sklearn.preprocessing scaler) Output data scaler
         subset: (float) Fraction of data to be loaded
         num_z_bins: (int) Number of bins along z-axis
-        flatten_coord: (boolean) If True, flatten single coord by hid
+        mass: (boolean) If True, calculate particle mass on z-axis
         
     Returns:
         train_inputs: (np array) Train input data scaled between 0 and 1
@@ -188,16 +234,10 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
     
     train_inputs,\
     train_outputs = load_raw_datasets(path_data, num_particles, 'train',
-                                      subset, output_cols)
+                                      output_cols, subset)
     valid_inputs,\
     valid_outputs = load_raw_datasets(path_data, num_particles, 'valid',
-                                      subset, output_cols)
-    
-    if flatten_coord:
-        train_hids = train_outputs["hid"].values
-        valid_hids = valid_outputs["hid"].values
-        train_outputs = train_outputs.drop(['hid'], axis=1)
-        valid_outputs = valid_outputs.drop(['hid'], axis=1)
+                                      output_cols, subset)
     
     train_inputs, scaler_in = scale_images(train_inputs)
     valid_inputs, _ = scale_images(valid_inputs, scaler_in)
@@ -206,25 +246,27 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
     
     if num_z_bins:
         z_bins = calc_z_bins(train_outputs, valid_outputs, num_z_bins)
-        train_outputs, _ = calc_z_relative_mass(outputs=train_outputs,
-                                                z_bins=z_bins)
-        valid_outputs, _ = calc_z_relative_mass(outputs=valid_outputs,
-                                                z_bins=z_bins)
+        if mass:
+            train_outputs, _ = calc_z_relative_mass(outputs=train_outputs,
+                                                    z_bins=z_bins)
+            valid_outputs, _ = calc_z_relative_mass(outputs=valid_outputs,
+                                                    z_bins=z_bins)
+        else:
+            train_outputs, _ = calc_z_dist(outputs=train_outputs,
+                                           z_bins=z_bins)
+            valid_outputs, _ = calc_z_dist(outputs=valid_outputs,
+                                           z_bins=z_bins)        
     else:
-        train_outputs = scaler_out.fit_transform(train_outputs)
-        valid_outputs = scaler_out.transform(valid_outputs)
-
-    if flatten_coord:
-        output_cols.remove("hid")
-        train_outputs = flatten_coordinate(train_outputs.flatten(),
-                                           train_hids, output_cols[0])
-        valid_outputs = flatten_coordinate(valid_outputs.flatten(),
-                                           valid_hids, output_cols[0]) 
-        
-    if train_inputs.shape[0] != train_outputs.shape[0]:
-        factor = int(train_outputs.shape[0]/train_inputs.shape[0])
-        train_inputs = np.repeat(train_inputs, factor, axis=0)
-        factor = int(valid_outputs.shape[0]/valid_inputs.shape[0])
-        valid_inputs = np.repeat(valid_inputs, factor, axis=0)
+        if train_inputs.shape[0] != train_outputs.shape[0]:
+            col = [c for c in output_cols if c != 'hid']
+            train_outputs[col] = scaler_out.fit_transform(train_outputs[col])
+            train_outputs = outputs_3d(train_outputs, train_inputs.shape[0])
+            valid_outputs[col] = scaler_out.transform(valid_outputs[col])
+            valid_outputs = outputs_3d(valid_outputs, valid_inputs.shape[0])
+        else:
+            train_outputs.drop(['hid'], axis=1)
+            train_outputs = scaler_out.fit_transform(train_outputs)
+            valid_outputs.drop(['hid'], axis=1)
+            valid_outputs = scaler_out.transform(valid_outputs)
         
     return train_inputs, train_outputs, valid_inputs, valid_outputs
