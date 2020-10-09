@@ -185,11 +185,18 @@ def calc_z_bins(train_outputs, valid_outputs, num_z_bins):
     z_bins = np.linspace(z_min, z_max, num_z_bins)
     return z_bins
 
+# added this because the previous code allowed a different max_particle size
+# depending on which split df was opened and the subset
+def get_max_particles(path_data, num_particles, output_cols):
+    ds = open_dataset(path_data, num_particles, "train")
+    outputs = ds[output_cols].to_dataframe()
+    max_particles = outputs['hid'].value_counts().max()
+    return max_particles
+
 # updated function to create the entire dataset template at one time to
 # decrease overhead and eliminate setting random seeds
-def make_template(df, num_images):
-    max_particles = df['hid'].value_counts().max()
-    size = (max_particles * num_images, 1) 
+def make_template(df, num_images, max_particles):
+    size = (num_images * max_particles, 1)
     x = np.random.uniform(low=df['x'].min(), high=df['x'].max(), size=size)
     y = np.random.uniform(low=df['y'].min(), high=df['y'].max(), size=size)
     z = np.random.uniform(low=df['z'].min(), high=df['z'].max(), size=size)
@@ -201,8 +208,8 @@ def make_template(df, num_images):
 
 # cycles through dataset by "hid" to overwrite random data generated in
 # make_template with actual data and classification of 1
-def outputs_3d(outputs, num_images):
-    outputs_array = make_template(outputs, num_images)
+def outputs_3d(outputs, num_images, max_particles):
+    outputs_array = make_template(outputs, num_images, max_particles)
     for hid in outputs["hid"].unique():
         outputs_hid = outputs.loc[outputs['hid'] == hid].to_numpy()
         outputs_hid[:, -1] = 1
@@ -231,7 +238,6 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
         valid_inputs: (np array) Valid input data scaled between 0 and 1
         valid_outputs: (np array) Scaled valid output data
     """
-    
     train_inputs,\
     train_outputs = load_raw_datasets(path_data, num_particles, 'train',
                                       output_cols, subset)
@@ -259,10 +265,13 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
     else:
         if train_inputs.shape[0] != train_outputs.shape[0]:
             col = [c for c in output_cols if c != 'hid']
+            max_particles = get_max_particles(path_data, num_particles, output_cols)
             train_outputs[col] = scaler_out.fit_transform(train_outputs[col])
-            train_outputs = outputs_3d(train_outputs, train_inputs.shape[0])
+            train_outputs = outputs_3d(train_outputs, train_inputs.shape[0],
+                                       max_particles)
             valid_outputs[col] = scaler_out.transform(valid_outputs[col])
-            valid_outputs = outputs_3d(valid_outputs, valid_inputs.shape[0])
+            valid_outputs = outputs_3d(valid_outputs, valid_inputs.shape[0],
+                                       max_particles)
         else:
             train_outputs.drop(['hid'], axis=1)
             train_outputs = scaler_out.fit_transform(train_outputs)
