@@ -8,7 +8,7 @@ from tensorflow.keras.layers import Input, Conv2D, Dense, Flatten, MaxPool2D
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.optimizers import Adam, SGD
 
-from holodecml.library.losses import *
+from holodecml.losses import *
 
 
 logger = logging.getLogger(__name__)

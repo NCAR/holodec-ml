@@ -9,142 +9,26 @@ import torch
 import pickle
 import logging
 
-from torchvision.utils import save_image
 from torch.utils.data import Dataset, DataLoader
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import *
+from torch import nn
 
-from typing import List, Dict
+from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
 from multiprocessing import cpu_count
+from shutil import copyfile
 
 # custom
 from holodecml.vae.checkpointer import *
 from holodecml.vae.data_loader import *
 from holodecml.vae.optimizers import *
 from holodecml.vae.transforms import *
+from holodecml.vae.trainers import *
 from holodecml.vae.models import *
 from holodecml.vae.visual import *
 from holodecml.vae.losses import *
 
 
 logger = logging.getLogger(__name__)
-
-
-class Trainer:
-    
-    def __init__(self, 
-                 model, 
-                 optimizer,
-                 train_gen, 
-                 valid_gen, 
-                 dataloader, 
-                 valid_dataloader,
-                 batch_size,
-                 path_save,
-                 device,
-                 test_image = None):
-        
-        self.model = model
-        self.optimizer = optimizer
-        self.train_gen = train_gen
-        self.valid_gen = valid_gen
-        self.dataloader = dataloader
-        self.valid_dataloader = valid_dataloader
-        self.batch_size = batch_size
-        self.path_save = path_save
-        self.device = device
-        self.test_image = test_image
-        
-        
-    def train_one_epoch(self, epoch):
-
-        self.model.train()
-        batches_per_epoch = int(np.ceil(self.train_gen.__len__() / self.batch_size))
-        batch_group_generator = tqdm.tqdm(
-            enumerate(self.dataloader),
-            total=batches_per_epoch, 
-            leave=True
-        )
-
-        epoch_losses = {"loss": [], "bce": [], "kld": []}
-        for idx, images in batch_group_generator:
-
-            images = images.to(self.device)
-            recon_images, mu, logvar = self.model(images)
-            loss, bce, kld = loss_fn(recon_images, images, mu, logvar)
-
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-
-            batch_loss = loss.item() / batch_size
-            bce_loss = bce.item() / batch_size
-            kld_loss = kld.item() / batch_size
-
-            epoch_losses["loss"].append(batch_loss)
-            epoch_losses["bce"].append(bce_loss)
-            epoch_losses["kld"].append(kld_loss)
-
-            loss = np.mean(epoch_losses["loss"])
-            bce = np.mean(epoch_losses["bce"])
-            kld = np.mean(epoch_losses["kld"])
-
-            to_print = "loss: {:.3f} bce: {:.3f} kld: {:.3f}".format(loss, bce, kld)
-            batch_group_generator.set_description(to_print)
-            batch_group_generator.update()
-
-        return loss, bce, kld
-
-
-    def test(self, epoch):
-
-        self.model.eval()
-        batches_per_epoch = int(np.ceil(self.valid_gen.__len__() / self.batch_size))
-
-        with torch.no_grad():
-
-            batch_group_generator = tqdm.tqdm(
-                enumerate(self.valid_dataloader),
-                total=batches_per_epoch, 
-                leave=True
-            )
-
-            epoch_losses = {"loss": [], "bce": [], "kld": []}
-            for idx, images in batch_group_generator:
-
-                images = images.to(self.device)
-                recon_images, mu, logvar = self.model(images)
-                loss, bce, kld = loss_fn(recon_images, images, mu, logvar)
-
-                batch_loss = loss.item() / batch_size
-                bce_loss = bce.item() / batch_size
-                kld_loss = kld.item() / batch_size
-
-                epoch_losses["loss"].append(batch_loss)
-                epoch_losses["bce"].append(bce_loss)
-                epoch_losses["kld"].append(kld_loss)
-
-                loss = np.mean(epoch_losses["loss"])
-                bce = np.mean(epoch_losses["bce"])
-                kld = np.mean(epoch_losses["kld"])
-
-                to_print = "val_loss: {:.3f} val_bce: {:.3f} val_kld: {:.3f}".format(loss, bce, kld)
-                batch_group_generator.set_description(to_print)
-                batch_group_generator.update()
-
-            if os.path.isfile(self.test_image):
-                with open(self.test_image, "rb") as fid:
-                    pic = pickle.load(fid)
-                self.compare(epoch, pic)
-
-        return loss, bce, kld
-    
-    
-    def compare(self, epoch, x):
-        x = x.to(self.device)
-        recon_x, _, _ = self.model(x)
-        compare_x = torch.cat([x, recon_x])
-        save_image(compare_x.data.cpu(), f'{self.path_save}/image_epoch_{epoch}.png')
-
 
     
 if __name__ == '__main__':
@@ -157,17 +41,19 @@ if __name__ == '__main__':
     
     with open(sys.argv[1]) as config_file:
         config = yaml.load(config_file, Loader=yaml.FullLoader)
-        
+
     ############################################################
     #
     # Create the save directory if it does not exist
     #
     ############################################################
     
-    try:
-        os.makedirs(config["path_save"])
-    except:
-        pass
+    #try:
+    #    os.makedirs(config["log"])
+    #except:
+    #    pass
+    
+    #copyfile(sys.argv[1], os.path.join(config["log"], sys.argv[1]))
     
     ############################################################
     #
@@ -186,7 +72,7 @@ if __name__ == '__main__':
     root.addHandler(ch)
     
     # Save the log file
-    logger_name = os.path.join(config["path_save"], "log.txt")
+    logger_name = os.path.join(config["log"], "log.txt")
     fh = logging.FileHandler(logger_name,
                              mode="w",
                              encoding='utf-8')
@@ -194,33 +80,6 @@ if __name__ == '__main__':
     fh.setFormatter(formatter)
     root.addHandler(fh)
 
-    ############################################################
-    #
-    # Read in some of the parameters from the configuration file
-    #
-    ############################################################
-
-    logging.info(f'Reading parameters from {sys.argv[1]}')
-    
-    path_data = config["path_data"]
-    path_save = config["path_save"]
-    num_particles = config["num_particles"]
-    maxnum_particles = config["maxnum_particles"]
-    output_cols = config["output_cols"]
-    subset = config["subset"]
-    test_image = config["test_image"]
-    
-    batch_size = config["batch_size"]
-    workers = min(config["workers"], cpu_count())
-    epochs = config["epochs"]
-    retrain = False if "retrain" not in config else config["retrain"]
-    
-    model_save_path = os.path.join(f"{path_save}", "checkpoint.pt")
-    
-    start_epoch = 0
-    if retrain:
-        saved_model_optimizer = torch.load(model_save_path)
-        start_epoch = saved_model_optimizer["epoch"] + 1
 
     ############################################################
     #
@@ -230,6 +89,9 @@ if __name__ == '__main__':
 
     is_cuda = torch.cuda.is_available()
     device = torch.device(torch.cuda.current_device()) if is_cuda else torch.device("cpu")
+    
+    if is_cuda:
+        torch.backends.cudnn.benchmark = True
     
     logging.info(f'Preparing to use device {device}')
     
@@ -243,54 +105,54 @@ if __name__ == '__main__':
     
     tforms = []
     transform_config = config["transforms"]
-    
+
+    if "RandomVerticalFlip" in transform_config:
+        tforms.append(RandVerticalFlip(0.5))
+    if "RandomHorizontalFlip" in transform_config:
+        tforms.append(RandHorizontalFlip(0.5))
     if "Rescale" in transform_config:
         rescale = transform_config["Rescale"]
         tforms.append(Rescale(rescale))
     if "Normalize" in transform_config:
-        tforms.append(Normalize())
+        mode = transform_config["Normalize"]
+        tforms.append(Normalize(mode))
     if "ToTensor" in transform_config:
         tforms.append(ToTensor(device))
     if "RandomCrop" in transform_config:
         tforms.append(RandomCrop())
     if "Standardize" in transform_config:
         tforms.append(Standardize())
-    
+
     transform = transforms.Compose(tforms)
     
     # Data readers for train/test
     
     train_gen = HologramDataset(
-        path_data, num_particles, "train", subset, 
-        output_cols, maxnum_particles = maxnum_particles, 
-        transform = transform
+        split = "train", 
+        transform = transform,
+        **config["data"]
     )
-    
+
     train_scalers = train_gen.get_transform()
 
     valid_gen = HologramDataset(
-        path_data, num_particles, "test", subset, 
-        output_cols, scaler = train_scalers, 
-        maxnum_particles = maxnum_particles,
-        transform = transform
+        split = "test",
+        transform = transform,
+        **config["data"]
     )
     
     # Data iterators using multiprocessing for train/test
     
-    logging.info(f"Loading training data iterator using {workers} workers")
+    logging.info(f"Loading training data iterator using {config['iterator']['num_workers']} workers")
     
     dataloader = DataLoader(
         train_gen,
-        batch_size = batch_size,
-        shuffle = True,
-        num_workers = workers
+        **config["iterator"]
     )
-    
+
     valid_dataloader = DataLoader(
         valid_gen,
-        batch_size = batch_size,
-        shuffle = False,
-        num_workers = workers
+        **config["iterator"]
     )
     
     ############################################################
@@ -298,31 +160,37 @@ if __name__ == '__main__':
     # Load the model
     #
     ############################################################
-            
-    vae = CNN_VAE(**config["model"]).to(device)
+    if "load_weights" in config["model"]:
+        load_weights = isinstance(config["model"]["load_weights"], str)
+        model_save_path = config["model"]["load_weights"]
+        del config["model"]["load_weights"]
+    else:
+        load_weights = False
+    
+    vae = ATTENTION_VAE(**config["model"]).to(device)
+    #vae = CNN_VAE(**config["model"]).to(device)
     
     # Print the total number of model parameters
     logging.info(
         f"The model contains {count_parameters(vae)} parameters"
     )
     
-    if retrain:
-        vae = vae.load_state_dict(
-            saved_model_optimizer["model_state_dict"], map_location=device
-        )
-        logging.info(f"Loaded model weights from {model_save_path}")
-        
+    restart_training = config["trainer"]["start_epoch"] > 0
     
+    if load_weights:
+        pretrained_model = load_checkpoint(model_save_path)
+        vae.load_state_dict(pretrained_model["model_state_dict"])
+        logging.info(f"Loaded model weights from {model_save_path}")
+      
     ############################################################
     #
     # Load the optimizer (after the model gets mounted onto GPU)
     #
     ############################################################
-    
     optimizer_config = config["optimizer"]
-    learning_rate = optimizer_config["lr"] if not retrain else saved_model_optimizer["lr"]
+    learning_rate = optimizer_config["lr"]
     optimizer_type = optimizer_config["type"]
-    
+
     if optimizer_type == "lookahead-diffgrad":
         optimizer = LookaheadDiffGrad(vae.parameters(), lr=learning_rate)
     elif optimizer_type == "diffgrad":
@@ -340,16 +208,39 @@ if __name__ == '__main__':
             f"Optimzer type {optimizer_type} is unknown. Exiting with error."
         )
         sys.exit(1)
+
+    if restart_training and load_weights:
+        optimizer.load_state_dict(pretrained_model["optimizer_state_dict"])
+        for param_group in optimizer.param_groups:
+            learning_rate = param_group["lr"]
+            break
+        logging.info(f"Loaded the {optimizer_type} optimizer and weights {model_save_path}")
+        logging.info(f"... with learning rate {learning_rate}")
         
-    logging.info(
-        f"Loaded the {optimizer_type} optimizer with learning rate {learning_rate}"
-    )
-    
-    if retrain:
-        optimizer = optimizer.load_state_dict(
-            saved_model_optimizer["optimizer_state_dict"], map_location=device
+    else:
+        logging.info(
+            f"Loaded the {optimizer_type} optimizer with learning rate {learning_rate}"
         )
-        logging.info(f"Loaded optimizer weights from {model_save_path}")
+          
+ 
+    ############################################################
+    #
+    # Load a Trainer object
+    #
+    ############################################################
+        
+    logging.info("Loading trainer object")
+        
+    trainer = BaseTrainer(
+        model = vae,
+        optimizer = optimizer,
+        train_gen = train_gen,
+        valid_gen = valid_gen, 
+        dataloader = dataloader, 
+        valid_dataloader = valid_dataloader,
+        device = device,
+        **config["trainer"]
+    )
     
     ############################################################
     #
@@ -358,48 +249,31 @@ if __name__ == '__main__':
     ############################################################
     
     # Initialize LR annealing scheduler 
-    schedule_config = config["callbacks"]["ReduceLROnPlateau"]
-    
-    logging.info(
-        f"Loaded ReduceLROnPlateau learning rate annealer with patience {schedule_config['patience']}"
-    )
-        
-    scheduler = ReduceLROnPlateau(optimizer,
-                                  mode=schedule_config["mode"],
-                                  patience=schedule_config["patience"],
-                                  factor=schedule_config["factor"],
-                                  min_lr=schedule_config["min_lr"],
-                                  verbose=schedule_config["verbose"])
+    if "ReduceLROnPlateau" in config["callbacks"]:
+        schedule_config = config["callbacks"]["ReduceLROnPlateau"]
+        scheduler = ReduceLROnPlateau(trainer.optimizer, **schedule_config)
+        logging.info(
+            f"Loaded ReduceLROnPlateau learning rate annealer with patience {schedule_config['patience']}"
+        )
+    elif "ExponentialLR" in config["callbacks"]:
+        schedule_config = config["callbacks"]["ExponentialLR"]
+        scheduler = ExponentialLR(trainer.optimizer, **schedule_config)
+        logging.info(
+            f"Loaded ExponentialLR learning rate annealer with reduce factor {schedule_config['gamma']}"
+        )
 
+    ### No restart_training options yet for checkpoint_config ... 
+        
     # Early stopping
     checkpoint_config = config["callbacks"]["EarlyStopping"]
-    early_stopping = EarlyStopping(path=model_save_path, 
-                                   patience=checkpoint_config["patience"], 
-                                   verbose=checkpoint_config["verbose"])
-    
-    # Write metrics to csv each epoch
-    metrics_logger = MetricsLogger(path_save, reload = retrain)
-    
-    ############################################################
-    #
-    # Load the trainer class
-    #
-    ############################################################
+    early_stopping = EarlyStopping(**checkpoint_config)
 
-    logging.info("Loading trainer object")
+    # Write metrics to csv each epoch
     
-    trainer = Trainer(
-        vae,
-        optimizer,
-        train_gen,
-        valid_gen, 
-        dataloader, 
-        valid_dataloader,
-        batch_size,
-        path_save,
-        device,
-        test_image
-    )
+    if restart_training:
+        config["callbacks"]["MetricsLogger"]["reload"] = True
+    
+    metrics_logger = MetricsLogger(**config["callbacks"]["MetricsLogger"])
     
     ############################################################
     #
@@ -407,34 +281,7 @@ if __name__ == '__main__':
     #
     ############################################################
     
-    logging.info(
-        f"Training the model for up to {epochs} epochs starting at epoch {start_epoch}"
-    )
-    
-    for epoch in range(start_epoch, epochs):
-        
-        train_loss, train_bce, train_kld = trainer.train_one_epoch(epoch)
-        test_loss, test_bce, test_kld = trainer.test(epoch)
-
-        scheduler.step(test_loss)
-        early_stopping(epoch, test_loss, trainer.model, trainer.optimizer)
-
-        # Write results to the callback logger 
-        result = {
-            "epoch": epoch,
-            "train_loss": train_loss,
-            "train_bce": train_bce,
-            "train_kld": train_kld,
-            "valid_loss": test_loss,
-            "valid_bce": test_bce,
-            "valid_kld": test_kld,
-            "lr": early_stopping.print_learning_rate(trainer.optimizer)
-        }
-        metrics_logger.update(result)
-
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
+    trainer.train(scheduler, early_stopping, metrics_logger)
     
     ############################################################
     #
@@ -442,4 +289,5 @@ if __name__ == '__main__':
     #
     ############################################################
 
-    generate_video(f"{path_save}", "generated_hologram.avi") 
+    video = config["trainer"]["path_save"]
+    generate_video(video, "generated_hologram.avi") 

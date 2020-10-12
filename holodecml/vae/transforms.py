@@ -1,4 +1,5 @@
 import torch
+import random
 import logging
 import torchvision
 import numpy as np
@@ -15,6 +16,30 @@ from skimage.transform import rescale, resize, downscale_local_mean
 
 logger = logging.getLogger(__name__)
 
+
+class RandVerticalFlip(object):
+    
+    def __init__(self, p):
+        logger.info(f"Loaded RandomVerticalFlip transformation with probability {p}")
+        self.p = p
+    
+    def __call__(self, sample):
+        image = sample['image']
+        if random.random() < self.p:
+            image = np.flip(image, axis = 1)
+        return {'image': image}
+    
+class RandHorizontalFlip(object):
+    
+    def __init__(self, p):
+        logger.info(f"Loaded RandomHorizontalFlip transformation with probability {p}")
+        self.p = p
+    
+    def __call__(self, sample):
+        image = sample['image']
+        if random.random() < self.p:
+            image = np.flip(image, axis = 2)
+        return {'image': image}
 
 class Rescale(object):
     """Rescale the image in a sample to a given size.
@@ -85,19 +110,31 @@ class Standardize(object):
     
     def __call__(self, sample):
         image = sample['image']
-        image = (image-np.mean(image)) / (np.std(image))
+        image = (image-image.mean()) / (image.std())
         return {'image': image}
     
 
 class Normalize(object):
     """Normalize image"""
-    def __init__(self):
-        logger.info(f"Loaded Normalize transformation that normalizes data in the range 0 to 1")
     
+    def __init__(self, mode = "norm"):
+        if mode == "norm":
+            logger.info(f"Loaded Normalize transformation that normalizes data in the range 0 to 1")
+        if mode == "sym":
+            logger.info(f"Loaded Normalize transformation that normalizes data in the range -1 to 1")
+        self.mode = mode
+            
     def __call__(self, sample):
+        
         image = sample['image'].astype(np.float32)
-        image -= image.min()
-        image /= image.max()
+        
+        if self.mode == "norm":
+            image -= image.min()
+            image /= image.max()
+        
+        if self.mode == "sym":
+            image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
+        
         return {'image': image}
     
             

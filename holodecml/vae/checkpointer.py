@@ -16,7 +16,12 @@ def load_checkpoint(checkpoint_path: str):
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, patience=7, verbose=False, delta=0, path='checkpoint.pt'):
+    def __init__(self, 
+                 patience=7,
+                 verbose=False,
+                 delta=0,
+                 save_every_epoch=False,
+                 path_save='checkpoint.pt'):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -37,30 +42,34 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
-        self.path = path
+        self.path = path_save
+        self.dirpath = os.path.dirname(self.path)
+        self.save_every_epoch = save_every_epoch
         
         logger.info(f"Loaded EarlyStopping checkpointer with patience {self.patience}")
     
     def __call__(self, epoch, val_loss, model, optimizer):
 
-        score = -val_loss
+        score = val_loss
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(epoch, val_loss, model, optimizer)
-        elif score < self.best_score + self.delta:
+            self.save_checkpoint(epoch, val_loss, model, optimizer, best = True)
+        elif score < (self.best_score + self.delta):
+            self.best_score = score
+            self.save_checkpoint(epoch, val_loss, model, optimizer, best = True)
+            self.counter = 0
+        else:
             self.counter += 1
             logger.info(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.save_every_epoch:
+                self.save_checkpoint(epoch, val_loss, model, optimizer, best = False)
             if self.counter >= self.patience:
                 self.early_stop = True
-        else:
-            self.best_score = score
-            self.save_checkpoint(epoch, val_loss, model, optimizer)
-            self.counter = 0
 
-    def save_checkpoint(self, epoch, val_loss, model, optimizer):
+    def save_checkpoint(self, epoch, val_loss, model, optimizer, best = False):
         '''Saves model when validation loss decrease.'''
-        if self.verbose:
+        if best:
             logger.info(
                 f'Validation loss decreased on epoch {epoch} ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model.'
             )
@@ -71,8 +80,13 @@ class EarlyStopping:
             'optimizer_state_dict': optimizer.state_dict(),
             'lr': self.print_learning_rate(optimizer)
         }
-        torch.save(checkpoint, self.path)
-        self.val_loss_min = val_loss
+        if not best: # save a model, not the best one seen so far
+            save_path = os.path.join(self.dirpath, "checkpoint.pt")
+            torch.save(checkpoint, save_path)
+        else: # save best model so far
+            save_path = os.path.join(self.dirpath, "best.pt")
+            torch.save(checkpoint, save_path)
+            self.val_loss_min = val_loss
         
     def print_learning_rate(self, optimizer):
         for param_group in optimizer.param_groups:

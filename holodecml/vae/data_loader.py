@@ -15,7 +15,7 @@ num_particles_dict = {
     1: '1particle',
     3: '3particle',
     'multi': 'multiparticle',
-    '50-100': '50-100'
+    '50-100': '50-100particle_monodisperse'
 }
 
 
@@ -74,14 +74,31 @@ class HologramDataset(Dataset):
     
     def __getitem__(self, idx):
         'Generate one data point'
-        hologram = random.choice(self.hologram_numbers)
+        hologram = self.hologram_numbers[idx] #random.choice(self.hologram_numbers)
         im = self.ds["image"][hologram].values
-        im = {"image": self.reshape(im)}
+        im = {"image": self.reshape(im)} 
+        
+        #particles = np.where(self.ds["hid"] == hologram + 1)[0]
+        #for l, p in enumerate(particles):
+        #    for m, col in enumerate(self.output_cols):
+        #        val = self.ds[col].values[p]
+        #        y_out[k, l, m] = val
+        
+        ##########################################################
+        #
+        #
+        # {"image": image, "outputs": outputs} -- need to transform the outputs if not invariant under transformation
+        #
+        #
+        ##########################################################
+        
         if self.transform:
             im = self.transform(im)
+        
         self.processed += 1
         if self.processed == self.__len__():
             self.on_epoch_end()
+        
         return im["image"]
     
     def on_epoch_end(self):
@@ -140,3 +157,7 @@ class HologramDataset(Dataset):
         ds_name = f'synthetic_holograms_{num_particles}_{split}.{file_extension}'
 
         return ds_name
+    
+    def closest(self, lst, K): 
+        idx = (np.abs(lst - K)).argmin() 
+        return idx 
