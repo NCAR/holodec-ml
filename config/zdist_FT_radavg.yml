@@ -1,0 +1,21 @@
+path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/ft_rad_bidis_z/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/ft_rad_bidis_models/z/"
+model_name: "cnn"
+random_seed: 328942
+input_variable: 'input_image'
+label_variable: 'histogram'
+metric: "mae"
+conv2d_network:
+  filters: [4, 8, 16]
+  kernel_sizes: [5, 5, 5]
+  conv2d_activation: "relu"
+  pool_sizes: [0, 0, 0]
+  dense_sizes: [64, 32, 16]
+  dense_activation: "elu"
+  lr: 0.001
+  optimizer: "adam"
+  loss: "categorical_crossentropy"
+  batch_size: 256
+  metrics: ["TP","FP","TN","FN"]
+  epochs: 20
+  verbose: 1
