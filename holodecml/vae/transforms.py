@@ -17,6 +17,28 @@ from skimage.transform import rescale, resize, downscale_local_mean
 logger = logging.getLogger(__name__)
 
 
+def LoadTransformations(transform_config: str, device: str = "cpu"):
+    tforms = []
+    if "RandomVerticalFlip" in transform_config:
+        tforms.append(RandVerticalFlip(0.5))
+    if "RandomHorizontalFlip" in transform_config:
+        tforms.append(RandHorizontalFlip(0.5))
+    if "Rescale" in transform_config:
+        rescale = transform_config["Rescale"]
+        tforms.append(Rescale(rescale))
+    if "Normalize" in transform_config:
+        mode = transform_config["Normalize"]
+        tforms.append(Normalize(mode))
+    if "ToTensor" in transform_config:
+        tforms.append(ToTensor(device))
+    if "RandomCrop" in transform_config:
+        tforms.append(RandomCrop())
+    if "Standardize" in transform_config:
+        tforms.append(Standardize())
+    transform = transforms.Compose(tforms)
+    return transform
+
+
 class RandVerticalFlip(object):
     
     def __init__(self, p):

@@ -3,8 +3,36 @@ import torch
 import logging
 import torch.nn as nn
 import itertools as it
+from typing import Dict
+
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
+
+
+def LoadOptimizer(optimizer_type: str, parameters: Dict[str, float], learning_rate: float = 0.001, weight_decay = 0.0):
+
+    if optimizer_type == "lookahead-diffgrad":
+        optimizer = LookaheadDiffGrad(parameters, lr=learning_rate, weight_decay=weight_decay)
+    elif optimizer_type == "diffgrad":
+        optimizer = DiffGrad(parameters, lr=learning_rate, weight_decay=weight_decay)
+    elif optimizer_type == "lookahead-radam":
+        optimizer = LookaheadRAdam(parameters, lr=learning_rate, weight_decay=weight_decay)
+    elif optimizer_type == "radam":
+        optimizer = RAdam(parameters, lr=learning_rate, weight_decay=weight_decay)
+    elif optimizer_type == "adam":
+        optimizer = torch.optim.Adam(parameters, lr=learning_rate, weight_decay=weight_decay)
+    elif optimizer_type == "sgd":
+        optimizer = torch.optim.SGD(parameters, lr=learning_rate, weight_decay=weight_decay)
+    else:
+        logging.warning(
+            f"Optimzer type {optimizer_type} is unknown. Exiting with error."
+        )
+        sys.exit(1)
+
+    logger.info(
+        f"Loaded the {optimizer_type} optimizer with learning rate {learning_rate} and L2 penalty {weight_decay}"
+    )
+    return optimizer
 
 
 class DiffGrad(torch.optim.Optimizer):

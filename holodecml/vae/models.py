@@ -1,16 +1,36 @@
+import os
 import torch
 import logging
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from .spectral import SpectralNorm
-from .attention import Self_Attention
+from holodecml.vae.spectral import SpectralNorm
+from holodecml.vae.attention import Self_Attention
 
 # some pytorch examples - https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
 
 
 logger = logging.getLogger(__name__)
+
+
+def LoadModel(model_type, config, device):
+    logger.info(f"Loading model-type {model_type}")
+    if model_type == "vae":
+        model = ConvVAE(**config).to(device)
+    elif model_type == "att-vae":
+        model = ATTENTION_VAE(**config).to(device)
+    elif model_type == "encoder-vae":
+        model =  LatentEncoder(**config).to(device)
+    else:
+        logger.info(
+            f"Unsupported model type {model_type}. Choose from vae, att-vae, or encoder-vae. Exiting."
+        )
+        sys.exit(1)
+    logger.info(
+        f"The model contains {count_parameters(model)} trainable parameters"
+    )
+    return model 
 
 
 def count_parameters(model):
@@ -350,106 +370,76 @@ class ConvVAE(nn.Module):
         return reconstruction, mu, log_var
 
 
-
-# class Flatten(nn.Module):
-#     def forward(self, input):
-#         return input.view(input.size(0), -1)
+class LatentEncoder(ATTENTION_VAE):
     
-# class UnFlatten(nn.Module):
-#     def forward(self, input, size=1000):
-#         return input.view(input.size(0), size, 1, 1)
+    def __init__(self,
+                 image_channels=1,
+                 hidden_dims=[8, 16, 32, 64, 128, 256],
+                 z_dim=10,
+                 dense_hidden_dims = [100, 10],
+                 dense_dropouts = [0.0, 0.0], 
+                 tasks = ["x", "y", "z", "d"],
+                 num_outputs = 100,
+                 pretrained_model = None):
+        
+        super(LatentEncoder, self).__init__(
+            image_channels=image_channels,
+            hidden_dims=hidden_dims,
+            z_dim=z_dim)
 
+        if os.path.isfile(pretrained_model):
+            # Load params from file
+            model_dict = torch.load(pretrained_model, map_location=lambda storage, loc: storage)
+            self.load_state_dict(model_dict["model_state_dict"])
+            # Freeze all parameters from VAE
+            for layer in self.modules():
+               for param in layer.parameters():
+                   param.requires_grad = False
+
+            logging.info(
+                f"Loaded VAE weights {pretrained_model} and froze these parameters"
+            )
+        else:
+            logging.info(
+                f"Loaded a fresh VAE  with trainable parameters"
+            )
+
+        # Build the dense network for predicting particle attributes
+        self.num_outputs = num_outputs
+
+        self.tasks = tasks
+        self.task_blocks = nn.ModuleDict({
+            task: self.build_block(dense_hidden_dims, dense_dropouts)
+            for task in self.tasks
+        })
     
-# class CNN_VAE(nn.Module):
-    
-#     def __init__(self,
-#                  image_channels=1,
-#                  hidden_dims=[8, 16, 32, 64, 128],
-#                  z_dim=10):
-        
-#         super(CNN_VAE, self).__init__()
-        
-#         self.hidden_dims = hidden_dims
-#         h_dim = int(216 * self.hidden_dims[-1])
-        
-#         self.encoder = nn.Sequential(
-#             nn.Conv2d(image_channels, self.hidden_dims[0], kernel_size=4, stride=2, padding=1),
-#             nn.BatchNorm2d(self.hidden_dims[0]),
-#             nn.LeakyReLU(),
-#             nn.Conv2d(self.hidden_dims[0], self.hidden_dims[1], kernel_size=4, stride=2, padding=1),
-#             nn.BatchNorm2d(self.hidden_dims[1]),
-#             nn.LeakyReLU(),
-#             nn.Conv2d(self.hidden_dims[1], self.hidden_dims[2], kernel_size=4, stride=2, padding=1),
-#             nn.BatchNorm2d(self.hidden_dims[2]),
-#             nn.LeakyReLU(),
-#             nn.Conv2d(self.hidden_dims[2], self.hidden_dims[3], kernel_size=4, stride=2, padding=1),
-#             nn.BatchNorm2d(self.hidden_dims[3]),
-#             nn.LeakyReLU(),
-#             nn.Conv2d(self.hidden_dims[3], self.hidden_dims[4], kernel_size=4, stride=2, padding=1),
-#             nn.BatchNorm2d(self.hidden_dims[4]),
-#             nn.LeakyReLU(),
-#             Flatten()
-#         )
-        
-#         self.fc1 = nn.Linear(h_dim, z_dim)
-#         self.fc2 = nn.Linear(h_dim, z_dim)
-#         self.fc3 = nn.Linear(z_dim, 1000)
-                
-#         #600/5/5/3/2/2/2
-#         #400/5/5/2/2/2/2
-        
-#         self.decoder = nn.Sequential(
-#             UnFlatten(),
-#             nn.ConvTranspose2d(1000, self.hidden_dims[4], kernel_size=5, stride=5, padding=0),
-#             nn.BatchNorm2d(self.hidden_dims[4]),
-#             nn.LeakyReLU(),
-#             # size = B x 500 x 5 x 5
-#             nn.ConvTranspose2d(self.hidden_dims[4], self.hidden_dims[3], kernel_size=5, stride=5, padding=0),
-#             nn.BatchNorm2d(self.hidden_dims[3]),
-#             nn.LeakyReLU(),
-#             # size = B x 250 x 25 x 25
-#             nn.ConvTranspose2d(self.hidden_dims[3], self.hidden_dims[2], kernel_size=(3,2), stride=(3,2), padding=0),
-#             nn.BatchNorm2d(self.hidden_dims[2]),
-#             nn.LeakyReLU(),
-#             # size = B x 125 x 75 x 50
-#             nn.ConvTranspose2d(self.hidden_dims[2], self.hidden_dims[1], kernel_size=4, stride=2, padding=1),
-#             nn.BatchNorm2d(self.hidden_dims[1]),
-#             nn.LeakyReLU(),
-#             # size = B x 125 x 150 x 100        
-#             nn.ConvTranspose2d(self.hidden_dims[1], self.hidden_dims[0], kernel_size=4, stride=2, padding=1),
-#             nn.BatchNorm2d(self.hidden_dims[0]),
-#             nn.LeakyReLU(),
-#             # size = B x 35 x 300 x 200            
-#             nn.ConvTranspose2d(self.hidden_dims[0], 1, kernel_size=4, stride=2, padding=1),
-#             # size = B x 1 x 600 x 400
-#             nn.Sigmoid()
-#         )
-        
-#         logger.info("Loaded a CNN-VAE model")
-        
-#     def reparameterize(self, mu, logvar):
-#         std = logvar.mul(0.5).exp_()
-#         # return torch.normal(mu, std)
-#         esp = torch.randn(*mu.size()).to(std.device)
-#         z = mu + std * esp
-#         return z
-    
-#     def bottleneck(self, h):
-#         mu, logvar = self.fc1(h), self.fc2(h)
-#         z = self.reparameterize(mu, logvar)
-#         return z, mu, logvar
+    def build_block(self, dense_hidden_dims, dense_dropouts):
+        blocks = [self.dense_block(self.z_dim, dense_hidden_dims[0], dense_dropouts[0])]
+        N = len(dense_hidden_dims)
+        if N > 1:
+            for i in range(N-1):
+                blocks.append(
+                    self.dense_block(dense_hidden_dims[i], dense_hidden_dims[i+1], dense_dropouts[i+1])
+                    )
+        blocks.append(self.dense_block(dense_hidden_dims[-1], self.num_outputs, 0.0, False))
+        blocks = [item for sublist in blocks for item in sublist]
+        return nn.Sequential(*blocks)
 
-#     def encode(self, x):
-#         h = self.encoder(x)
-#         z, mu, logvar = self.bottleneck(h)
-#         return z, mu, logvar
+    def dense_block(self, input_dim, output_dim, dr = 0.0, activation_layer = True):
+        block = [nn.Linear(input_dim, output_dim)]
+        if dr > 0.0 and activation_layer:
+            block.append(nn.Dropout(dr))
+        if activation_layer:
+            block.append(nn.LeakyReLU())
+        else:
+            block.append(nn.Sigmoid())
+        return block
 
-#     def decode(self, z):
-#         z = self.fc3(z)
-#         z = self.decoder(z)
-#         return z
-
-#     def forward(self, x):
-#         z, mu, logvar = self.encode(x)
-#         z = self.decode(z)
-#         return z, mu, logvar
+    def forward(self, x):
+        z, mu, logvar = self.encode(x)
+        x_att = self.task_blocks["x"](z)
+        y_att = self.task_blocks["y"](z)
+        z_att = self.task_blocks["z"](z)
+        d_att = self.task_blocks["d"](z)
+        output = torch.stack([x_att, y_att, z_att, d_att], 2)
+        return output
