@@ -1,9 +1,13 @@
 from collections import defaultdict
-import torch, os, time, math, glob
 from typing import List, Dict
 import pandas as pd
 import numpy as np
 import logging
+import torch
+import time
+import math
+import glob
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +20,8 @@ def load_checkpoint(checkpoint_path: str):
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, 
+
+    def __init__(self,
                  patience=7,
                  verbose=False,
                  delta=0,
@@ -45,29 +50,32 @@ class EarlyStopping:
         self.path = path_save
         self.dirpath = os.path.dirname(self.path)
         self.save_every_epoch = save_every_epoch
-        
-        logger.info(f"Loaded EarlyStopping checkpointer with patience {self.patience}")
-    
+
+        logger.info(
+            f"Loaded EarlyStopping checkpointer with patience {self.patience}")
+
     def __call__(self, epoch, val_loss, model, optimizer):
 
         score = val_loss
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(epoch, val_loss, model, optimizer, best = True)
+            self.save_checkpoint(epoch, val_loss, model, optimizer, best=True)
         elif score < (self.best_score + self.delta):
             self.best_score = score
-            self.save_checkpoint(epoch, val_loss, model, optimizer, best = True)
+            self.save_checkpoint(epoch, val_loss, model, optimizer, best=True)
             self.counter = 0
         else:
             self.counter += 1
-            logger.info(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            logger.info(
+                f'EarlyStopping counter: {self.counter} out of {self.patience}')
             if self.save_every_epoch:
-                self.save_checkpoint(epoch, val_loss, model, optimizer, best = False)
+                self.save_checkpoint(
+                    epoch, val_loss, model, optimizer, best=False)
             if self.counter >= self.patience:
                 self.early_stop = True
 
-    def save_checkpoint(self, epoch, val_loss, model, optimizer, best = False):
+    def save_checkpoint(self, epoch, val_loss, model, optimizer, best=False):
         '''Saves model when validation loss decrease.'''
         if best:
             logger.info(
@@ -80,56 +88,53 @@ class EarlyStopping:
             'optimizer_state_dict': optimizer.state_dict(),
             'lr': self.print_learning_rate(optimizer)
         }
-        if not best: # save a model, not the best one seen so far
+        if not best:  # save a model, not the best one seen so far
             save_path = os.path.join(self.dirpath, "checkpoint.pt")
             torch.save(checkpoint, save_path)
-        else: # save best model so far
+        else:  # save best model so far
             save_path = os.path.join(self.dirpath, "best.pt")
             torch.save(checkpoint, save_path)
             self.val_loss_min = val_loss
-        
+
     def print_learning_rate(self, optimizer):
         for param_group in optimizer.param_groups:
             return param_group["lr"]
-        
-            
-        
+
+
 class MetricsLogger:
-    
+
     def __init__(self, path_save: str, reload: bool = False) -> None:
-        
+
         self.path_save = os.path.join(f"{path_save}", "training_log.csv")
-        
+
         if reload:
             self.load()
-            logger.info(f"Loaded a previous metrics file from {self.path_save}")
+            logger.info(
+                f"Loaded a previous metrics file from {self.path_save}")
         else:
             self.metrics = defaultdict(list)
-            logger.info(f"Loaded a metrics logger {self.path_save} to track the training results")
-            
-    
+            logger.info(
+                f"Loaded a metrics logger {self.path_save} to track the training results")
+
     def update(self, data: Dict[str, float]) -> None:
         for key, value in data.items():
             self.metrics[key].append(value)
         self.save()
-        
-    
+
     def to_pandas(self) -> pd.DataFrame:
         return pd.DataFrame.from_dict(self.metrics)
-    
-    
+
     def save(self) -> None:
         self.to_pandas().to_csv(
-            self.path_save, 
-            sep = ',', 
-            encoding = 'utf-8', 
-            index = None
+            self.path_save,
+            sep=',',
+            encoding='utf-8',
+            index=None
         )
-        
-        
+
     def load(self) -> None:
         self.metrics = pd.read_csv(
-            self.path_save, 
-            sep = ',', 
-            encoding = 'utf-8'
+            self.path_save,
+            sep=',',
+            encoding='utf-8'
         ).to_dict()

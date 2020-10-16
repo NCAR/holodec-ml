@@ -40,28 +40,32 @@ def LoadTransformations(transform_config: str, device: str = "cpu"):
 
 
 class RandVerticalFlip(object):
-    
+
     def __init__(self, p):
-        logger.info(f"Loaded RandomVerticalFlip transformation with probability {p}")
+        logger.info(
+            f"Loaded RandomVerticalFlip transformation with probability {p}")
         self.p = p
-    
+
     def __call__(self, sample):
         image = sample['image']
         if random.random() < self.p:
-            image = np.flip(image, axis = 1)
+            image = np.flip(image, axis=1)
         return {'image': image}
-    
+
+
 class RandHorizontalFlip(object):
-    
+
     def __init__(self, p):
-        logger.info(f"Loaded RandomHorizontalFlip transformation with probability {p}")
+        logger.info(
+            f"Loaded RandomHorizontalFlip transformation with probability {p}")
         self.p = p
-    
+
     def __call__(self, sample):
         image = sample['image']
         if random.random() < self.p:
-            image = np.flip(image, axis = 2)
+            image = np.flip(image, axis=2)
         return {'image': image}
+
 
 class Rescale(object):
     """Rescale the image in a sample to a given size.
@@ -75,17 +79,18 @@ class Rescale(object):
     def __init__(self, output_size):
         assert isinstance(output_size, (int, tuple))
         self.output_size = output_size
-        logger.info(f"Loaded Rescale transformation with output size {output_size}")
+        logger.info(
+            f"Loaded Rescale transformation with output size {output_size}")
 
     def __call__(self, sample):
         image = sample['image']
         image_dim = image.shape
-        
+
         if image_dim[-2] > self.output_size:
             frac = self.output_size / image_dim[-2]
         else:
             frac = image_dim[-2] / self.output_size
-        
+
         image = image.reshape(image.shape[-2], image.shape[-1])
         image = rescale(image, frac, anti_aliasing=False)
         image = image.reshape(1, image.shape[-2], image.shape[-1])
@@ -111,7 +116,7 @@ class RandomCrop(object):
         logger.info(f"Loaded RandomCrop transformation")
 
     def __call__(self, sample):
-        image= sample['image']
+        image = sample['image']
 
         h, w = image.shape[:2]
         new_h, new_w = self.output_size
@@ -123,49 +128,55 @@ class RandomCrop(object):
                       left: left + new_w]
 
         return {'image': image}
-      
-        
+
+
 class Standardize(object):
     """Standardize image"""
+
     def __init__(self):
-        logger.info(f"Loaded Standardize transformation that rescales data so mean = 0, std = 1")
-    
+        logger.info(
+            f"Loaded Standardize transformation that rescales data so mean = 0, std = 1")
+
     def __call__(self, sample):
         image = sample['image']
         image = (image-image.mean()) / (image.std())
         return {'image': image}
-    
+
 
 class Normalize(object):
     """Normalize image"""
-    
-    def __init__(self, mode = "norm"):
+
+    def __init__(self, mode="norm"):
         if mode == "norm":
-            logger.info(f"Loaded Normalize transformation that normalizes data in the range 0 to 1")
+            logger.info(
+                f"Loaded Normalize transformation that normalizes data in the range 0 to 1")
         if mode == "sym":
-            logger.info(f"Loaded Normalize transformation that normalizes data in the range -1 to 1")
+            logger.info(
+                f"Loaded Normalize transformation that normalizes data in the range -1 to 1")
         self.mode = mode
-            
+
     def __call__(self, sample):
-        
+
         image = sample['image'].astype(np.float32)
-        
+
         if self.mode == "norm":
             image -= image.min()
             image /= image.max()
-        
+
         if self.mode == "sym":
             image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
-        
+
         return {'image': image}
-    
-            
+
+
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
-    def __init__(self, device = "cpu"):
+
+    def __init__(self, device="cpu"):
         self.device = device
-        logger.info(f"Loaded ToTensor transformation, putting tensors on device {device}")
-    
+        logger.info(
+            f"Loaded ToTensor transformation, putting tensors on device {device}")
+
     def __call__(self, sample):
         image = sample['image'].astype(np.float32)
         if len(image.shape) == 2:

@@ -9,20 +9,26 @@ from typing import Dict
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
-def LoadOptimizer(optimizer_type: str, parameters: Dict[str, float], learning_rate: float = 0.001, weight_decay = 0.0):
+def LoadOptimizer(optimizer_type: str, parameters: Dict[str, float], learning_rate: float = 0.001, weight_decay=0.0):
 
     if optimizer_type == "lookahead-diffgrad":
-        optimizer = LookaheadDiffGrad(parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = LookaheadDiffGrad(
+            parameters, lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_type == "diffgrad":
-        optimizer = DiffGrad(parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = DiffGrad(parameters, lr=learning_rate,
+                             weight_decay=weight_decay)
     elif optimizer_type == "lookahead-radam":
-        optimizer = LookaheadRAdam(parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = LookaheadRAdam(
+            parameters, lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_type == "radam":
-        optimizer = RAdam(parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = RAdam(parameters, lr=learning_rate,
+                          weight_decay=weight_decay)
     elif optimizer_type == "adam":
-        optimizer = torch.optim.Adam(parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = torch.optim.Adam(
+            parameters, lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_type == "sgd":
-        optimizer = torch.optim.SGD(parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = torch.optim.SGD(
+            parameters, lr=learning_rate, weight_decay=weight_decay)
     else:
         logging.warning(
             f"Optimzer type {optimizer_type} is unknown. Exiting with error."
@@ -65,16 +71,17 @@ class DiffGrad(torch.optim.Optimizer):
         if not 0.0 <= eps:
             raise ValueError("Invalid epsilon value: {}".format(eps))
         if not 0.0 <= betas[0] < 1.0:
-            raise ValueError("Invalid beta parameter at index 0: {}".format(betas[0]))
+            raise ValueError(
+                "Invalid beta parameter at index 0: {}".format(betas[0]))
         if not 0.0 <= betas[1] < 1.0:
-            raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
-        
-        
+            raise ValueError(
+                "Invalid beta parameter at index 1: {}".format(betas[1]))
+
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
-        
+
         super().__init__(params, defaults)
-        
-        #save version
+
+        # save version
         self.version = version
 
     def __setstate__(self, state):
@@ -96,7 +103,8 @@ class DiffGrad(torch.optim.Optimizer):
                     continue
                 grad = p.grad.data
                 if grad.is_sparse:
-                    raise RuntimeError('diffGrad does not support sparse gradients, please consider SparseAdam instead')
+                    raise RuntimeError(
+                        'diffGrad does not support sparse gradients, please consider SparseAdam instead')
 
                 state = self.state[p]
 
@@ -127,48 +135,50 @@ class DiffGrad(torch.optim.Optimizer):
                 bias_correction2 = 1 - beta2 ** state['step']
 
                 # compute diffgrad coefficient (dfc)
-                
-                
-                if self.version==0:
+
+                if self.version == 0:
                     diff = abs(previous_grad - grad)
-                elif self.version ==1:
+                elif self.version == 1:
                     diff = previous_grad-grad
-                elif self.version ==2:
-                    diff =  .5*abs(previous_grad - grad)
-                    
-                if self.version==0 or self.version==1:    
+                elif self.version == 2:
+                    diff = .5*abs(previous_grad - grad)
+
+                if self.version == 0 or self.version == 1:
                     dfc = 1. / (1. + torch.exp(-diff))
-                elif self.version==2:
-                    dfc = 9. / (1. + torch.exp(-diff))-4      #DFC2 = 9/(1+e-(.5/g/)-4 #range .5,5
-                    
+                elif self.version == 2:
+                    # DFC2 = 9/(1+e-(.5/g/)-4 #range .5,5
+                    dfc = 9. / (1. + torch.exp(-diff))-4
+
                 state['previous_grad'] = grad
 
                 # update momentum with dfc
                 exp_avg1 = exp_avg * dfc
 
-                step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
+                step_size = group['lr'] * \
+                    math.sqrt(bias_correction2) / bias_correction1
 
                 p.data.addcdiv_(-step_size, exp_avg1, denom)
 
         return loss
-    
+
 
 class LookaheadDiffGrad(torch.optim.Optimizer):
-    def __init__(self, 
-                 params, 
+    def __init__(self,
+                 params,
                  lr=1e-3,
                  betas=(0.9, 0.999),
                  eps=1e-8,
                  weight_decay=0,
                  alpha=0.5,
                  k=6):
-        
+
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f'Invalid slow update rate: {alpha}')
         if not 1 <= k:
             raise ValueError(f'Invalid lookahead steps: {k}')
-        
-        base_optimizer = DiffGrad(params, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+
+        base_optimizer = DiffGrad(
+            params, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
         self.buffer = [[None, None, None] for ind in range(10)]
         self.optimizer = base_optimizer
         self.param_groups = self.optimizer.param_groups
@@ -177,11 +187,11 @@ class LookaheadDiffGrad(torch.optim.Optimizer):
         for group in self.param_groups:
             group["step_counter"] = 0
         self.slow_weights = [[p.clone().detach() for p in group['params']]
-                                for group in self.param_groups]
+                             for group in self.param_groups]
 
         for w in it.chain(*self.slow_weights):
             w.requires_grad = False
-            
+
         self.state = base_optimizer.state
 
     def step(self, closure=None):
@@ -189,19 +199,19 @@ class LookaheadDiffGrad(torch.optim.Optimizer):
         if closure is not None:
             loss = closure()
         loss = self.optimizer.step()
-        for group,slow_weights in zip(self.param_groups,self.slow_weights):
+        for group, slow_weights in zip(self.param_groups, self.slow_weights):
             group['step_counter'] += 1
             if group['step_counter'] % self.k != 0:
                 continue
-            for p,q in zip(group['params'],slow_weights):
+            for p, q in zip(group['params'], slow_weights):
                 if p.grad is None:
                     continue
-                q.data.add_(self.alpha,p.data - q.data)
+                q.data.add_(self.alpha, p.data - q.data)
                 p.data.copy_(q.data)
                 self.state = self.optimizer.state
         return loss
-    
-    
+
+
 class RAdam(torch.optim.Optimizer):
     # from https://github.com/LiyuanLucasLiu/RAdam/blob/master/radam.py
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):
@@ -225,7 +235,8 @@ class RAdam(torch.optim.Optimizer):
                     continue
                 grad = p.grad.data.float()
                 if grad.is_sparse:
-                    raise RuntimeError('RAdam does not support sparse gradients')
+                    raise RuntimeError(
+                        'RAdam does not support sparse gradients')
 
                 p_data_fp32 = p.data.float()
 
@@ -237,7 +248,8 @@ class RAdam(torch.optim.Optimizer):
                     state['exp_avg_sq'] = torch.zeros_like(p_data_fp32)
                 else:
                     state['exp_avg'] = state['exp_avg'].type_as(p_data_fp32)
-                    state['exp_avg_sq'] = state['exp_avg_sq'].type_as(p_data_fp32)
+                    state['exp_avg_sq'] = state['exp_avg_sq'].type_as(
+                        p_data_fp32)
 
                 exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
                 beta1, beta2 = group['betas']
@@ -253,23 +265,27 @@ class RAdam(torch.optim.Optimizer):
                     buffered[0] = state['step']
                     beta2_t = beta2 ** state['step']
                     N_sma_max = 2 / (1 - beta2) - 1
-                    N_sma = N_sma_max - 2 * state['step'] * beta2_t / (1 - beta2_t)
+                    N_sma = N_sma_max - 2 * \
+                        state['step'] * beta2_t / (1 - beta2_t)
                     buffered[1] = N_sma
 
                     # more conservative since it's an approximated value
                     if N_sma >= 5:
-                        step_size = math.sqrt((1 - beta2_t) * (N_sma - 4) / (N_sma_max - 4) * (N_sma - 2) / N_sma * N_sma_max / (N_sma_max - 2)) / (1 - beta1 ** state['step'])
+                        step_size = math.sqrt((1 - beta2_t) * (N_sma - 4) / (N_sma_max - 4) * (
+                            N_sma - 2) / N_sma * N_sma_max / (N_sma_max - 2)) / (1 - beta1 ** state['step'])
                     else:
                         step_size = 1.0 / (1 - beta1 ** state['step'])
                     buffered[2] = step_size
 
                 if group['weight_decay'] != 0:
-                    p_data_fp32.add_(-group['weight_decay'] * group['lr'], p_data_fp32)
+                    p_data_fp32.add_(-group['weight_decay']
+                                     * group['lr'], p_data_fp32)
 
                 # more conservative since it's an approximated value
-                if N_sma >= 5:            
+                if N_sma >= 5:
                     denom = exp_avg_sq.sqrt().add_(group['eps'])
-                    p_data_fp32.addcdiv_(-step_size * group['lr'], exp_avg, denom)
+                    p_data_fp32.addcdiv_(-step_size *
+                                         group['lr'], exp_avg, denom)
                 else:
                     p_data_fp32.add_(-step_size * group['lr'], exp_avg)
 
@@ -277,23 +293,24 @@ class RAdam(torch.optim.Optimizer):
 
         return loss
 
-    
+
 class LookaheadRAdam(torch.optim.Optimizer):
-    def __init__(self, 
-                 params, 
+    def __init__(self,
+                 params,
                  lr=1e-3,
                  betas=(0.9, 0.999),
                  eps=1e-8,
                  weight_decay=0,
                  alpha=0.5,
                  k=6):
-        
+
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f'Invalid slow update rate: {alpha}')
         if not 1 <= k:
             raise ValueError(f'Invalid lookahead steps: {k}')
-        
-        base_optimizer = RAdam(params, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+
+        base_optimizer = RAdam(params, lr=lr, betas=betas,
+                               eps=eps, weight_decay=weight_decay)
         self.buffer = [[None, None, None] for ind in range(10)]
         self.optimizer = base_optimizer
         self.param_groups = self.optimizer.param_groups
@@ -302,11 +319,11 @@ class LookaheadRAdam(torch.optim.Optimizer):
         for group in self.param_groups:
             group["step_counter"] = 0
         self.slow_weights = [[p.clone().detach() for p in group['params']]
-                                for group in self.param_groups]
+                             for group in self.param_groups]
 
         for w in it.chain(*self.slow_weights):
             w.requires_grad = False
-            
+
         self.state = base_optimizer.state
 
     def step(self, closure=None):
@@ -314,14 +331,13 @@ class LookaheadRAdam(torch.optim.Optimizer):
         if closure is not None:
             loss = closure()
         loss = self.optimizer.step()
-        for group,slow_weights in zip(self.param_groups,self.slow_weights):
+        for group, slow_weights in zip(self.param_groups, self.slow_weights):
             group['step_counter'] += 1
             if group['step_counter'] % self.k != 0:
                 continue
-            for p,q in zip(group['params'],slow_weights):
+            for p, q in zip(group['params'], slow_weights):
                 if p.grad is None:
                     continue
-                q.data.add_(self.alpha,p.data - q.data)
+                q.data.add_(self.alpha, p.data - q.data)
                 p.data.copy_(q.data)
                 self.state = self.optimizer.state
- 

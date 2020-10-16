@@ -17,51 +17,52 @@ def LoadTrainer(trainer_type, model, optimizer, train_gen, valid_gen, dataloader
     logger.info(f"Loading trainer-type {trainer_type}")
     if trainer_type in ["vae", "att-vae"]:
         return BaseTrainer(
-            model = model,
-            optimizer = optimizer,
-            train_gen = train_gen,
-            valid_gen = train_gen, 
-            dataloader = dataloader,
-            valid_dataloader = valid_dataloader,
-            device = device,
+            model=model,
+            optimizer=optimizer,
+            train_gen=train_gen,
+            valid_gen=train_gen,
+            dataloader=dataloader,
+            valid_dataloader=valid_dataloader,
+            device=device,
             **config
         )
     elif trainer_type == "encoder-vae":
         return BaseEncoderTrainer(
-            model = model,
-            optimizer = optimizer,
-            train_gen = train_gen,
-            valid_gen = train_gen, 
-            dataloader = dataloader,
-            valid_dataloader = valid_dataloader,
-            device = device,
+            model=model,
+            optimizer=optimizer,
+            train_gen=train_gen,
+            valid_gen=train_gen,
+            dataloader=dataloader,
+            valid_dataloader=valid_dataloader,
+            device=device,
             **config
         )
     else:
-        logger.info(f"Unsupported trainer type {trainer_type}. Choose from vae, att-vae, or encoder-vae. Exiting.")
+        logger.info(
+            f"Unsupported trainer type {trainer_type}. Choose from vae, att-vae, or encoder-vae. Exiting.")
         sys.exit(1)
 
 
 class BaseTrainer:
-    
-    def __init__(self, 
-                 model, 
+
+    def __init__(self,
+                 model,
                  optimizer,
-                 train_gen, 
-                 valid_gen, 
-                 dataloader, 
+                 train_gen,
+                 valid_gen,
+                 dataloader,
                  valid_dataloader,
-                 start_epoch = 0,
-                 epochs = 100,
-                 device = "cpu",
-                 clip = 1.0,
-                 alpha = 1.0, 
-                 beta = 1.0, 
-                 kld_weight = [],
-                 path_save = "./",
-                 test_image = None,
-                 save_test_image_every = 1):
-        
+                 start_epoch=0,
+                 epochs=100,
+                 device="cpu",
+                 clip=1.0,
+                 alpha=1.0,
+                 beta=1.0,
+                 kld_weight=[],
+                 path_save="./",
+                 test_image=None,
+                 save_test_image_every=1):
+
         self.model = model
         self.optimizer = optimizer
         self.train_gen = train_gen
@@ -71,13 +72,13 @@ class BaseTrainer:
         self.batch_size = dataloader.batch_size
         self.path_save = path_save
         self.device = device
-        
-        self.start_epoch = start_epoch 
+
+        self.start_epoch = start_epoch
         self.epochs = epochs
-        
+
         self.alpha = alpha
         self.beta = beta
-        
+
         self.kld_weight = kld_weight
         if len(kld_weight) == 0:
             self.kld_weight = [
@@ -90,30 +91,30 @@ class BaseTrainer:
         self.criterion_test = SymmetricMSE(
             self.alpha, self.beta, self.kld_weight[1]
         )
-        
+
         self.test_image = test_image
         self.save_test_image_every = save_test_image_every
-        
+
         # Gradient clipping through hook registration
         for p in self.model.parameters():
             if p.requires_grad:
                 p.register_hook(lambda grad: torch.clamp(grad, -clip, clip))
         logger.info(f"Clipping gradients to range [-{clip}, {clip}]")
-        
+
         # Create the save directory if it does not exist
         try:
             os.makedirs(path_save)
         except:
             pass
-        
-        
+
     def train_one_epoch(self, epoch):
 
         self.model.train()
-        batches_per_epoch = int(np.ceil(self.train_gen.__len__() / self.batch_size))
+        batches_per_epoch = int(
+            np.ceil(self.train_gen.__len__() / self.batch_size))
         batch_group_generator = tqdm.tqdm(
             enumerate(self.dataloader),
-            total=batches_per_epoch, 
+            total=batches_per_epoch,
             leave=True
         )
 
@@ -122,15 +123,16 @@ class BaseTrainer:
 
             images = images.to(self.device)
             recon_images, mu, logvar = self.model(images)
-            loss, bce, kld = self.criterion_train(recon_images, images, mu, logvar)
+            loss, bce, kld = self.criterion_train(
+                recon_images, images, mu, logvar)
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-            batch_loss = loss.item() #/ self.batch_size
-            bce_loss = bce.item() #/ self.batch_size
-            kld_loss = kld.item() #/ self.batch_size
+            batch_loss = loss.item()  # / self.batch_size
+            bce_loss = bce.item()  # / self.batch_size
+            kld_loss = kld.item()  # / self.batch_size
 
             epoch_losses["loss"].append(batch_loss)
             epoch_losses["bce"].append(bce_loss)
@@ -140,23 +142,24 @@ class BaseTrainer:
             bce = np.mean(epoch_losses["bce"])
             kld = np.mean(epoch_losses["kld"])
 
-            to_print = "loss: {:.3f} bce: {:.3f} kld: {:.3f}".format(loss, bce, kld)
+            to_print = "loss: {:.3f} bce: {:.3f} kld: {:.3f}".format(
+                loss, bce, kld)
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
 
         return loss, bce, kld
 
-
     def test(self, epoch):
 
         self.model.eval()
-        batches_per_epoch = int(np.ceil(self.valid_gen.__len__() / self.batch_size))
+        batches_per_epoch = int(
+            np.ceil(self.valid_gen.__len__() / self.batch_size))
 
         with torch.no_grad():
 
             batch_group_generator = tqdm.tqdm(
                 enumerate(self.valid_dataloader),
-                total=batches_per_epoch, 
+                total=batches_per_epoch,
                 leave=True
             )
 
@@ -164,11 +167,12 @@ class BaseTrainer:
             for idx, images in batch_group_generator:
                 images = images.to(self.device)
                 recon_images, mu, logvar = self.model(images)
-                loss, bce, kld = self.criterion_test(recon_images, images, mu, logvar)
+                loss, bce, kld = self.criterion_test(
+                    recon_images, images, mu, logvar)
 
-                batch_loss = loss.item() #/ self.batch_size
-                bce_loss = bce.item() #/ self.batch_size
-                kld_loss = kld.item() #/ self.batch_size
+                batch_loss = loss.item()  # / self.batch_size
+                bce_loss = bce.item()  # / self.batch_size
+                kld_loss = kld.item()  # / self.batch_size
 
                 epoch_losses["loss"].append(batch_loss)
                 epoch_losses["bce"].append(bce_loss)
@@ -178,7 +182,8 @@ class BaseTrainer:
                 bce = np.mean(epoch_losses["bce"])
                 kld = np.mean(epoch_losses["kld"])
 
-                to_print = "val_loss: {:.3f} val_bce: {:.3f} val_kld: {:.3f}".format(loss, bce, kld)
+                to_print = "val_loss: {:.3f} val_bce: {:.3f} val_kld: {:.3f}".format(
+                    loss, bce, kld)
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
 
@@ -188,9 +193,8 @@ class BaseTrainer:
                 self.compare(epoch, pic)
 
         return loss, bce, kld
-    
-    
-    def compare(self, epoch, x):        
+
+    def compare(self, epoch, x):
         x = x.to(self.device)
         recon_x, _, _ = self.model(x)
         if x.shape[0] > 1:
@@ -198,23 +202,25 @@ class BaseTrainer:
                 _x = torch.unsqueeze(_x, 0)
                 _x_recon_x = torch.unsqueeze(_x_recon_x, 0)
                 compare_x = torch.cat([_x, _x_recon_x])
-                save_image(compare_x.data.cpu(), f'{self.path_save}/image_epoch_{epoch}_{k}.png')
+                save_image(compare_x.data.cpu(),
+                           f'{self.path_save}/image_epoch_{epoch}_{k}.png')
         else:
             compare_x = torch.cat([x, recon_x])
-            save_image(compare_x.data.cpu(), f'{self.path_save}/image_epoch_{epoch}.png')
-        
+            save_image(compare_x.data.cpu(),
+                       f'{self.path_save}/image_epoch_{epoch}.png')
 
     def train(self,
               scheduler,
               early_stopping,
               metrics_logger):
-        
+
         logger.info(
             f"Training the model for up to {self.epochs} epochs starting at epoch {self.start_epoch}"
         )
-        
-        flag = isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
-        
+
+        flag = isinstance(
+            scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+
         for epoch in range(self.start_epoch, self.epochs):
 
             train_loss, train_bce, train_kld = self.train_one_epoch(epoch)
@@ -223,7 +229,7 @@ class BaseTrainer:
             scheduler.step(test_loss if flag else epoch)
             early_stopping(epoch, test_loss, self.model, self.optimizer)
 
-            # Write results to the callback logger 
+            # Write results to the callback logger
             result = {
                 "epoch": epoch,
                 "train_loss": train_loss,
@@ -239,26 +245,26 @@ class BaseTrainer:
             if early_stopping.early_stop:
                 logger.info("Early stopping")
                 break
-                
-                
+
+
 class BaseEncoderTrainer:
-    
-    def __init__(self, 
-                 model, 
+
+    def __init__(self,
+                 model,
                  optimizer,
-                 train_gen, 
-                 valid_gen, 
-                 dataloader, 
+                 train_gen,
+                 valid_gen,
+                 dataloader,
                  valid_dataloader,
-                 start_epoch = 0,
-                 epochs = 100,
-                 device = "cpu",
-                 clip = 1.0,
-                 alpha = 1.0, 
-                 beta = 1.0, 
-                 path_save = "./",
-                 test_image = None,
-                 save_test_image_every = 1):
+                 start_epoch=0,
+                 epochs=100,
+                 device="cpu",
+                 clip=1.0,
+                 alpha=1.0,
+                 beta=1.0,
+                 path_save="./",
+                 test_image=None,
+                 save_test_image_every=1):
 
         self.model = model
         self.optimizer = optimizer
@@ -269,39 +275,39 @@ class BaseEncoderTrainer:
         self.batch_size = dataloader.batch_size
         self.path_save = path_save
         self.device = device
-        
-        self.start_epoch = start_epoch 
+
+        self.start_epoch = start_epoch
         self.epochs = epochs
-        
+
         self.alpha = alpha
         self.beta = beta
-        
+
         self.criterion_train = nn.MSELoss()
         self.criterion_test = nn.MSELoss()
-        
+
         self.test_image = test_image
         self.save_test_image_every = save_test_image_every
-        
+
         # Gradient clipping through hook registration
         for p in self.model.parameters():
             if p.requires_grad:
                 p.register_hook(lambda grad: torch.clamp(grad, -clip, clip))
         logger.info(f"Clipping gradients to range [-{clip}, {clip}]")
-        
+
         # Create the save directory if it does not exist
         try:
             os.makedirs(path_save)
         except:
             pass
-        
-        
+
     def train_one_epoch(self, epoch):
 
         self.model.train()
-        batches_per_epoch = int(np.ceil(self.train_gen.__len__() / self.batch_size))
+        batches_per_epoch = int(
+            np.ceil(self.train_gen.__len__() / self.batch_size))
         batch_group_generator = tqdm.tqdm(
             enumerate(self.dataloader),
-            total=batches_per_epoch, 
+            total=batches_per_epoch,
             leave=True
         )
 
@@ -310,14 +316,14 @@ class BaseEncoderTrainer:
             images = images.to(self.device)
             y_out = y_out.to(self.device)
             y_pred = self.model(images)
-            
+
             loss = self.criterion_train(y_out, y_pred)
-            
+
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-            batch_loss = loss.item() #/ self.batch_size
+            batch_loss = loss.item()  # / self.batch_size
             epoch_losses["loss"].append(batch_loss)
             loss = np.mean(epoch_losses["loss"])
 
@@ -327,17 +333,17 @@ class BaseEncoderTrainer:
 
         return loss
 
-
     def test(self, epoch):
 
         self.model.eval()
-        batches_per_epoch = int(np.ceil(self.valid_gen.__len__() / self.batch_size))
+        batches_per_epoch = int(
+            np.ceil(self.valid_gen.__len__() / self.batch_size))
 
         with torch.no_grad():
 
             batch_group_generator = tqdm.tqdm(
                 enumerate(self.valid_dataloader),
-                total=batches_per_epoch, 
+                total=batches_per_epoch,
                 leave=True
             )
 
@@ -348,10 +354,10 @@ class BaseEncoderTrainer:
                 y_pred = self.model(images)
 
                 loss = self.criterion_test(y_out, y_pred)
-                batch_loss = loss.item() #/ self.batch_size
+                batch_loss = loss.item()  # / self.batch_size
                 epoch_losses["loss"].append(batch_loss)
                 loss = np.mean(epoch_losses["loss"])
-                
+
                 to_print = "val_loss: {:.3f}".format(loss)
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
@@ -362,19 +368,19 @@ class BaseEncoderTrainer:
                 self.compare(epoch, pic)
 
         return loss
-    
 
     def train(self,
               scheduler,
               early_stopping,
               metrics_logger):
-        
+
         logger.info(
             f"Training the model for up to {self.epochs} epochs starting at epoch {self.start_epoch}"
         )
-        
-        flag = isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
-        
+
+        flag = isinstance(
+            scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+
         for epoch in range(self.start_epoch, self.epochs):
 
             train_loss = self.train_one_epoch(epoch)
@@ -383,7 +389,7 @@ class BaseEncoderTrainer:
             scheduler.step(test_loss if flag else epoch)
             early_stopping(epoch, test_loss, self.model, self.optimizer)
 
-            # Write results to the callback logger 
+            # Write results to the callback logger
             result = {
                 "epoch": epoch,
                 "train_loss": train_loss,
