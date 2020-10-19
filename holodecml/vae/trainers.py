@@ -13,14 +13,23 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def LoadTrainer(trainer_type, model, optimizer, train_gen, valid_gen, dataloader, valid_dataloader, device, config):
+def LoadTrainer(trainer_type, 
+                model, 
+                optimizer, 
+                train_gen, 
+                valid_gen, 
+                dataloader, 
+                valid_dataloader, 
+                device, 
+                config):
+    
     logger.info(f"Loading trainer-type {trainer_type}")
     if trainer_type in ["vae", "att-vae"]:
         return BaseTrainer(
             model=model,
             optimizer=optimizer,
             train_gen=train_gen,
-            valid_gen=train_gen,
+            valid_gen=valid_gen,
             dataloader=dataloader,
             valid_dataloader=valid_dataloader,
             device=device,
@@ -31,7 +40,7 @@ def LoadTrainer(trainer_type, model, optimizer, train_gen, valid_gen, dataloader
             model=model,
             optimizer=optimizer,
             train_gen=train_gen,
-            valid_gen=train_gen,
+            valid_gen=valid_gen,
             dataloader=dataloader,
             valid_dataloader=valid_dataloader,
             device=device,
@@ -281,9 +290,10 @@ class BaseEncoderTrainer:
 
         self.alpha = alpha
         self.beta = beta
-
-        self.criterion_train = nn.MSELoss()
-        self.criterion_test = nn.MSELoss()
+        
+        #self.criterion_train = weighted_mse_loss
+        #self.criterion_test = nn.MSELoss()
+        self.binary = ("binary" in self.train_gen.output_cols)
 
         self.test_image = test_image
         self.save_test_image_every = save_test_image_every
@@ -299,6 +309,33 @@ class BaseEncoderTrainer:
             os.makedirs(path_save)
         except:
             pass
+        
+        
+    def wmse(self, input, target, weight = None):
+        residuals = (input - target) ** 2
+        if weight is not None:
+            residuals *= weight
+        return residuals.mean()
+        
+    def criterion(self, input, target, weight = None):
+        mse_loss = 0
+        accuracy = None
+        weight = weight.float() if weight != None else None
+        for task in target:
+            input[task] = input[task].float()
+            target[task] = target[task].float()
+            if task != "binary":
+                mse_loss += self.wmse(input[task], target[task], weight)
+            else:
+                mse_loss += nn.BCELoss(weight)(input[task], target[task])
+                # Compute BCE accuracy
+                predicted = input[task].clone().detach()
+                truth = target[task].clone().detach()
+                condition = (predicted >= 0.5)
+                predicted[~condition] = 0.0
+                predicted[condition] = 1.0
+                accuracy = (predicted == truth).float().mean()
+        return mse_loss, accuracy
 
     def train_one_epoch(self, epoch):
 
@@ -311,27 +348,32 @@ class BaseEncoderTrainer:
             leave=True
         )
 
-        epoch_losses = {"loss": []}
-        for idx, (images, y_out) in batch_group_generator:
+        epoch_losses = {"loss": [], "accuracy": []}
+        for idx, (images, y_out, w_out) in batch_group_generator:
             images = images.to(self.device)
-            y_out = y_out.to(self.device)
+            y_out = {task: value.to(self.device) for task, value in y_out.items()}
+            w_out = w_out.to(self.device)
             y_pred = self.model(images)
-
-            loss = self.criterion_train(y_out, y_pred)
+            loss, accuracy = self.criterion(y_pred, y_out, w_out)
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-            batch_loss = loss.item()  # / self.batch_size
+            batch_loss = loss.item()
             epoch_losses["loss"].append(batch_loss)
             loss = np.mean(epoch_losses["loss"])
-
-            to_print = "loss: {:.3f}".format(loss)
+            
+            to_print = f"loss: {loss:.3f}"
+            if accuracy is not None:
+                epoch_losses["accuracy"].append(accuracy.item())
+                accuracy = np.mean(epoch_losses["accuracy"])
+                to_print += f" accuracy: {accuracy:.3f}"
+            
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
 
-        return loss
+        return loss, accuracy
 
     def test(self, epoch):
 
@@ -347,27 +389,27 @@ class BaseEncoderTrainer:
                 leave=True
             )
 
-            epoch_losses = {"loss": []}
-            for idx, (images, y_out) in batch_group_generator:
+            epoch_losses = {"loss": [], "accuracy": []}
+            for idx, (images, y_out, w_out) in batch_group_generator:
                 images = images.to(self.device)
-                y_out = y_out.to(self.device)
+                y_out = {task: value.to(self.device) for task, value in y_out.items()}
                 y_pred = self.model(images)
+                loss, accuracy = self.criterion(y_pred, y_out)
 
-                loss = self.criterion_test(y_out, y_pred)
                 batch_loss = loss.item()  # / self.batch_size
                 epoch_losses["loss"].append(batch_loss)
                 loss = np.mean(epoch_losses["loss"])
-
-                to_print = "val_loss: {:.3f}".format(loss)
+                
+                to_print = f"valid_loss: {loss:.3f}"
+                if accuracy is not None:
+                    epoch_losses["accuracy"].append(accuracy.item())
+                    accuracy = np.mean(epoch_losses["accuracy"])
+                    to_print += f" accuracy: {accuracy:.3f}"
+                
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
-
-            if os.path.isfile(self.test_image) and (epoch % self.save_test_image_every == 0):
-                with open(self.test_image, "rb") as fid:
-                    pic = pickle.load(fid)
-                self.compare(epoch, pic)
-
-        return loss
+            
+        return loss, accuracy
 
     def train(self,
               scheduler,
@@ -383,8 +425,8 @@ class BaseEncoderTrainer:
 
         for epoch in range(self.start_epoch, self.epochs):
 
-            train_loss = self.train_one_epoch(epoch)
-            test_loss = self.test(epoch)
+            train_loss, train_accuracy = self.train_one_epoch(epoch)
+            test_loss, test_accuracy = self.test(epoch)
 
             scheduler.step(test_loss if flag else epoch)
             early_stopping(epoch, test_loss, self.model, self.optimizer)
@@ -396,8 +438,13 @@ class BaseEncoderTrainer:
                 "valid_loss": test_loss,
                 "lr": early_stopping.print_learning_rate(self.optimizer)
             }
+            if train_accuracy is not None:
+                result["train_acc"] = train_accuracy
+                result["valid_acc"] = test_accuracy
             metrics_logger.update(result)
 
             if early_stopping.early_stop:
                 logger.info("Early stopping")
                 break
+                
+        return result

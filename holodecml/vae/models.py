@@ -468,9 +468,4 @@ class LatentEncoder(ATTENTION_VAE):
 
     def forward(self, x):
         z, mu, logvar = self.encode(x)
-        x_att = self.task_blocks["x"](z)
-        y_att = self.task_blocks["y"](z)
-        z_att = self.task_blocks["z"](z)
-        d_att = self.task_blocks["d"](z)
-        output = torch.stack([x_att, y_att, z_att, d_att], 2)
-        return output
+        return {task: self.task_blocks[task](z) for task in self.tasks}

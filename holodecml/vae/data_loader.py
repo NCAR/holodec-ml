@@ -102,20 +102,6 @@ class HologramDataset(Dataset):
         im = self.ds["image"][hologram].values
         im = {"image": self.reshape(im)}
 
-        #particles = np.where(self.ds["hid"] == hologram + 1)[0]
-        # for l, p in enumerate(particles):
-        #    for m, col in enumerate(self.output_cols):
-        #        val = self.ds[col].values[p]
-        #        y_out[k, l, m] = val
-
-        ##########################################################
-        #
-        #
-        # {"image": image, "outputs": outputs} -- need to transform the outputs if not invariant under transformation
-        #
-        #
-        ##########################################################
-
         if self.transform:
             im = self.transform(im)
 
@@ -202,6 +188,7 @@ class MultiTaskHologramDataset(Dataset):
             maxnum_particles: int = False,
             scaler: Dict[str, str] = False,
             transform=None) -> None:
+        
         'Initialization'
         self.ds = self.open_dataset(path_data, num_particles, split)
         self.output_cols = [x for x in output_cols if x != 'hid']
@@ -214,10 +201,14 @@ class MultiTaskHologramDataset(Dataset):
         self.maxnum_particles = maxnum_particles
         self.transform = transform
         self.on_epoch_end()
+        
+        self.binary = "binary" in self.output_cols
+        self.num_outs = len(self.output_cols)-1 if self.binary else len(self.output_cols)
 
         if not scaler:
             self.scaler = {col: MinMaxScaler() for col in output_cols}
             for col in output_cols:
+                if col == "binary": continue
                 scale = self.ds[col].values
                 self.scaler[col].fit(scale.reshape(scale.shape[-1], -1))
         else:
@@ -240,17 +231,28 @@ class MultiTaskHologramDataset(Dataset):
         hologram = self.hologram_numbers[idx]
         im = self.ds["image"][hologram].values
         im = {"image": np.expand_dims(im, 0)}  # reshape
-
-        y_out = np.zeros((
-            self.maxnum_particles if self.maxnum_particles else self.num_particles,
-            len(self.output_cols)
+        
+        y_out = {}
+        for task in self.output_cols:
+            y_out[task] = np.zeros((
+                self.maxnum_particles if self.maxnum_particles else self.num_particles
+            ))
+        w_out = np.zeros((
+            self.maxnum_particles if self.maxnum_particles else self.num_particles
         ))
         particles = np.where(self.ds["hid"] == hologram + 1)[0]
         for l, p in enumerate(particles):
-            for m, col in enumerate(self.output_cols):
-                val = self.ds[col].values[p]
-                val = self.scaler[col].transform(val.reshape(-1, 1))[0][0]
-                y_out[l, m] = val
+            for task in self.output_cols:
+                if task == "binary":
+                    y_out[task][l] = 1
+                    continue
+                val = self.ds[task].values[p]
+                val = self.scaler[task].transform(val.reshape(-1, 1))[0][0]
+                y_out[task][l] = val
+        
+        num_particles = (l + 1)
+        w_out[:num_particles] = num_particles / self.maxnum_particles
+        w_out[num_particles:] = (self.maxnum_particles - num_particles) / self.maxnum_particles
 
         if self.transform:
             im = self.transform(im)
@@ -258,8 +260,8 @@ class MultiTaskHologramDataset(Dataset):
         self.processed += 1
         if self.processed == self.__len__():
             self.on_epoch_end()
-
-        return im["image"], y_out
+        
+        return im["image"], y_out, w_out
 
     def on_epoch_end(self):
         'Updates indexes after each epoch'
