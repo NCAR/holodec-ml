@@ -187,7 +187,8 @@ class MultiTaskHologramDataset(Dataset):
             shuffle: bool = True,
             maxnum_particles: int = False,
             scaler: Dict[str, str] = False,
-            transform=None) -> None:
+            transform=None,
+            cache=False) -> None:
         
         'Initialization'
         self.ds = self.open_dataset(path_data, num_particles, split)
@@ -200,6 +201,7 @@ class MultiTaskHologramDataset(Dataset):
         self.shuffle = shuffle
         self.maxnum_particles = maxnum_particles
         self.transform = transform
+        self.cache = {} if cache else False
         self.on_epoch_end()
         
         self.binary = "binary" in self.output_cols
@@ -229,6 +231,11 @@ class MultiTaskHologramDataset(Dataset):
         'Generate one data point'
         # random.choice(self.hologram_numbers)
         hologram = self.hologram_numbers[idx]
+        
+        if isinstance(self.cache, dict):
+            if hologram in cache:
+                return self.cache[hologram]
+        
         im = self.ds["image"][hologram].values
         im = {"image": np.expand_dims(im, 0)}  # reshape
         
@@ -260,6 +267,10 @@ class MultiTaskHologramDataset(Dataset):
         self.processed += 1
         if self.processed == self.__len__():
             self.on_epoch_end()
+            
+        if isinstance(self.cache, dict):
+            if hologram not in self.cache:
+                self.cache[hologram] = (im["image"], y_out, w_out)
         
         return im["image"], y_out, w_out
 

@@ -256,7 +256,7 @@ class ATTENTION_VAE(nn.Module):
         h = self.encoder_block6(h)
         h = h.view(h.size(0), -1)  # flatten
         z, mu, logvar = self.bottleneck(h)
-        return z, mu, logvar  # , att_map
+        return z, mu, logvar, [att_map3, att_map4, att_map5]
 
     def decode(self, z):
         z = self.fc3(z)
@@ -272,12 +272,12 @@ class ATTENTION_VAE(nn.Module):
         z = self.decoder_block5(z)
         #z, att_map5 = self.decoder_atten5(z)
         z = self.decoder_block6(z)
-        return z  # , att_map
+        return z, [att_map1, att_map2, att_map3]
 
     def forward(self, x):
-        z, mu, logvar = self.encode(x)
-        z = self.decode(z)
-        return z, mu, logvar  # , encoder_att_map, decoder_att_map
+        z, mu, logvar, encoder_att = self.encode(x)
+        z, decoder_att = self.decode(z)
+        return z, mu, logvar
 
 
 class ConvVAE(nn.Module):
@@ -467,5 +467,7 @@ class LatentEncoder(ATTENTION_VAE):
         return block
 
     def forward(self, x):
-        z, mu, logvar = self.encode(x)
-        return {task: self.task_blocks[task](z) for task in self.tasks}
+        z, mu, logvar, encoder_att = self.encode(x)
+        task_dict = {task: self.task_blocks[task](z) for task in self.tasks}
+        task_dict["encoder_att"] = encoder_att
+        return task_dict

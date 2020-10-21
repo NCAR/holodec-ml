@@ -2,7 +2,7 @@ log: 'test'
 type: "encoder-vae"
 
 data:
-  path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+  path_data: "/glade/scratch/schreck/holodec/"
   num_particles: "50-100"
   maxnum_particles: 100
   output_cols: ["x", "y", "z", "d", "binary"]
@@ -16,23 +16,24 @@ transforms:
   ToTensor: True
 
 iterator:
-  num_workers: 16
+  num_workers: 8
   batch_size: 32
   pin_memory: True
   shuffle: True
-
+  
 model:
   image_channels: 1
   hidden_dims: [3, 94, 141, 471, 425, 1122]
   z_dim: 1277
-  dense_hidden_dims: [100]
+  dense_hidden_dims: [1000]
   dense_dropouts: [0.0]
   tasks: ["x", "y", "z", "d", "binary"]
-  pretrained_model: "test/pretrained.pt"
+  pretrained_model: "pretrained/pretrained.pt"
 
-optimizer: 
+optimizer:
   type: "lookahead-diffgrad"
-  lr: 0.00001
+  lr: 0.000631
+  weight_decay: 0.0
 
 callbacks:
   MetricsLogger:
@@ -43,21 +44,21 @@ callbacks:
     verbose: True
     path_save: "test/checkpoint.pt"
   ExponentialLR:
-    gamma: 0.99
+    gamma: 0.95
     
 #   ReduceLROnPlateau: 
 #     mode: "min"
 #     factor: 0.2
-#     patience: 2
-#     min_lr: 0.00000001
+#     patience: 1
+#     min_lr: 0.0000000001
 #     verbose: True
 
 trainer:
   start_epoch: 0
-  epochs: 1
+  epochs: 100
   clip: 1.0
   alpha: 1.0
-  beta: 1.0
+  beta: 0.1
   path_save: "test"
   test_image: "test/image_600.pkl"
   

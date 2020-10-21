@@ -319,6 +319,7 @@ class BaseEncoderTrainer:
         
     def criterion(self, input, target, weight = None):
         mse_loss = 0
+        bce_loss = 0
         accuracy = None
         weight = weight.float() if weight != None else None
         for task in target:
@@ -327,7 +328,7 @@ class BaseEncoderTrainer:
             if task != "binary":
                 mse_loss += self.wmse(input[task], target[task], weight)
             else:
-                mse_loss += nn.BCELoss(weight)(input[task], target[task])
+                bce_loss += nn.BCELoss(weight)(input[task], target[task])
                 # Compute BCE accuracy
                 predicted = input[task].clone().detach()
                 truth = target[task].clone().detach()
@@ -335,7 +336,7 @@ class BaseEncoderTrainer:
                 predicted[~condition] = 0.0
                 predicted[condition] = 1.0
                 accuracy = (predicted == truth).float().mean()
-        return mse_loss, accuracy
+        return mse_loss, bce_loss, accuracy
 
     def train_one_epoch(self, epoch):
 
@@ -348,32 +349,37 @@ class BaseEncoderTrainer:
             leave=True
         )
 
-        epoch_losses = {"loss": [], "accuracy": []}
+        epoch_losses = {"loss": [], "mse": [], "bce": [], "accuracy": []}
         for idx, (images, y_out, w_out) in batch_group_generator:
             images = images.to(self.device)
             y_out = {task: value.to(self.device) for task, value in y_out.items()}
             w_out = w_out.to(self.device)
             y_pred = self.model(images)
-            loss, accuracy = self.criterion(y_pred, y_out, w_out)
+            mse_loss, bce_loss, accuracy = self.criterion(y_pred, y_out, w_out)
+            loss = self.alpha * mse_loss + self.beta * bce_loss
+            loss /= (self.alpha + self.beta + 1e-8)
 
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-            batch_loss = loss.item()
-            epoch_losses["loss"].append(batch_loss)
+            epoch_losses["mse"].append(mse_loss.item())
+            epoch_losses["bce"].append(bce_loss.item())
+            epoch_losses["loss"].append(loss.item())
+            mse = np.mean(epoch_losses["mse"])
+            bce = np.mean(epoch_losses["bce"])
             loss = np.mean(epoch_losses["loss"])
             
-            to_print = f"loss: {loss:.3f}"
+            to_print = f"Epoch: {epoch} loss: {loss:.3f} mse: {mse:.3f} bce: {bce:.3f}"
             if accuracy is not None:
                 epoch_losses["accuracy"].append(accuracy.item())
                 accuracy = np.mean(epoch_losses["accuracy"])
-                to_print += f" accuracy: {accuracy:.3f}"
+                to_print += f" acc: {accuracy:.3f}"
             
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
 
-        return loss, accuracy
+        return loss, mse, bce, accuracy
 
     def test(self, epoch):
 
@@ -389,32 +395,37 @@ class BaseEncoderTrainer:
                 leave=True
             )
 
-            epoch_losses = {"loss": [], "accuracy": []}
+            epoch_losses = {"loss": [], "mse": [], "bce": [], "accuracy": []}
             for idx, (images, y_out, w_out) in batch_group_generator:
                 images = images.to(self.device)
                 y_out = {task: value.to(self.device) for task, value in y_out.items()}
                 y_pred = self.model(images)
-                loss, accuracy = self.criterion(y_pred, y_out)
+                mse_loss, bce_loss, accuracy = self.criterion(y_pred, y_out)
+                loss = mse_loss + bce_loss
 
-                batch_loss = loss.item()  # / self.batch_size
-                epoch_losses["loss"].append(batch_loss)
+                epoch_losses["mse"].append(mse_loss.item())
+                epoch_losses["bce"].append(bce_loss.item())
+                epoch_losses["loss"].append(loss.item())
+                mse = np.mean(epoch_losses["mse"])
+                bce = np.mean(epoch_losses["bce"])
                 loss = np.mean(epoch_losses["loss"])
                 
-                to_print = f"valid_loss: {loss:.3f}"
+                to_print = f"Epoch: {epoch} val_loss: {loss:.3f} val_mse: {mse:.3f} val_bce: {bce:.3f}"
                 if accuracy is not None:
                     epoch_losses["accuracy"].append(accuracy.item())
                     accuracy = np.mean(epoch_losses["accuracy"])
-                    to_print += f" accuracy: {accuracy:.3f}"
+                    to_print += f" val_acc: {accuracy:.3f}"
                 
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
             
-        return loss, accuracy
+        return loss, mse, bce, accuracy
 
     def train(self,
               scheduler,
               early_stopping,
-              metrics_logger):
+              metrics_logger,
+              metric = "val_loss"):
 
         logger.info(
             f"Training the model for up to {self.epochs} epochs starting at epoch {self.start_epoch}"
@@ -425,17 +436,33 @@ class BaseEncoderTrainer:
 
         for epoch in range(self.start_epoch, self.epochs):
 
-            train_loss, train_accuracy = self.train_one_epoch(epoch)
-            test_loss, test_accuracy = self.test(epoch)
+            train_loss, train_mse, train_bce, train_accuracy = self.train_one_epoch(epoch)
+            test_loss, test_mse, test_bce, test_accuracy = self.test(epoch)
+            
+            if "val_loss" in metric:
+                metric_val = test_loss
+            elif "val_mse_loss" in metric:
+                metric_val = test_mse
+            elif "val_bce_loss" in metric:
+                metric_val = test_bce
+            elif "val_acc" in metric:
+                metric_val = -test_accuracy
+            else:
+                supported = "val_loss, val_mse_loss, val_bce_loss, val_acc"
+                raise ValueError(f"The metric {metric} is not supported. Choose from {supported}")
 
-            scheduler.step(test_loss if flag else epoch)
-            early_stopping(epoch, test_loss, self.model, self.optimizer)
+            scheduler.step(metric_val if flag else epoch)
+            early_stopping(epoch, metric_val, self.model, self.optimizer)
 
             # Write results to the callback logger
             result = {
                 "epoch": epoch,
                 "train_loss": train_loss,
+                "train_mse": train_mse,
+                "train_bce": train_bce,
                 "valid_loss": test_loss,
+                "valid_mse": test_mse,
+                "valid_bce": test_bce,
                 "lr": early_stopping.print_learning_rate(self.optimizer)
             }
             if train_accuracy is not None:
