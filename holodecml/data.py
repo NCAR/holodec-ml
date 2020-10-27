@@ -1,10 +1,8 @@
 import os
-import random
-import xarray as xr
-import numpy as np
-import pandas as pd
-from datetime import datetime
+import socket
 
+import numpy as np
+import xarray as xr
 
 num_particles_dict = {
     1 : '1particle',
@@ -16,6 +14,12 @@ split_dict = {
     'train' : 'training',
     'test'   : 'test',
     'valid': 'validation'}
+
+def get_dataset_path():
+    if 'casper' in socket.gethostname():
+        return "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+    else:
+        return "/Users/ggantos/PycharmProjects/holodec-ml/data/"
 
 def dataset_name(num_particles, split, file_extension='nc'):
     """
