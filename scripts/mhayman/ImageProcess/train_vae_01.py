@@ -32,6 +32,9 @@ settings={
 
 
 """
+# disable plotting in xwin
+import matplotlib
+matplotlib.use('Agg')
 
 import sys
 import numpy as np
@@ -58,7 +61,7 @@ import ml_utils as ml
 import ml_defs as mldef
 
 run_date = datetime.datetime.now()
-run_date_str = run_date.strftime('%Y%m%dT%h%m%s')
+run_date_str = run_date.strftime('%Y%m%dT%H%M%S')
 
 num_epochs = settings['num_epochs']
 
@@ -71,7 +74,7 @@ image_rescale = settings['image_rescale']
 
 with xr.open_dataset(paths['load_data']+settings['datafile'],chunks={'hologram_number':settings['h_chunk']}) as ds:
     print(ds.data_vars)
-    file_base = 'vae_'+settings['datafile']+'_'+run_date_str
+    file_base = 'vae_'+settings['datafile'].replace('.nc','')+'_'+run_date_str
     save_path = paths['save_data']+file_base+'/'
     model_save_path = paths['save_data']
     ml.ensure_path(save_path)
@@ -194,7 +197,7 @@ ax.set_xlabel('Epoch')
 ax.set_ylabel('Loss')
 ax.grid(b=True)
 plt.legend()
-plt.savefig(save_path+file_base+"LossHistory_"+file_base+".png", dpi=200, bbox_inches="tight")
+plt.savefig(save_path+file_base+"_LossHistory_"+file_base+".png", dpi=200, bbox_inches="tight")
 
 # fig, bx = plt.subplots(1, 1, figsize=(8, 4))
 # bx.plot(epochs,history.history['acc'],'bo-',alpha=0.5,label='Training')
@@ -235,4 +238,5 @@ for im in settngs['holo_examples']:
     plt.colorbar(im_obj, ax=ax_obj)
     ax_obj.set_title('Difference')
     plt.savefig(save_path+file_base+"_ExampleCase_%d_"%im+file_base+".png", dpi=200, bbox_inches="tight")
+    plt.close('all')
     
