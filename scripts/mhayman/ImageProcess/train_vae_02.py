@@ -222,7 +222,7 @@ print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_in_test.values.shape[0]
 preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','xsize','ysize','channel'),
                             coords=scaled_in_test.coords)
 
-for im in settngs['holo_examples']:
+for im in settings['holo_examples']:
     fig_obj, ax_obj_lst = plt.subplots(1, 3, figsize=(3*6, 4))
     ax_obj = ax_obj_lst[0]
     im_obj = ax_obj.matshow(scaled_in_test.isel(hologram_number=im,channel=0))
@@ -251,7 +251,7 @@ print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_in_train.values.shape[0
 preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','xsize','ysize','channel'),
                             coords=scaled_in_train.coords)
 
-for im in settngs['holo_examples']:
+for im in settings['holo_examples']:
     fig_obj, ax_obj_lst = plt.subplots(1, 3, figsize=(3*6, 4))
     ax_obj = ax_obj_lst[0]
     im_obj = ax_obj.matshow(scaled_in_train.isel(hologram_number=im,channel=0))
