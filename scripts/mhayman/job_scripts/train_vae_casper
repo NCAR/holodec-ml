@@ -25,4 +25,4 @@ source activate ml-casper
 #pip install -e .
 
 ### Run the executable
-python run_vae_training_01.py
+python run_vae_training_02.py
