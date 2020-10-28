@@ -12,7 +12,7 @@ settings={
         'nPool':4, # max pool size
         'activation':'relu', # convolution activation
         'kernel_initializer':"he_normal",
-        'latent_dim':32,
+        'latent_dim':64,
         'n_dense_layers':2, # number of dense layers in bottom layer
         'loss_fun':'mse',   # training loss function
         'out_act':'linear',  # output activation
