@@ -6,7 +6,7 @@ paths = {   'load_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
             'save_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/vae/'}
 settings={
         'datafile':'synthetic_holograms_v02.nc',
-        'n_layers':4, # must be greater than 1 because the latent layer counts
+        'n_layers':3, # must be greater than 1 because the latent layer counts
         'n_filters':2, # number of input convolutional channels
         'nConv':3, # convolution kernel size
         'nPool':2, # max pool size
