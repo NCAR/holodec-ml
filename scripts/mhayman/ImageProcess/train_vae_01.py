@@ -186,7 +186,7 @@ ml.ensure_path(save_path)
 plot_model(mod,show_shapes=True,to_file=save_path+file_base+"model_plot.png")
 
 history = mod.fit(scaled_in_train.values,y=None,
-                  batch_size=settings['batch_size'], epochs=20, verbose=1,
+                  batch_size=settings['batch_size'], epochs=settings['num_epochs'], verbose=1,
                   validation_data=(scaled_in_valid.values,None))
 
 epochs = np.arange(len(history.history['loss']))+1
@@ -212,6 +212,7 @@ plt.savefig(save_path+file_base+"_LossHistory_"+file_base+".png", dpi=200, bbox_
 # save the model
 save_model(mod, model_save_path+file_base+'.h5', save_format="h5")
 
+# output test examples
 cnn_start = datetime.datetime.now()
 preds_out = mod.predict(scaled_in_test.values, batch_size=64)
 cnn_stop = datetime.datetime.now()
@@ -222,7 +223,7 @@ preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','xsize','ysize','c
                             coords=scaled_in_test.coords)
 
 for im in settngs['holo_examples']:
-    fig_obj, ax_obj_lst = plt.subplots(1, 3, figsize=(3*7, 4))
+    fig_obj, ax_obj_lst = plt.subplots(1, 3, figsize=(3*6, 4))
     ax_obj = ax_obj_lst[0]
     im_obj = ax_obj.matshow(scaled_in_test.isel(hologram_number=im,channel=0))
     plt.colorbar(im_obj, ax=ax_obj)
@@ -237,6 +238,34 @@ for im in settngs['holo_examples']:
     im_obj = ax_obj.imshow(scaled_in_test.isel(hologram_number=im,channel=0)-preds_out_da.isel(hologram_number=im,channel=0))
     plt.colorbar(im_obj, ax=ax_obj)
     ax_obj.set_title('Difference')
-    plt.savefig(save_path+file_base+"_ExampleCase_%d_"%im+file_base+".png", dpi=200, bbox_inches="tight")
+    plt.savefig(save_path+file_base+"_TestExampleCase_%d_"%im+file_base+".png", dpi=200, bbox_inches="tight")
     plt.close('all')
     
+# output training examples
+cnn_start = datetime.datetime.now()
+preds_out = mod.predict(scaled_in_train.values, batch_size=64)
+cnn_stop = datetime.datetime.now()
+print(f"{scaled_in_train.values.shape[0]} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
+print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_in_train.values.shape[0]} seconds per hologram")
+
+preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','xsize','ysize','channel'),
+                            coords=scaled_in_train.coords)
+
+for im in settngs['holo_examples']:
+    fig_obj, ax_obj_lst = plt.subplots(1, 3, figsize=(3*6, 4))
+    ax_obj = ax_obj_lst[0]
+    im_obj = ax_obj.matshow(scaled_in_train.isel(hologram_number=im,channel=0))
+    plt.colorbar(im_obj, ax=ax_obj)
+    ax_obj.set_title('True image')
+
+    ax_obj = ax_obj_lst[1]
+    im_obj = ax_obj.matshow(preds_out_da.isel(hologram_number=im,channel=0))
+    plt.colorbar(im_obj, ax=ax_obj)
+    ax_obj.set_title('Reconstructed Image')
+
+    ax_obj = ax_obj_lst[2]
+    im_obj = ax_obj.imshow(scaled_in_train.isel(hologram_number=im,channel=0)-preds_out_da.isel(hologram_number=im,channel=0))
+    plt.colorbar(im_obj, ax=ax_obj)
+    ax_obj.set_title('Difference')
+    plt.savefig(save_path+file_base+"_TrainExampleCase_%d_"%im+file_base+".png", dpi=200, bbox_inches="tight")
+    plt.close('all')

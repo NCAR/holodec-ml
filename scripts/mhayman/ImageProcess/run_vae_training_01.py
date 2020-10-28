@@ -17,7 +17,7 @@ settings={
         'loss_fun':'mse',   # training loss function
         'out_act':'linear',  # output activation
         'num_epochs':100,
-        'batch_size':16,
+        'batch_size':32,
         'input_variable':'image',
         'split_fraction':0.8,
         'valid_fraction':0.2,
