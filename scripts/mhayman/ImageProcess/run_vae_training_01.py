@@ -18,7 +18,7 @@ settings={
         'out_act':'linear',  # output activation
         'num_epochs':100,
         'batch_size':16,
-        'input_variable':'image,
+        'input_variable':'image',
         'split_fraction':0.8,
         'valid_fraction':0.2,
         'image_rescale':255.0,
