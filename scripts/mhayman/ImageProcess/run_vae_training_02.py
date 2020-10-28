@@ -22,7 +22,7 @@ settings={
         'split_fraction':0.8,
         'valid_fraction':0.2,
         'image_rescale':255.0,
-        'beta':5e-4,   # KL divergence penalty scalar
+        'beta':4e-5,   # KL divergence penalty scalar
         'h_chunk':128,      # xarray chunk size when loading
         'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267]  # example outputs
         }
