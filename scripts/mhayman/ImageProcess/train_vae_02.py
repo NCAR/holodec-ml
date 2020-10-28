@@ -159,7 +159,7 @@ z_decoded = Conv2D(2,(1,1),padding="same",activation=settings['out_act'])(return
 
 class CustomVariationalLayer(Layer):
     def vae_loss(self,x,z_decoded,z_mean,z_log_var):
-        x_hat = K.square(np.sqrt(0.5)+z_decoded[...,0])+K.square(z_decoded[...,0])
+        x_hat = K.square(np.sqrt(0.5)+z_decoded[...,0])+K.square(z_decoded[...,1])
         x_mse_loss = K.mean(K.square(x[...,0]-x_hat),axis=[1,2])
         beta = settings['beta']
         kl_loss = -beta*K.mean(1+z_log_var-K.square(z_mean) - K.exp(z_log_var),axis=-1)
