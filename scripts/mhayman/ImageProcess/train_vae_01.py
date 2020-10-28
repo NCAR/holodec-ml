@@ -86,6 +86,8 @@ with xr.open_dataset(paths['load_data']+settings['datafile'],chunks={'hologram_n
     print()
     
     # Setup training data
+    split_index = np.int(split_fraction*ds.sizes['hologram_number'])  # number of training+validation points
+    valid_index = np.int(valid_fraction*ds.sizes['hologram_number'])  # number of validation points
     
     scaled_in_data = ds[input_variable]/image_rescale
     print('\ninput dimensions:')
