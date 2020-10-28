@@ -242,14 +242,16 @@ def add_unet_vae(input_node,n_layers,n_filters,nConv=5,
 
         input_shape = K.int_shape(input_node)
         zinput = Flatten()(input_node)
-        z_mean = zinput
-        z_log_var = zinput
-        for _ in range(n_dense_layers):
+        z_mean = Dense(latent_dim,activation='relu')(zinput)
+        z_log_var = Dense(latent_dim,activation='relu')(zinput)
+        for _ in range(np.maximum(n_dense_layers-2,0)):
             # represent the mean and variance branches
             # with separate dense networks
             z_mean = Dense(latent_dim,activation='relu')(z_mean)
             z_log_var = Dense(latent_dim,activation='relu')(z_log_var)
-        
+        z_mean = Dense(latent_dim,activation='linear')(z_mean)
+        z_log_var = Dense(latent_dim,activation='linear')(z_log_var)
+
         z = Lambda(vae_sample)([z_mean,z_log_var,latent_dim])
 
         x1 = Dense(np.prod(input_shape[1:]),activation='relu')(z)
@@ -267,8 +269,8 @@ def add_unet_vae(input_node,n_layers,n_filters,nConv=5,
 
 def vae_sample(args):
     # random sample for VAE resampling latent space
-    z_mean,z_log_var,latent_dim = args
-    epsilon = K.random_normal(shape=(K.shape(z_mean)[0],latent_dim),
+    z_mean,z_log_var = args
+    epsilon = K.random_normal(shape=K.shape(z_mean),
                     mean=0., stddev=1.)
     return z_mean + epsilon*K.exp(z_log_var)
 
@@ -363,3 +365,4 @@ def cum_poisson_nll(y_true,y_pred):
     Poisson observations
     """
     return K.sum(K.cumsum(y_pred,axis=1)-K.cumsum(K.cast(y_true,'float32'),axis=1)*K.log(K.cumsum(y_pred,axis=1)+1e-9),axis=1)
+
