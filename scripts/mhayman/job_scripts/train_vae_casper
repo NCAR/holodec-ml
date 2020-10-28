@@ -25,4 +25,4 @@ source activate ml-casper
 #pip install -e .
 
 ### Run the executable
-python run_train_1d_psd_casper.py
+python run_vae_training_01.py
