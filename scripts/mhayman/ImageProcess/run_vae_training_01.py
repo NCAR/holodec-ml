@@ -6,13 +6,13 @@ paths = {   'load_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
             'save_data':'/glade/scratch/mhayman/holodec/holodec-ml-data/vae/'}
 settings={
         'datafile':'synthetic_holograms_v02.nc',
-        'n_layers':1, # must be greater than 1 because the latent layer counts
+        'n_layers':3, # must be greater than 1 because the latent layer counts
         'n_filters':2, # number of input convolutional channels
         'nConv':5, # convolution kernel size
         'nPool':4, # max pool size
         'activation':'relu', # convolution activation
         'kernel_initializer':"he_normal",
-        'latent_dim':64,
+        'latent_dim':128,
         'n_dense_layers':2, # number of dense layers in bottom layer
         'loss_fun':'mse',   # training loss function
         'out_act':'linear',  # output activation
