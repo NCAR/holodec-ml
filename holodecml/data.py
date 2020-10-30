@@ -208,7 +208,20 @@ def make_template(df, num_images, max_particles):
     prob = np.zeros(d.shape)
     template = np.hstack((x, y ,z ,d ,prob))
     template = template.reshape((num_images, max_particles, -1))
-    return template    
+    return template
+
+def make_random_valid_outputs(path_data, num_particles, num_images,
+                              max_particles):
+    df = open_dataset(path_data, num_particles, 'valid')
+    size = (num_images * max_particles, 1)
+    x = np.random.uniform(low=df['x'].min(), high=df['x'].max(), size=size)
+    y = np.random.uniform(low=df['y'].min(), high=df['y'].max(), size=size)
+    z = np.random.uniform(low=df['z'].min(), high=df['z'].max(), size=size)
+    d = np.random.uniform(low=df['d'].min(), high=df['d'].max(), size=size)
+    prob = np.zeros(d.shape)
+    template = np.hstack((x, y, z, d, prob))
+    template = template.reshape((num_images, max_particles, -1))
+    return template
 
 # cycles through dataset by "hid" to overwrite random data generated in
 # make_template with actual data and classification of 1

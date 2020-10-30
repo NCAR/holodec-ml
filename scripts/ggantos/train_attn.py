@@ -13,7 +13,7 @@ from datetime import datetime
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import binary_crossentropy
-from holodecml.data import load_scaled_datasets
+from holodecml.data import load_scaled_datasets, make_random_valid_outputs
 from holodecml.models import ParticleAttentionNet
 from holodecml.losses import attention_net_loss
 
@@ -75,13 +75,15 @@ def main():
     
     # add noise to the outputs
     train_outputs_noisy = train_outputs * (1 + np.random.normal(0, config['noisy_sd'], train_outputs.shape))
-    valid_outputs_noisy = valid_outputs * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs.shape))
-    model_start = datetime.now() 
+    valid_outputs_noisy = make_random_valid_outputs(path_data, num_particles,
+                                                    valid_inputs.shape[0],
+                                                    train_outputs.shape[1])
+    valid_outputs_noisy = valid_outputs_noisy * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs_noisy.shape))
+    model_start = datetime.now()
     net = ParticleAttentionNet(**config["attention_network"])
-    print(type(net))
     net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=attention_net_loss)
-    hist = net.fit([train_outputs_noisy, train_inputs], train_outputs,
-                   validation_data=([valid_outputs_noisy, valid_inputs], valid_outputs),
+    hist = net.fit([train_outputs_noisy[:,:,:-1], train_inputs], train_outputs,
+                   validation_data=([valid_outputs_noisy[:,:,:-1], valid_inputs], valid_outputs),
                    epochs=config["train"]['epochs'],
                    batch_size=config["train"]['batch_size'],
                    verbose=config["train"]['verbose'])
