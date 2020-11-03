@@ -15,7 +15,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import binary_crossentropy
 from holodecml.data import load_scaled_datasets, make_random_valid_outputs
 from holodecml.models import ParticleAttentionNet
-from holodecml.losses import attention_net_loss
+from holodecml.losses import attention_net_loss, attention_net_validation_loss
 
 
 scalers = {"MinMaxScaler": MinMaxScaler,
@@ -81,7 +81,8 @@ def main():
     valid_outputs_noisy = valid_outputs_noisy * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs_noisy.shape))
     model_start = datetime.now()
     net = ParticleAttentionNet(**config["attention_network"])
-    net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=attention_net_loss)
+    net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=attention_net_loss,
+               metrics=[attention_net_validation_loss])
     hist = net.fit([train_outputs_noisy[:,:,:-1], train_inputs], train_outputs,
                    validation_data=([valid_outputs_noisy[:,:,:-1], valid_inputs], valid_outputs),
                    epochs=config["train"]['epochs'],
@@ -91,7 +92,7 @@ def main():
     
     # predict outputs
     print("Predicting outputs..")
-    valid_outputs_pred = net.predict([valid_outputs_noisy, valid_inputs],
+    valid_outputs_pred = net.predict([valid_outputs_noisy[:,:,:-1], valid_inputs],
                                      batch_size=config['train']["batch_size"])
     raw = valid_outputs_pred.reshape(-1, valid_outputs_pred.shape[-1])
     raw = scaler_out.inverse_transform(raw[:,:-1])

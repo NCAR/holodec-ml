@@ -1,15 +1,15 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/attention/noisysd4/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attention_valid/test"
 model_name: "attn"
 num_particles: "large"
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]
 scaler_out: "MinMaxScaler"
 num_z_bins: False
-subset: False
+subset: 0.1
 mass: False
 metric: "mae"
-noisy_sd: 0.4
+noisy_sd: 0.1
 attention_network:
   attention_neurons: 100
   hidden_layers: 2
