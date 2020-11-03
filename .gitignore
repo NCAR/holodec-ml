@@ -7,3 +7,6 @@
 *.o*
 .idea
 holodecml.egg-info/
+data/
+models/
+

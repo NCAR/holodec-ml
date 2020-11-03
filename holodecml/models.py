@@ -23,7 +23,8 @@ custom_losses = {
     "rmse": rmse,
     "weighted_mse": wmse,
     "r2": R2,
-    "attn": attention_net_loss
+    "attn": attention_net_loss,
+    "attn_valid": attention_net_validation_loss
 }
 
 custom_metrics = {
@@ -366,7 +367,7 @@ def run_particleattentionnet():
     particle_pos, holo = generate_gaussian_particles(num_images=num_images, num_particles=num_particles,
                                 image_size_pixels=image_size_pixels, gaussian_sd=filter_size)
     particle_pos_noisy = particle_pos * (1 + np.random.normal(0, noise_sd, particle_pos.shape))
-    net.compile(optimizer="adam", loss=custom_losses["attn"])
+    net.compile(optimizer="adam", loss=custom_losses["attn"], metrics="attn_valid")
     net.fit([particle_pos_noisy, holo], particle_pos, epochs=15, batch_size=32, verbose=1)
     pred_particle_pos = net.predict([particle_pos_noisy, holo], batch_size=128)
     import matplotlib.pyplot as plt
