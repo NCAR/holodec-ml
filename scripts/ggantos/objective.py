@@ -88,11 +88,12 @@ def objective(trial, config):
 
     # Fit the model on the training data.
     # The KerasPruningCallback checks for pruning condition every epoch.
+    callbacks = get_callbacks(config["callbacks"]) + KerasPruningCallback(trial, "val_loss")
     hist = net.fit([train_outputs_noisy[:,:,:-1], train_inputs], train_outputs,
                    validation_data=([valid_outputs_noisy[:,:,:-1], valid_inputs], valid_outputs),
                    epochs=config["train"]['epochs'],
                    batch_size=config["train"]['batch_size'],
-                   callbacks=[KerasPruningCallback(trial, "val_loss")],
+                   callbacks=callbacks,
                    verbose=config["train"]['verbose'])
     print(f"Running model took {datetime.now() - model_start} time")
 
