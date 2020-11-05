@@ -6,6 +6,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, Ro
 from datetime import datetime
 
 from holodecml.data import load_scaled_datasets, make_random_valid_outputs
+from holodecml.callbacks import get_callbacks
 from holodecml.models import ParticleAttentionNet
 from holodecml.losses import attention_net_loss, attention_net_validation_loss
 
