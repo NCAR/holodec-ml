@@ -63,23 +63,23 @@ def attention_net_validation_loss(y_true, y_pred):
         dist_z = (y_true_h[:, 2:3] - tf.transpose(y_pred)[2:3, :, h]) ** 2
         dist_squared = dist_x + dist_y + dist_z
         loss_dist_h = tf.math.reduce_sum(tf.math.reduce_min(dist_squared, axis=1))
-        loss_dist += loss_dist_h
+        loss_dist = loss_dist + loss_dist_h
 
         max_idx = tf.cast(tf.math.argmin(dist_squared, axis=1), dtype=tf.int32)
         max_idx_2d = tf.stack((tf.range(tf.shape(dist_squared)[0]), max_idx), axis=-1)
 
         dist_d = (y_true_h[:, 3:4] - tf.transpose(y_pred)[3:4, :, h]) ** 2
         loss_diam_h = tf.math.reduce_sum(tf.gather_nd(dist_d, max_idx_2d))
-        loss_diam = tf.math.add(loss_diam, loss_diam_h)
+        loss_diam = loss_diam + loss_diam_h
 
         dist_p = (y_true_h[:, 4:5] - tf.transpose(y_pred)[4:5, :, h]) ** 2
         loss_prob_h = tf.math.reduce_sum(tf.gather_nd(dist_p, max_idx_2d))
-        loss_prob = tf.math.add(loss_prob, loss_prob_h)
+        loss_prob = loss_prob + loss_prob_h
 
         y_pred_h_bce = y_pred[h, :, -1]
         loss_bce_h = tf.keras.losses.binary_crossentropy(y_true_h[:, -1],
                                                          tf.gather(y_pred_h_bce,max_idx))
-        loss_bce = tf.math.add(loss_bce, loss_bce_h)
+        loss_bce = loss_bce + loss_bce_h
 
     loss_dist = loss_dist/tf.cast(tf.shape(y_true)[0], dtype=tf.float32)
     loss_diam = loss_diam/tf.cast(tf.shape(y_true)[0], dtype=tf.float32)
