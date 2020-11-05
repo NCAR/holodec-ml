@@ -55,7 +55,7 @@ def attention_net_validation_loss(y_true, y_pred):
     loss_prob = tf.zeros((), dtype=tf.float32)
     loss_bce = tf.zeros((), dtype=tf.float32)
 
-    for h in range(y_true.shape[0]):
+    for h in range(tf.shape(y_true)[0]):
         y_true_h = y_true[h:h + 1][y_true[h:h + 1, :, -1] > 0]
         dist_x = (y_true_h[:, 0:1] - tf.transpose(y_pred)[0:1, :, h]) ** 2
         dist_y = (y_true_h[:, 1:2] - tf.transpose(y_pred)[1:2, :, h]) ** 2
