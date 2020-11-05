@@ -48,7 +48,6 @@ def attention_net_loss(y_true, y_pred):
     loss_total = loss_real + loss_bce
     return loss_total
 
-
 def attention_net_validation_loss(y_true, y_pred):
     print("ATTENTION_NET_VALIDATION_LOSS")
     loss_dist = tf.zeros((), dtype=tf.float32)
@@ -56,7 +55,7 @@ def attention_net_validation_loss(y_true, y_pred):
     loss_prob = tf.zeros((), dtype=tf.float32)
     loss_bce = tf.zeros((), dtype=tf.float32)
 
-    for h in range(tf.shape(y_true)[0]):
+    for h in range(y_true.shape[0]):
         y_true_h = y_true[h:h + 1][y_true[h:h + 1, :, -1] > 0]
         dist_x = (y_true_h[:, 0:1] - tf.transpose(y_pred)[0:1, :, h]) ** 2
         dist_y = (y_true_h[:, 1:2] - tf.transpose(y_pred)[1:2, :, h]) ** 2
@@ -86,10 +85,10 @@ def attention_net_validation_loss(y_true, y_pred):
     loss_prob = loss_prob/tf.cast(tf.shape(y_true)[0], dtype=tf.float32)
     loss_bce = loss_bce/tf.cast(tf.shape(y_true)[0], dtype=tf.float32)
 
-    print(f"loss_dist: {loss_dist}\ttf.shape(loss_dist): {tf.shape(loss_dist)}")
-    print(f"loss_diam: {loss_diam}\ttf.shape(loss_diam): {tf.shape(loss_diam)}")
-    print(f"loss_dist: {loss_prob}\ttf.shape(loss_prob): {tf.shape(loss_prob)}")
-    print(f"loss_dist: {loss_bce}\ttf.shape(loss_bce): {tf.shape(loss_bce)}")
+    # print(f"loss_dist: {loss_dist}\ttf.shape(loss_dist): {tf.shape(loss_dist)}")
+    # print(f"loss_diam: {loss_diam}\ttf.shape(loss_diam): {tf.shape(loss_diam)}")
+    # print(f"loss_dist: {loss_prob}\ttf.shape(loss_prob): {tf.shape(loss_prob)}")
+    # print(f"loss_dist: {loss_bce}\ttf.shape(loss_bce): {tf.shape(loss_bce)}")
     valid_error = loss_dist + loss_diam + loss_bce
 
     return valid_error

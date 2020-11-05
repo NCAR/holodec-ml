@@ -11,14 +11,9 @@ mass: False
 metric: "mae"
 noisy_sd: 0.1
 attention_network:
-  attention_neurons: 100
-  hidden_layers: 2
-  hidden_neurons: 100
   activation: "relu"
-  min_filters: 16
   output_num: 5
 train:
-  learning_rate: 0.001
   epochs: 40
   batch_size: 64
   verbose: 1

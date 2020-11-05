@@ -1,6 +1,10 @@
 import keras
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
+import numpy as np
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
+from datetime import datetime
+
 from holodecml.data import load_scaled_datasets, make_random_valid_outputs
 from holodecml.models import ParticleAttentionNet
 from holodecml.losses import attention_net_loss, attention_net_validation_loss
@@ -11,6 +15,11 @@ from aimlutils.hyper_opt.base_objective import *
 import optuna
 from optuna.integration import KerasPruningCallback
 
+
+scalers = {"MinMaxScaler": MinMaxScaler,
+           "MaxAbsScaler": MaxAbsScaler,
+           "StandardScaler": StandardScaler,
+           "RobustScaler": RobustScaler}
 
 def create_model(trial, config):
 
