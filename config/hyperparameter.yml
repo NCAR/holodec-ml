@@ -1,0 +1,80 @@
+log:
+  save_path: "test/log.txt"
+
+slurm:
+  jobs: 1
+  batch:
+    account: "NAML0001"
+    gres: "gpu:v100:1"
+    mem: "256G"
+    n: 8
+    t: "12:00:00"
+    J: "hyper_opt"
+    o: "hyper_opt.out"
+    e: "hyper_opt.err"
+
+optuna:
+  name: "holodec_optimization.db"
+  reload: 0
+  objective: "/glade/work/ggantos/holodec-ml/scripts/ggantos/train_attn_optuna.py"
+  direction: "minimize"
+  metric: "val_loss"
+  n_trials: 10
+  gpu: True
+  save_path: '/glade/p/cisl/aiml/ggantos/holodec/attention/optuna/test'
+  sampler:
+    type: "TPESampler"
+  parameters:
+    attention_neurons:
+      type: "int"
+      settings:
+          name: "attention_neurons"
+          low: 50
+          high: 150
+    hidden_layers:
+      type: "int"
+      settings:
+        name: "hidden_layers"
+        low: 1
+        high: 4
+    hidden_neurons:
+      type: "int"
+      settings:
+        name: "hidden_neurons"
+        low: 50
+        high: 150
+    min_filters:
+      type: "int"
+      settings:
+        name: "min_filters"
+        low: 8
+        high: 24
+    learning_rate:
+      type: "float"
+      settings:
+        name: "learning_rate"
+        low: 0.00001
+        high: 0.01
+
+attention_network:
+  activation: "relu"
+  output_num: 5
+
+train:
+  epochs: 40
+  batch_size: 64
+  verbose: 1
+
+path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attention_valid/test"
+model_name: "attn"
+num_particles: "large"
+random_seed: 328942
+output_cols: ["x", "y", "z", "d", "hid"]
+scaler_out: "MinMaxScaler"
+num_z_bins: False
+subset: 0.1
+mass: False
+metric: "mae"
+noisy_sd: 0.1
+

@@ -1,4 +1,3 @@
-import sys
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
 from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
 import pandas as pd
@@ -12,7 +11,6 @@ from os.path import join, exists
 from datetime import datetime
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import binary_crossentropy
 from holodecml.data import load_scaled_datasets, make_random_valid_outputs
 from holodecml.models import ParticleAttentionNet
 from holodecml.losses import attention_net_loss, attention_net_validation_loss
@@ -22,8 +20,6 @@ scalers = {"MinMaxScaler": MinMaxScaler,
            "MaxAbsScaler": MaxAbsScaler,
            "StandardScaler": StandardScaler,
            "RobustScaler": RobustScaler}
-
-
 
 def rmse(y_true, y_pred):
     return np.sqrt(mean_squared_error(y_true, y_pred))
@@ -35,7 +31,6 @@ metrics = {"mae": mean_absolute_error,
            "rmse": rmse,
            "r2": r2,
            "max_error": max_error}
-
 
 def main():
     
@@ -72,13 +67,14 @@ def main():
                                          config["subset"],
                                          config["num_z_bins"],
                                          config["mass"])
-    
+
     # add noise to the outputs
     train_outputs_noisy = train_outputs * (1 + np.random.normal(0, config['noisy_sd'], train_outputs.shape))
     valid_outputs_noisy = make_random_valid_outputs(path_data, num_particles,
                                                     valid_inputs.shape[0],
                                                     train_outputs.shape[1])
     valid_outputs_noisy = valid_outputs_noisy * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs_noisy.shape))
+
     model_start = datetime.now()
     net = ParticleAttentionNet(**config["attention_network"])
     net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=attention_net_loss,
