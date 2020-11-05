@@ -20,7 +20,7 @@ optuna:
   direction: "minimize"
   metric: "val_loss"
   n_trials: 2
-  gpu: False
+  gpu: True
   save_path: "/glade/p/cisl/aiml/ggantos/holodec/optuna/test/"
   sampler:
     type: "TPESampler"
