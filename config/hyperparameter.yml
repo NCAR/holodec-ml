@@ -1,5 +1,5 @@
 log:
-  save_path: "test/log.txt"
+  save_path: "/glade/p/cisl/aiml/ggantos/holodec/optuna/test/log.txt"
 
 slurm:
   jobs: 1
@@ -21,7 +21,7 @@ optuna:
   metric: "val_loss"
   n_trials: 2
   gpu: False
-  save_path: '/glade/p/cisl/aiml/ggantos/holodec/optuna/test/'
+  save_path: "/glade/p/cisl/aiml/ggantos/holodec/optuna/test/"
   sampler:
     type: "TPESampler"
   parameters:
