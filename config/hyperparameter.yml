@@ -16,12 +16,12 @@ slurm:
 optuna:
   name: "holodec_optimization.db"
   reload: 0
-  objective: "/Users/ggantos/PycharmProjects/holodec-ml/scripts/ggantos/objective.py"
+  objective: "/glade/work/ggantos/holodec-ml/scripts/ggantos/objective.py"
   direction: "minimize"
   metric: "val_loss"
   n_trials: 2
   gpu: False
-  save_path: '/Users/ggantos/PycharmProjects/aiml-utils/aimlutils/hyper_opt/'
+  save_path: '/glade/p/cisl/aiml/ggantos/holodec/optuna/test/'
   sampler:
     type: "TPESampler"
   parameters:

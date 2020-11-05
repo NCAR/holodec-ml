@@ -92,7 +92,7 @@ def objective(trial, config):
                    validation_data=([valid_outputs_noisy[:,:,:-1], valid_inputs], valid_outputs),
                    epochs=config["train"]['epochs'],
                    batch_size=config["train"]['batch_size'],
-                   callbacks=[KerasPruningCallback(trial, "val_accuracy")],
+                   callbacks=[KerasPruningCallback(trial, "val_loss")],
                    verbose=config["train"]['verbose'])
     print(f"Running model took {datetime.now() - model_start} time")
 
@@ -116,6 +116,7 @@ class Objective(BaseObjective):
     def train(self, trial, conf):
 
         result = objective(trial, conf)
+
 
         results_dictionary = {
             "val_loss": result
