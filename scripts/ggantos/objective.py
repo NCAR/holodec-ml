@@ -13,8 +13,7 @@ from aimlutils.hyper_opt.utils import trial_suggest_loader
 from aimlutils.hyper_opt.base_objective import *
 
 import optuna
-from optuna.integration import KerasPruningCallback
-
+from aimlutils.hyper_opt.utils import KerasPruningCallback
 
 scalers = {"MinMaxScaler": MinMaxScaler,
            "MaxAbsScaler": MaxAbsScaler,
