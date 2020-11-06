@@ -2,7 +2,8 @@ log:
   save_path: "/glade/p/cisl/aiml/ggantos/holodec/optuna/test/log.txt"
 
 slurm:
-  jobs: 1
+  jobs: 20
+  kernel: "ncar_pylib ncar_20200417"
   batch:
     account: "NAML0001"
     gres: "gpu:v100:1"
