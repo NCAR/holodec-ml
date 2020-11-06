@@ -1,12 +1,12 @@
-path_data: "/Users/ggantos/PycharmProjects/holodec-ml/data/"
-path_save: "/Users/ggantos/PycharmProjects/aiml-utils/aimlutils/hyper_opt/"
-model_name: "attn"
+  
+path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attention_valid/base"
 num_particles: "large"
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]
 scaler_out: "MinMaxScaler"
 num_z_bins: False
-subset: 0.1
+subset: False
 mass: False
 metric: "mae"
 noisy_sd: 0.1
