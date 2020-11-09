@@ -24,6 +24,12 @@ scalers = {"MinMaxScaler": MinMaxScaler,
            "StandardScaler": StandardScaler,
            "RobustScaler": RobustScaler}
 
+def rmse(y_true, y_pred):
+    return np.sqrt(mean_squared_error(y_true, y_pred))
+
+def r2(y_true, y_pred):
+    return np.corrcoef(y_true, y_pred)[0, 1] ** 2
+
 metrics = {"mae": mean_absolute_error,
            "rmse": rmse,
            "r2": r2,
