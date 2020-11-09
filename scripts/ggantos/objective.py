@@ -101,6 +101,44 @@ def objective(trial, config):
     print("Predicting outputs..")
     valid_outputs_pred = net.predict([valid_outputs_noisy[:,:,:-1], valid_inputs],
                                      batch_size=config['train']["batch_size"])
+    raw = valid_outputs_pred.reshape(-1, valid_outputs_pred.shape[-1])
+    raw = scaler_out.inverse_transform(raw[:, :-1])
+    raw = raw.reshape(valid_outputs_pred.shape[0], valid_outputs_pred.shape[1], -1)
+    valid_outputs_pred_raw = valid_outputs_pred.copy()
+    valid_outputs_pred_raw[:, :, :-1] = raw
+    valid_outputs_pred_da = xr.DataArray(valid_outputs_pred,
+                                         coords={"hid": np.arange(valid_inputs.shape[0]),
+                                                 "particle": np.arange(valid_outputs.shape[1]),
+                                                 "output": output_cols},
+                                         dims=("hid", "particle", "output"),
+                                         name="valid_pred_scaled")
+    valid_outputs_pred_raw_da = xr.DataArray(valid_outputs_pred_raw,
+                                             coords={"hid": np.arange(valid_inputs.shape[0]),
+                                                     "particle": np.arange(valid_outputs.shape[1]),
+                                                     "output": output_cols},
+                                             dims=("hid", "particle", "output"),
+                                             name="valid_pred_raw")
+
+    # calculate errors
+    print("Calculating errors..")
+    scaled_scores = pd.DataFrame(0, index=["mae", "rmse", "r2"], columns=output_cols, dtype=np.float64)
+    for metric in scaled_scores.index:
+        for c, col in enumerate(output_cols):
+            scaled_scores.loc[metric, col] = metrics[metric](valid_outputs[:, c], valid_outputs_pred[:, c])
+            print(f"{metric} {col}: {scaled_scores.loc[metric, col]: 0.3f}")
+
+    # save outputs to files
+    print("Saving results and config file..")
+    net.save(path_save, save_format="tf")
+    net.save_weights(path_save + '_weights', save_format='tf')
+    scaled_scores.to_csv(join(path_save, "scaled_scores_val.csv"), index_label="metric")
+    valid_outputs_pred_da.to_netcdf(join(path_save, "valid_outputs_pred.nc"))
+    valid_outputs_pred_raw_da.to_netcdf(join(path_save, "valid_outputs_pred_raw.nc"))
+    for k in hist.history.keys():
+        np.savetxt(join(path_save, k + ".csv"), hist.history[k])
+    with open(join(path_save, 'config.yml'), 'w') as f:
+        yaml.dump(config, f)
+    print("Finished saving results.")
 
     # Evaluate the model accuracy on the validation set.
     score = attention_net_validation_loss(valid_outputs, valid_outputs_pred)
