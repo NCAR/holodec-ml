@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
+from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
 from datetime import datetime
 
 from holodecml.data import load_scaled_datasets, make_random_valid_outputs
@@ -17,10 +18,16 @@ from aimlutils.hyper_opt.base_objective import *
 import optuna
 from aimlutils.hyper_opt.utils import KerasPruningCallback
 
+
 scalers = {"MinMaxScaler": MinMaxScaler,
            "MaxAbsScaler": MaxAbsScaler,
            "StandardScaler": StandardScaler,
            "RobustScaler": RobustScaler}
+
+metrics = {"mae": mean_absolute_error,
+           "rmse": rmse,
+           "r2": r2,
+           "max_error": max_error}
 
 def create_model(trial, config):
 
