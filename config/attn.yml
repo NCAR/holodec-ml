@@ -1,5 +1,6 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/attention_valid/base"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attention_valid/v_loss"
+model_name: attn
 num_particles: "large"
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]

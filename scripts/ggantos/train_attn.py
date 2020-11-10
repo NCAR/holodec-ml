@@ -77,7 +77,8 @@ def main():
 
     model_start = datetime.now()
     net = ParticleAttentionNet(**config["attention_network"])
-    net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=attention_net_loss,
+    net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=attention_net_validation_loss,
+    net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=attention_net_validation_loss,
                metrics=[attention_net_validation_loss])
     hist = net.fit([train_outputs_noisy[:,:,:-1], train_inputs], train_outputs,
                    validation_data=([valid_outputs_noisy[:,:,:-1], valid_inputs], valid_outputs),
