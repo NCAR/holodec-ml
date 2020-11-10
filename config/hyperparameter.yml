@@ -20,7 +20,7 @@ optuna:
   objective: "/glade/work/ggantos/holodec-ml/scripts/ggantos/objective.py"
   direction: "minimize"
   metric: "val_loss"
-  n_trials: 2
+  n_trials: 20
   gpu: True
   save_path: "/glade/p/cisl/aiml/ggantos/holodec/optuna/test/"
   sampler:
