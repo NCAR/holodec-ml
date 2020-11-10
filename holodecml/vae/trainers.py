@@ -94,11 +94,13 @@ class BaseTrainer:
                 self.batch_size/self.train_gen.__len__(),
                 self.batch_size/self.valid_gen.__len__()
             ]
+            
+        logger.info(f"Using mse/kld weights {self.alpha}/{self.beta} during training")
         self.criterion_train = SymmetricMSE(
             self.alpha, self.beta, self.kld_weight[0]
         )
         self.criterion_test = SymmetricMSE(
-            self.alpha, self.beta, self.kld_weight[1]
+            1.0, 1.0, self.kld_weight[1]
         )
 
         self.test_image = test_image

@@ -27,7 +27,7 @@ split_dict = {
 }
 
 
-def LoadReader(reader_type: str, split: str, transform: str, scaler: str, config: Dict[str, str]):
+def LoadReader(reader_type: str, transform: str, scaler: str, config: Dict[str, str], split: str = None):
     logger.info(f"Loading reader-type {reader_type}")
     if reader_type in ["vae", "att-vae"]:
         return HologramDataset(
@@ -43,11 +43,120 @@ def LoadReader(reader_type: str, split: str, transform: str, scaler: str, config
             scaler=scaler if scaler else False,
             **config
         )
+    elif reader_type == "multi":
+        return MultiHologramDataset(
+            **config,
+            transform=transform,
+            scaler=scaler if scaler else False,
+        )
     else:
         logger.info(
             f"Unsupported reader type {reader_type}. Choose from vae, att-vae, or encoder-vae. Exiting.")
         sys.exit(1)
 
+
+class MultiHologramDataset(Dataset):
+
+    def __init__(
+            self,
+            path_data: List[str],
+            output_cols: List[str],
+            shuffle: bool = True,
+            maxnum_particles: int = 100,
+            scaler: Dict[str, str] = False,
+            transform = None,
+            labels: bool = False, 
+            null_weight: float = 0.001) -> None:
+        
+        'Initialization'
+        self.ds = {name: xr.open_dataset(name) for name in path_data}
+        
+        self.hologram_numbers = []
+        for name, _ds in sorted(self.ds.items()):
+            for hologram_number in _ds["hologram_number"].values:
+                self.hologram_numbers.append([name, hologram_number])
+        
+        self.output_cols = [x for x in output_cols if x != 'hid']        
+        self.shuffle = shuffle
+        self.maxnum_particles = maxnum_particles
+        self.transform = transform
+        self.labels = labels
+        self.null_weight = null_weight 
+        
+        self.on_epoch_end()
+        
+        self.scaler = None
+        if self.labels:
+            self.set_scaler(scaler)
+
+        logger.info(
+            f"Loaded {path_data} hologram data containing {len(self.hologram_numbers)} images"
+        )
+        
+    def set_scaler(self, scaler = None):
+        if not scaler:
+            self.scaler = {col: MinMaxScaler()
+                           for col in output_cols}  # StandardScaler()
+            for col in output_cols:
+                scale = np.hstack([arr[col].values for arr in self.ds.values()])
+                self.scaler[col].fit(scale.reshape(scale.shape[-1], -1))
+        else:
+            self.scaler = scaler
+
+    def get_transform(self):
+        return self.scaler
+
+    def __len__(self):
+        'Denotes the number of batches per epoch'
+        return len(self.hologram_numbers)
+
+    def __getitem__(self, idx):
+        'Generate one data point'
+        
+        # random.choice(self.hologram_numbers)
+        name, hologram = self.hologram_numbers[idx]
+        
+        self.processed += 1
+        if self.processed == self.__len__():
+            self.on_epoch_end()
+        
+        im = self.ds[name]["image"][hologram].values
+        im = {"image": np.expand_dims(im, 0)}  # reshape
+        
+        if self.transform:
+            im = self.transform(im)
+        
+        if not self.labels:
+            return im["image"]
+        
+        y_out = {}
+        for task in self.output_cols:
+            y_out[task] = np.zeros((self.maxnum_particles))
+        w_out = np.zeros((self.maxnum_particles))
+        particles = np.where(self.ds[name]["hid"] == hologram + 1)[0]
+        for l, p in enumerate(particles):
+            for task in self.output_cols:
+                if task == "binary":
+                    y_out[task][l] = 1
+                    continue
+                val = self.ds[name][task].values[p]
+                val = self.scaler[task].transform(val.reshape(-1, 1))[0][0]
+                y_out[task][l] = val
+            w_out[l] = 1
+        
+        num_particles = (l + 1)
+        w_out[num_particles:] = self.null_weight
+        w_out /= sum(w_out)
+
+        return im["image"], y_out, w_out
+
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        self.processed = 0
+        if self.shuffle == True:
+            random.shuffle(self.hologram_numbers)
+            
+            
 
 class HologramDataset(Dataset):
 
