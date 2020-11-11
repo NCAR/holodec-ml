@@ -37,7 +37,7 @@ def keras_mse(y_true, y_pred):
     return K.mean(K.square(y_pred - y_true))
 
 
-def attention_net_loss(y_true, y_pred):
+def noisy_true_particle_loss(y_true, y_pred):
     # y_true and y_pred will have shape (batch_size x max_num_particles x 5)
     print("ATTENTION_NET_LOSS")
     loss_real = tf.reduce_mean(tf.abs(y_true[y_true[:, :, -1] > 0] - y_pred[y_true[:, :, -1] > 0]))
@@ -48,7 +48,7 @@ def attention_net_loss(y_true, y_pred):
     loss_total = loss_real + loss_bce
     return loss_total
 
-def attention_net_validation_loss(y_true, y_pred):
+def random_particle_distance_loss(y_true, y_pred):
     print("ATTENTION_NET_VALIDATION_LOSS")
     loss_dist = tf.zeros((), dtype=tf.float32)
     loss_diam = tf.zeros((), dtype=tf.float32)
@@ -60,7 +60,7 @@ def attention_net_validation_loss(y_true, y_pred):
         dist_x = (y_true_h[:, 0:1] - tf.transpose(y_pred)[0:1, :, h]) ** 2
         dist_y = (y_true_h[:, 1:2] - tf.transpose(y_pred)[1:2, :, h]) ** 2
         dist_z = (y_true_h[:, 2:3] - tf.transpose(y_pred)[2:3, :, h]) ** 2
-        dist_squared = dist_x + dist_y + dist_z
+        dist_squared = tf.math.sqrt(dist_x + dist_y + dist_z)
         loss_dist_h = tf.math.reduce_sum(tf.math.reduce_min(dist_squared, axis=1))
         loss_dist = loss_dist + loss_dist_h
 

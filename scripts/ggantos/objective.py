@@ -173,7 +173,6 @@ class Objective(BaseObjective):
 
         result = objective(trial, conf)
 
-
         results_dictionary = {
             "val_loss": result
         }
