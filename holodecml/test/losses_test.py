@@ -1,5 +1,7 @@
+import tensorflow as tf
 import numpy as np
-from holodecml.losses import attention_net_loss, attention_net_validation_loss
+from holodecml.losses import noisy_true_particle_loss, random_particle_distance_loss
+
 
 true_bad = np.array([[[1, 1, 1, 1, 1], [30, 30, 30, 30, 1], [40, 40, 40, 40, 1], [1, 1, 1, 1, 0]],
                      [[1, 1, 1, 1, 1], [30, 30, 30, 30, 1], [40, 40, 40, 40, 1], [1, 1, 1, 1, 0]]])
@@ -22,16 +24,15 @@ pred_perfect = np.array([[[1, 1, 1, 1, 1], [30, 30, 30, 30, 1], [40, 40, 40, 40,
                          [[1, 1, 1, 1, 1], [30, 30, 30, 30, 1], [40, 40, 40, 40, 1], [1, 1, 1, 1, 0],
                           [60, 60, 60, 60, 0.9], [70, 70, 70, 70, 0.9]]])
 
-def test_attention_net_validation_loss():
+def test_random_particle_distance_loss():
 
-    assert attention_net_validation_loss(true_perfect, pred_perfect) == 0.0
-    assert attention_net_validation_loss(true_good, pred_good) < attention_net_validation_loss(true_bad, pred_bad)
+    assert random_particle_distance_loss(true_perfect, pred_perfect) == 0.0
+    assert random_particle_distance_loss(true_good, pred_good) < random_particle_distance_loss(true_bad, pred_bad)
     return
 
-def test_attention_net_loss():
-    assert attention_net_loss(true_good, pred_good).shape == ()
-    return
+# def test_attention_net_loss():
+#     assert attention_net_loss(true_good, pred_good).shape == ()
+#     return
 
 if __name__ == '__main__':
-    test_covariance_regularizer()
-    test_convariance_network()
+    test_random_particle_distance_loss()

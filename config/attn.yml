@@ -1,15 +1,15 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/attention_valid/v_loss"
-model_name: attn
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn/noteager/"
+model_name: "attn"
 num_particles: "large"
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]
 scaler_out: "MinMaxScaler"
 num_z_bins: False
-subset: False
+subset: 0.1
 mass: False
 metric: "mae"
-noisy_sd: 0.1
+noisy_sd: 0.05
 attention_network:
   attention_neurons: 100
   hidden_layers: 2
@@ -19,6 +19,6 @@ attention_network:
   output_num: 5
 train:
   learning_rate: 0.001
-  epochs: 40
+  epochs: 2
   batch_size: 64
   verbose: 1
