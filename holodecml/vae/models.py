@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+import numpy as np
 from holodecml.vae.spectral import SpectralNorm
 from holodecml.vae.attention import Self_Attention
 
@@ -14,19 +15,23 @@ from holodecml.vae.attention import Self_Attention
 logger = logging.getLogger(__name__)
 
 
-def LoadModel(model_type, config, device):
-    logger.info(f"Loading model-type {model_type}")
+def LoadModel(model_type, config):
+    logger.info(f"Loading model-type {model_type} with settings")
     if model_type == "vae":
-        model = ConvVAE(**config).to(device)
+        model = ConvVAE(**config)
     elif model_type == "att-vae":
-        model = ATTENTION_VAE(**config).to(device)
+        model = ATTENTION_VAE(**config)
     elif model_type == "encoder-vae":
-        model = LatentEncoder(**config).to(device)
+        model = LatentEncoder(**config)
     else:
         logger.info(
             f"Unsupported model type {model_type}. Choose from vae, att-vae, or encoder-vae. Exiting."
         )
         sys.exit(1)
+    
+    for key, val in config.items():
+        logger.info(f"{key}: {val}")
+    
     logger.info(
         f"The model contains {count_parameters(model)} trainable parameters"
     )
@@ -42,13 +47,20 @@ class CNN_VAE(nn.Module):
     def __init__(self,
                  image_channels=1,
                  hidden_dims=[8, 16, 32, 64, 128, 256],
-                 z_dim=10):
+                 z_dim=10,
+                 out_image_channels = 1):
 
         super(CNN_VAE, self).__init__()
 
         self.image_channels = image_channels
         self.hidden_dims = hidden_dims
         self.z_dim = z_dim
+        self.out_image_channels = out_image_channels
+        
+        self.encoder = None
+        self.decoder = None
+        
+    def build(self):
 
         self.encoder = nn.Sequential(
             # size = B x 1 x 600 x 400
@@ -71,7 +83,7 @@ class CNN_VAE(nn.Module):
                 3, 2), stride=(3, 2), padding=0),
             nn.BatchNorm2d(self.hidden_dims[3]),
             nn.LeakyReLU(),
-            # size = B x hiddem_dims[3] x 25 x 25
+            # size = B x hidden_dims[3] x 25 x 25
             nn.Conv2d(self.hidden_dims[3], self.hidden_dims[4],
                       kernel_size=5, stride=5, padding=0),
             nn.BatchNorm2d(self.hidden_dims[4]),
@@ -86,11 +98,17 @@ class CNN_VAE(nn.Module):
 
         self.fc1 = nn.Linear(self.hidden_dims[-1], self.z_dim)
         self.fc2 = nn.Linear(self.hidden_dims[-1], self.z_dim)
+        
+        if self.out_image_channels > 1:
+            self.hidden_dims = [
+                self.out_image_channels * x for x in self.hidden_dims
+            ]
+        
         self.fc3 = nn.Linear(self.z_dim, self.hidden_dims[-1])
 
         # 600/5/5/3/2/2/2
         # 400/5/5/2/2/2/2
-
+        
         self.decoder = nn.Sequential(
             # size = B x hidden_dims[5] x 1 x 1
             nn.ConvTranspose2d(
@@ -119,11 +137,11 @@ class CNN_VAE(nn.Module):
             nn.LeakyReLU(),
             # size = B x hidden_dims[0] x 300 x 200
             nn.ConvTranspose2d(
-                self.hidden_dims[0], self.image_channels, kernel_size=4, stride=2, padding=1),
-            # size = B x 1 x 600 x 400
+                self.hidden_dims[0], self.out_image_channels, kernel_size=4, stride=2, padding=1),
+            # size = B x out_image_channels x 600 x 400
         )
 
-        logger.info("Loaded a CNN-VAE model")
+        logger.info("Built a CNN-VAE model")
 
     def reparameterize(self, mu, logvar):
         std = logvar.mul(0.5).exp_()
@@ -152,6 +170,14 @@ class CNN_VAE(nn.Module):
     def forward(self, x):
         z, mu, logvar = self.encode(x)
         z = self.decode(z)
+        
+        if self.out_image_channels > 1:
+            z_real = np.sqrt(0.5) * z[:,0,:,:]
+            z_imag = z[:,1,:,:]
+            z = torch.square(z_real) + torch.square(z_imag)
+            z = torch.sqrt(z)
+            z = torch.unsqueeze(z, 1)
+        
         return z, mu, logvar
 
 
@@ -160,13 +186,20 @@ class ATTENTION_VAE(nn.Module):
     def __init__(self,
                  image_channels=1,
                  hidden_dims=[8, 16, 32, 64, 128, 256],
-                 z_dim=10):
+                 z_dim=10,
+                 out_image_channels = 1):
 
         super(ATTENTION_VAE, self).__init__()
 
         self.image_channels = image_channels
         self.hidden_dims = hidden_dims
         self.z_dim = z_dim
+        self.out_image_channels = out_image_channels
+        
+        self.encoder = None
+        self.decoder = None
+        
+    def build(self):
 
         self.encoder_block1 = self.encoder_block(
             self.image_channels, self.hidden_dims[0], 4, 2, 1)
@@ -188,6 +221,13 @@ class ATTENTION_VAE(nn.Module):
 
         self.fc1 = nn.Linear(self.hidden_dims[-1], self.z_dim)
         self.fc2 = nn.Linear(self.hidden_dims[-1], self.z_dim)
+        
+        # Add extra output channel if we are using Matt's physical constraint
+        if self.out_image_channels > 1:
+            self.hidden_dims = [
+                self.out_image_channels * x for x in self.hidden_dims
+            ]
+        
         self.fc3 = nn.Linear(self.z_dim, self.hidden_dims[-1])
 
         self.decoder_block1 = self.decoder_block(
@@ -206,7 +246,7 @@ class ATTENTION_VAE(nn.Module):
             self.hidden_dims[1], self.hidden_dims[0], 4, 2, 1)
         self.decoder_atten5 = Self_Attention(self.hidden_dims[0])
         self.decoder_block6 = self.decoder_block(
-            self.hidden_dims[0], self.image_channels, 4, 2, 1)
+            self.hidden_dims[0], self.out_image_channels, 4, 2, 1)
 
         logger.info("Loaded a self-attentive encoder-decoder VAE model")
 
@@ -277,124 +317,132 @@ class ATTENTION_VAE(nn.Module):
     def forward(self, x):
         z, mu, logvar, encoder_att = self.encode(x)
         z, decoder_att = self.decode(z)
+        
+        if self.out_image_channels > 1:
+            z_real = np.sqrt(0.5) * z[:,0,:,:]
+            z_imag = z[:,1,:,:]
+            z = torch.square(z_real) + torch.square(z_imag)
+            z = torch.sqrt(z)
+            z = torch.unsqueeze(z, 1)
+        
         return z, mu, logvar
 
 
-class ConvVAE(nn.Module):
+# class ConvVAE(nn.Module):
 
-    def __init__(self,
-                 image_channels=1,
-                 init_kernel=10,
-                 kernel_size=2,
-                 stride=1,
-                 padding=0):
+#     def __init__(self,
+#                  image_channels=1,
+#                  init_kernel=10,
+#                  kernel_size=2,
+#                  stride=1,
+#                  padding=0):
 
-        super(ConvVAE, self).__init__()
+#         super(ConvVAE, self).__init__()
 
-        # encoder
-        self.enc1 = nn.Conv2d(
-            in_channels=image_channels, out_channels=init_kernel, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.ebn1 = nn.BatchNorm2d(init_kernel)
-        self.enc2 = nn.Conv2d(
-            in_channels=init_kernel, out_channels=init_kernel*2, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.ebn2 = nn.BatchNorm2d(init_kernel*2)
-        self.enc3 = nn.Conv2d(
-            in_channels=init_kernel*2, out_channels=init_kernel*4, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.ebn3 = nn.BatchNorm2d(init_kernel*4)
-        self.enc4 = nn.Conv2d(
-            in_channels=init_kernel*4, out_channels=init_kernel*8, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.ebn4 = nn.BatchNorm2d(init_kernel*8)
-        self.enc5 = nn.Conv2d(
-            in_channels=init_kernel*8, out_channels=init_kernel, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
+#         # encoder
+#         self.enc1 = nn.Conv2d(
+#             in_channels=image_channels, out_channels=init_kernel, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.ebn1 = nn.BatchNorm2d(init_kernel)
+#         self.enc2 = nn.Conv2d(
+#             in_channels=init_kernel, out_channels=init_kernel*2, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.ebn2 = nn.BatchNorm2d(init_kernel*2)
+#         self.enc3 = nn.Conv2d(
+#             in_channels=init_kernel*2, out_channels=init_kernel*4, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.ebn3 = nn.BatchNorm2d(init_kernel*4)
+#         self.enc4 = nn.Conv2d(
+#             in_channels=init_kernel*4, out_channels=init_kernel*8, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.ebn4 = nn.BatchNorm2d(init_kernel*8)
+#         self.enc5 = nn.Conv2d(
+#             in_channels=init_kernel*8, out_channels=init_kernel, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
 
-        # decoder
-        self.dec1 = nn.ConvTranspose2d(
-            in_channels=init_kernel, out_channels=init_kernel*8, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.dbn1 = nn.BatchNorm2d(init_kernel*8)
-        self.dec2 = nn.ConvTranspose2d(
-            in_channels=init_kernel*8, out_channels=init_kernel*4, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.dbn2 = nn.BatchNorm2d(init_kernel*4)
-        self.dec3 = nn.ConvTranspose2d(
-            in_channels=init_kernel*4, out_channels=init_kernel*2, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.dbn3 = nn.BatchNorm2d(init_kernel*2)
-        self.dec4 = nn.ConvTranspose2d(
-            in_channels=init_kernel*2, out_channels=init_kernel, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
-        self.dbn4 = nn.BatchNorm2d(init_kernel)
-        self.dec5 = nn.ConvTranspose2d(
-            in_channels=init_kernel, out_channels=image_channels, kernel_size=kernel_size,
-            stride=stride, padding=padding
-        )
+#         # decoder
+#         self.dec1 = nn.ConvTranspose2d(
+#             in_channels=init_kernel, out_channels=init_kernel*8, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.dbn1 = nn.BatchNorm2d(init_kernel*8)
+#         self.dec2 = nn.ConvTranspose2d(
+#             in_channels=init_kernel*8, out_channels=init_kernel*4, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.dbn2 = nn.BatchNorm2d(init_kernel*4)
+#         self.dec3 = nn.ConvTranspose2d(
+#             in_channels=init_kernel*4, out_channels=init_kernel*2, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.dbn3 = nn.BatchNorm2d(init_kernel*2)
+#         self.dec4 = nn.ConvTranspose2d(
+#             in_channels=init_kernel*2, out_channels=init_kernel, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
+#         self.dbn4 = nn.BatchNorm2d(init_kernel)
+#         self.dec5 = nn.ConvTranspose2d(
+#             in_channels=init_kernel, out_channels=image_channels, kernel_size=kernel_size,
+#             stride=stride, padding=padding
+#         )
 
-    def reparameterize(self, mu, log_var):
-        """
-        :param mu: mean from the encoder's latent space
-        :param log_var: log variance from the encoder's latent space
-        """
-        std = torch.exp(0.5*log_var)  # standard deviation
-        eps = torch.randn_like(std)  # `randn_like` as we need the same size
-        sample = mu + (eps * std)  # sampling
-        return sample
+#     def reparameterize(self, mu, log_var):
+#         """
+#         :param mu: mean from the encoder's latent space
+#         :param log_var: log variance from the encoder's latent space
+#         """
+#         std = torch.exp(0.5*log_var)  # standard deviation
+#         eps = torch.randn_like(std)  # `randn_like` as we need the same size
+#         sample = mu + (eps * std)  # sampling
+#         return sample
 
-    def forward(self, x):
-        # encoding
+#     def forward(self, x):
+#         # encoding
 
-        x = self.enc1(x)
-        x = self.ebn1(x)
-        x = nn.LeakyReLU()(x)
-        x = self.enc2(x)
-        x = self.ebn2(x)
-        x = nn.LeakyReLU()(x)
-        x = self.enc3(x)
-        x = self.ebn3(x)
-        x = nn.LeakyReLU()(x)
-        x = self.enc4(x)
-        x = self.ebn4(x)
-        x = nn.LeakyReLU()(x)
-        x = self.enc5(x)
+#         x = self.enc1(x)
+#         x = self.ebn1(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.enc2(x)
+#         x = self.ebn2(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.enc3(x)
+#         x = self.ebn3(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.enc4(x)
+#         x = self.ebn4(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.enc5(x)
 
-        # get `mu` and `log_var`
-        mu = x
-        log_var = x
+#         # get `mu` and `log_var`
+#         mu = x
+#         log_var = x
 
-        # get the latent vector through reparameterization
-        z = self.reparameterize(mu, log_var)
+#         # get the latent vector through reparameterization
+#         z = self.reparameterize(mu, log_var)
 
-        # decoding
-        x = self.dec1(z)
-        x = self.dbn1(x)
-        x = nn.LeakyReLU()(x)
-        x = self.dec2(x)
-        x = self.dbn2(x)
-        x = nn.LeakyReLU()(x)
-        x = self.dec3(x)
-        x = self.dbn3(x)
-        x = nn.LeakyReLU()(x)
-        x = self.dec4(x)
-        x = self.dbn4(x)
-        x = nn.LeakyReLU()(x)
-        x = self.dec5(x)
+#         # decoding
+#         x = self.dec1(z)
+#         x = self.dbn1(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.dec2(x)
+#         x = self.dbn2(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.dec3(x)
+#         x = self.dbn3(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.dec4(x)
+#         x = self.dbn4(x)
+#         x = nn.LeakyReLU()(x)
+#         x = self.dec5(x)
 
-        reconstruction = torch.sigmoid(x)
+#         reconstruction = torch.sigmoid(x)
 
-        return reconstruction, mu, log_var
+#         return reconstruction, mu, log_var
 
 
 class LatentEncoder(ATTENTION_VAE):
@@ -413,7 +461,16 @@ class LatentEncoder(ATTENTION_VAE):
             image_channels=image_channels,
             hidden_dims=hidden_dims,
             z_dim=z_dim)
-
+        build = super().build() # Call inherited base build, then override
+        
+        # Build the base VAE model from the inherited build method
+        self.build()
+        
+        self.dense_hidden_dims = dense_hidden_dims
+        self.dense_dropouts = dense_dropouts
+        self.num_outputs = num_outputs
+        self.tasks = tasks
+        
         if os.path.isfile(pretrained_model):
             # Load params from file
             model_dict = torch.load(
@@ -432,12 +489,10 @@ class LatentEncoder(ATTENTION_VAE):
                 f"Loaded a fresh VAE  with trainable parameters"
             )
 
+    def build(self):
         # Build the dense network for predicting particle attributes
-        self.num_outputs = num_outputs
-
-        self.tasks = tasks
         self.task_blocks = nn.ModuleDict({
-            task: self.build_block(dense_hidden_dims, dense_dropouts)
+            task: self.build_block(self.dense_hidden_dims, self.dense_dropouts)
             for task in self.tasks
         })
 

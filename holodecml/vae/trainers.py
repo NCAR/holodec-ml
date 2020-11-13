@@ -5,10 +5,13 @@ import tqdm
 import torch
 import pickle
 import logging
+import numpy as np
 
 from torchvision.utils import save_image
 from holodecml.vae.losses import *
-import numpy as np
+from holodecml.vae.models import *
+from holodecml.vae.optimizers import *
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,23 +29,23 @@ def LoadTrainer(trainer_type,
     logger.info(f"Loading trainer-type {trainer_type}")
     if trainer_type in ["vae", "att-vae"]:
         return BaseTrainer(
-            model=model,
-            optimizer=optimizer,
             train_gen=train_gen,
             valid_gen=valid_gen,
             dataloader=dataloader,
             valid_dataloader=valid_dataloader,
+            model_conf = conf["model"], 
+            optimizer_conf = conf["optimizer"],
             device=device,
             **config
         )
     elif trainer_type == "encoder-vae":
         return BaseEncoderTrainer(
-            model=model,
-            optimizer=optimizer,
             train_gen=train_gen,
             valid_gen=valid_gen,
             dataloader=dataloader,
             valid_dataloader=valid_dataloader,
+            model_conf = conf["model"], 
+            optimizer_conf = conf["optimizer"],
             device=device,
             **config
         )
@@ -55,14 +58,15 @@ def LoadTrainer(trainer_type,
 class BaseTrainer:
 
     def __init__(self,
-                 model,
-                 optimizer,
                  train_gen,
                  valid_gen,
                  dataloader,
                  valid_dataloader,
+                 model_conf,
+                 optimizer_conf,
                  start_epoch=0,
                  epochs=100,
+                 batches_per_epoch = 1e10,
                  device="cpu",
                  clip=1.0,
                  alpha=1.0,
@@ -71,17 +75,30 @@ class BaseTrainer:
                  path_save="./",
                  test_image=None,
                  save_test_image_every=1):
-
-        self.model = model
-        self.optimizer = optimizer
+        
+        # Initialize and build a model
+        model_type = model_conf.pop("type")
+        self.model = LoadModel(model_type, model_conf)
+        self.model.build()
+        self.model = self.model.to(device)
+        
+        # Initialize the optimizer
+        optimizer_type = optimizer_conf.pop("type")
+        self.optimizer = LoadOptimizer(
+            optimizer_type, 
+            self.model.parameters(), 
+            optimizer_conf["lr"], 
+            optimizer_conf["weight_decay"]
+        )
+        
         self.train_gen = train_gen
         self.valid_gen = valid_gen
         self.dataloader = dataloader
         self.valid_dataloader = valid_dataloader
         self.batch_size = dataloader.batch_size
+        self.batches_per_epoch = batches_per_epoch 
         self.path_save = path_save
         self.device = device
-
         self.start_epoch = start_epoch
         self.epochs = epochs
 
@@ -123,6 +140,10 @@ class BaseTrainer:
         self.model.train()
         batches_per_epoch = int(
             np.ceil(self.train_gen.__len__() / self.batch_size))
+        
+        if batches_per_epoch > self.batches_per_epoch:
+            batches_per_epoch = self.batches_per_epoch
+        
         batch_group_generator = tqdm.tqdm(
             enumerate(self.dataloader),
             total=batches_per_epoch,
@@ -157,6 +178,9 @@ class BaseTrainer:
                 loss, bce, kld)
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
+            
+            if idx % batches_per_epoch == 0 and idx > 0:
+                break
 
         return loss, bce, kld
 
