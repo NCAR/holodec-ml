@@ -1,5 +1,5 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn/noteager/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn/predicted/"
 model_name: "attn"
 num_particles: "large"
 random_seed: 328942
@@ -9,7 +9,7 @@ num_z_bins: False
 subset: 0.1
 mass: False
 metric: "mae"
-noisy_sd: 0.05
+noisy_sd: 0.1
 attention_network:
   attention_neurons: 100
   hidden_layers: 2

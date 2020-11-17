@@ -13,7 +13,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from holodecml.data import load_scaled_datasets, make_random_valid_outputs
 from holodecml.models import ParticleAttentionNet
-from holodecml.losses import noisy_true_particle_loss, random_particle_distance_loss
+from holodecml.losses import noisy_true_particle_loss, random_particle_distance_loss, predicted_particle_distance_loss
 from tensorflow.python.framework.ops import disable_eager_execution
 disable_eager_execution()
 tf.config.experimental_run_functions_eagerly(False)
@@ -70,19 +70,24 @@ def main():
                                          config["subset"],
                                          config["num_z_bins"],
                                          config["mass"])
-
+    
+    print("train_outputs", train_outputs[0])
+    print("valid_outputs", valid_outputs[0])
     # add noise to the outputs
     train_outputs_noisy = train_outputs * (1 + np.random.normal(0, config['noisy_sd'], train_outputs.shape))
+    print("train_outputs_noisy", train_outputs_noisy[0])
     valid_outputs_noisy = make_random_valid_outputs(path_data, num_particles,
                                                     valid_inputs.shape[0],
                                                     train_outputs.shape[1])
+    print("valid_outputs_noisy.shape", valid_outputs_noisy[0].shape)
     valid_outputs_noisy = valid_outputs_noisy * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs_noisy.shape))
+    print("valid_outputs_noisy", valid_outputs_noisy[0])
 #     valid_outputs_noisy = valid_outputs * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs.shape))
 
     model_start = datetime.now()
     net = ParticleAttentionNet(**config["attention_network"])
-    net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=random_particle_distance_loss,
-               metrics=[noisy_true_particle_loss, random_particle_distance_loss])
+    net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=predicted_particle_distance_loss,
+               metrics=[noisy_true_particle_loss, predicted_particle_distance_loss])
     hist = net.fit([train_outputs_noisy[:,:,:-1], train_inputs], train_outputs,
                    validation_data=([valid_outputs_noisy[:,:,:-1], valid_inputs], valid_outputs),
                    epochs=config["train"]['epochs'],

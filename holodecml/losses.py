@@ -39,17 +39,13 @@ def keras_mse(y_true, y_pred):
 
 def noisy_true_particle_loss(y_true, y_pred):
     # y_true and y_pred will have shape (batch_size x max_num_particles x 5)
-    print("ATTENTION_NET_LOSS")
     loss_real = tf.reduce_mean(tf.abs(y_true[y_true[:, :, -1] > 0] - y_pred[y_true[:, :, -1] > 0]))
-    print(f"loss_real: {tf.shape(loss_real)}")
     loss_bce = tf.keras.losses.binary_crossentropy(tf.reshape(y_true[:, :, -1],[-1]),
                                                    tf.reshape(y_pred[:, :, -1],[-1]))
-    print(f"loss_bce: {tf.shape(loss_bce)}")
     loss_total = loss_real + loss_bce
     return loss_total
 
 def random_particle_distance_loss(y_true, y_pred):
-    print("ATTENTION_NET_VALIDATION_LOSS")
     loss_dist = tf.zeros((), dtype=tf.float32)
     loss_diam = tf.zeros((), dtype=tf.float32)
     loss_prob = tf.zeros((), dtype=tf.float32)
@@ -84,6 +80,52 @@ def random_particle_distance_loss(y_true, y_pred):
     loss_diam = loss_diam/tf.cast(tf.shape(y_true)[0], dtype=tf.float32)
     loss_prob = loss_prob/tf.cast(tf.shape(y_true)[0], dtype=tf.float32)
     loss_bce = loss_bce/tf.cast(tf.shape(y_true)[0], dtype=tf.float32)
+
+    valid_error = loss_dist + loss_diam + loss_bce
+
+    return valid_error
+
+def predicted_particle_distance_loss(y_true, y_pred):
+    loss_dist = tf.zeros((), dtype=tf.float32)
+    loss_diam = tf.zeros((), dtype=tf.float32)
+    loss_prob = tf.zeros((), dtype=tf.float32)
+    loss_bce = tf.zeros((), dtype=tf.float32)
+
+    for h in range(tf.shape(y_pred)[0]):
+        print(f"Mean: {tf.math.reduce_mean(y_pred[h:h + 1, :, -1])}")
+        print(f"Mean: {tf.math.reduce_mean(y_true[h:h + 1, :, -1])}")
+        print(f"Min: {tf.math.reduce_min(y_pred[h:h + 1, :, -1])}")
+        print(f"Min: {tf.math.reduce_min(y_true[h:h + 1, :, -1])}")
+        print(f"Max: {tf.math.reduce_max(y_pred[h:h + 1, :, -1])}")
+        print(f"Max: {tf.math.reduce_max(y_true[h:h + 1, :, -1])}")
+        y_pred_h = y_pred[h:h + 1][y_pred[h:h + 1, :, -1] > 0.5]
+        dist_x = (y_pred_h[:, 0:1] - tf.transpose(y_true)[0:1, :, h]) ** 2
+        dist_y = (y_pred_h[:, 1:2] - tf.transpose(y_true)[1:2, :, h]) ** 2
+        dist_z = (y_pred_h[:, 2:3] - tf.transpose(y_true)[2:3, :, h]) ** 2
+        dist_squared = tf.math.sqrt(dist_x + dist_y + dist_z)
+        loss_dist_h = tf.math.reduce_sum(tf.math.reduce_min(dist_squared, axis=1))
+        loss_dist = loss_dist + loss_dist_h
+
+        max_idx = tf.cast(tf.math.argmin(dist_squared, axis=1), dtype=tf.int32)
+        max_idx_2d = tf.stack((tf.range(tf.shape(dist_squared)[0]), max_idx), axis=-1)
+
+        dist_d = (y_pred_h[:, 3:4] - tf.transpose(y_true)[3:4, :, h]) ** 2
+        loss_diam_h = tf.math.reduce_sum(tf.gather_nd(dist_d, max_idx_2d))
+        loss_diam = loss_diam + loss_diam_h
+
+        dist_p = (y_pred_h[:, 4:5] - tf.transpose(y_true)[4:5, :, h]) ** 2
+        loss_prob_h = tf.math.reduce_sum(tf.gather_nd(dist_p, max_idx_2d))
+        loss_prob = loss_prob + loss_prob_h
+
+        y_true_h_bce = y_true[h, :, -1]
+        loss_bce_h = tf.keras.losses.binary_crossentropy(y_pred_h[:, -1],
+                                                         tf.gather(y_true_h_bce,max_idx))
+        loss_bce = loss_bce + loss_bce_h
+
+    loss_dist = loss_dist/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
+    loss_diam = loss_diam/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
+    loss_prob = loss_prob/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
+    loss_bce = loss_bce/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
 
     # print(f"loss_dist: {loss_dist}\ttf.shape(loss_dist): {tf.shape(loss_dist)}")
     # print(f"loss_diam: {loss_diam}\ttf.shape(loss_diam): {tf.shape(loss_diam)}")
