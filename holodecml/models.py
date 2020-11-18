@@ -115,7 +115,7 @@ class Conv2DNeuralNetwork(object):
             self.optimizer_obj = SGD(lr=self.lr, momentum=self.sgd_momentum,
                                      decay=self.decay)
         self.model.compile(
-            optimizer=self.optimizer,
+            optimizer=self.optimizer_obj,
             loss=self.loss,
             metrics=self.metrics
         )
@@ -148,7 +148,7 @@ class Conv2DNeuralNetwork(object):
         try:
             self.model.load_weights(weights)
             self.model.compile(
-                optimizer=self.optimizer,
+                optimizer=self.optimizer_obj,
                 loss=self.loss,
                 metrics=self.metrics
             )
