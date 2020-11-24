@@ -1,12 +1,12 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn/predicted/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn/predicted_scaled/"
 model_name: "attn"
 num_particles: "large"
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]
 scaler_out: "MinMaxScaler"
 num_z_bins: False
-subset: 0.1
+subset: False
 mass: False
 metric: "mae"
 noisy_sd: 0.1
@@ -19,6 +19,6 @@ attention_network:
   output_num: 5
 train:
   learning_rate: 0.001
-  epochs: 2
+  epochs: 40
   batch_size: 64
   verbose: 1
