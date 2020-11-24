@@ -92,13 +92,7 @@ def predicted_particle_distance_loss(y_true, y_pred):
     loss_bce = tf.zeros((), dtype=tf.float32)
 
     for h in range(tf.shape(y_pred)[0]):
-        print(f"Mean: {tf.math.reduce_mean(y_pred[h:h + 1, :, -1])}")
-        print(f"Mean: {tf.math.reduce_mean(y_true[h:h + 1, :, -1])}")
-        print(f"Min: {tf.math.reduce_min(y_pred[h:h + 1, :, -1])}")
-        print(f"Min: {tf.math.reduce_min(y_true[h:h + 1, :, -1])}")
-        print(f"Max: {tf.math.reduce_max(y_pred[h:h + 1, :, -1])}")
-        print(f"Max: {tf.math.reduce_max(y_true[h:h + 1, :, -1])}")
-        y_pred_h = y_pred[h:h + 1][y_pred[h:h + 1, :, -1] > 0.5]
+        y_pred_h = y_pred[h]
         dist_x = (y_pred_h[:, 0:1] - tf.transpose(y_true)[0:1, :, h]) ** 2
         dist_y = (y_pred_h[:, 1:2] - tf.transpose(y_true)[1:2, :, h]) ** 2
         dist_z = (y_pred_h[:, 2:3] - tf.transpose(y_true)[2:3, :, h]) ** 2
@@ -113,10 +107,6 @@ def predicted_particle_distance_loss(y_true, y_pred):
         loss_diam_h = tf.math.reduce_sum(tf.gather_nd(dist_d, max_idx_2d))
         loss_diam = loss_diam + loss_diam_h
 
-        dist_p = (y_pred_h[:, 4:5] - tf.transpose(y_true)[4:5, :, h]) ** 2
-        loss_prob_h = tf.math.reduce_sum(tf.gather_nd(dist_p, max_idx_2d))
-        loss_prob = loss_prob + loss_prob_h
-
         y_true_h_bce = y_true[h, :, -1]
         loss_bce_h = tf.keras.losses.binary_crossentropy(y_pred_h[:, -1],
                                                          tf.gather(y_true_h_bce,max_idx))
@@ -124,13 +114,8 @@ def predicted_particle_distance_loss(y_true, y_pred):
 
     loss_dist = loss_dist/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
     loss_diam = loss_diam/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
-    loss_prob = loss_prob/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
     loss_bce = loss_bce/tf.cast(tf.shape(y_pred)[0], dtype=tf.float32)
 
-    # print(f"loss_dist: {loss_dist}\ttf.shape(loss_dist): {tf.shape(loss_dist)}")
-    # print(f"loss_diam: {loss_diam}\ttf.shape(loss_diam): {tf.shape(loss_diam)}")
-    # print(f"loss_dist: {loss_prob}\ttf.shape(loss_prob): {tf.shape(loss_prob)}")
-    # print(f"loss_dist: {loss_bce}\ttf.shape(loss_bce): {tf.shape(loss_bce)}")
     valid_error = loss_dist + loss_diam + loss_bce
 
     return valid_error

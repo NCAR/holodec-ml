@@ -176,7 +176,7 @@ class Objective(BaseObjective):
         results_dictionary = {
             "val_loss": result
         }
-        return results_dictionary
+        return save(trial, results_dictionary)
 
 if __name__ == "__main__":
 

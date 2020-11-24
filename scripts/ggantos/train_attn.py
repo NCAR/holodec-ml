@@ -14,9 +14,9 @@ from tensorflow.keras.optimizers import Adam
 from holodecml.data import load_scaled_datasets, make_random_valid_outputs
 from holodecml.models import ParticleAttentionNet
 from holodecml.losses import noisy_true_particle_loss, random_particle_distance_loss, predicted_particle_distance_loss
-from tensorflow.python.framework.ops import disable_eager_execution
-disable_eager_execution()
-tf.config.experimental_run_functions_eagerly(False)
+# from tensorflow.python.framework.ops import disable_eager_execution
+# disable_eager_execution()
+# tf.config.experimental_run_functions_eagerly(False)
 
 
 scalers = {"MinMaxScaler": MinMaxScaler,
@@ -75,13 +75,13 @@ def main():
     print("valid_outputs", valid_outputs[0])
     # add noise to the outputs
     train_outputs_noisy = train_outputs * (1 + np.random.normal(0, config['noisy_sd'], train_outputs.shape))
-    print("train_outputs_noisy", train_outputs_noisy[0])
+#     print("train_outputs_noisy", train_outputs_noisy[0])
     valid_outputs_noisy = make_random_valid_outputs(path_data, num_particles,
                                                     valid_inputs.shape[0],
                                                     train_outputs.shape[1])
-    print("valid_outputs_noisy.shape", valid_outputs_noisy[0].shape)
+#     print("valid_outputs_noisy.shape", valid_outputs_noisy[0].shape)
     valid_outputs_noisy = valid_outputs_noisy * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs_noisy.shape))
-    print("valid_outputs_noisy", valid_outputs_noisy[0])
+#     print("valid_outputs_noisy", valid_outputs_noisy[0])
 #     valid_outputs_noisy = valid_outputs * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs.shape))
 
     model_start = datetime.now()
