@@ -210,16 +210,15 @@ def make_template(df, num_images, max_particles):
     template = template.reshape((num_images, max_particles, -1))
     return template
 
-def make_random_valid_outputs(path_data, num_particles, num_images,
-                              max_particles):
-    df = open_dataset(path_data, num_particles, 'valid')
+def make_random_outputs(ds):
+    num_images = ds.shape[0]
+    max_particles = ds.shape[1]
     size = (num_images * max_particles, 1)
-    x = np.random.uniform(low=0, high=1, size=size)
-    y = np.random.uniform(low=0, high=1, size=size)
-    z = np.random.uniform(low=0, high=1, size=size)
-    d = np.random.uniform(low=0, high=1, size=size)
-    prob = np.zeros(d.shape)
-    template = np.hstack((x, y, z, d, prob))
+    x = np.random.uniform(low=np.min(ds[:,:,0:1]), high=np.max(ds[:,:,0:1]), size=size)
+    y = np.random.uniform(low=np.min(ds[:,:,1:2]), high=np.max(ds[:,:,1:2]), size=size)
+    z = np.random.uniform(low=np.min(ds[:,:,2:3]), high=np.max(ds[:,:,2:3]), size=size)
+    d = np.random.uniform(low=np.min(ds[:,:,3:4]), high=np.max(ds[:,:,3:4]), size=size)
+    template = np.hstack((x, y, z, d))
     template = template.reshape((num_images, max_particles, -1))
     return template
 

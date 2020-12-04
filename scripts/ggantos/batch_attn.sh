@@ -3,7 +3,7 @@
 #SBATCH --account=NAML0001
 #SBATCH --ntasks=8
 #SBATCH --cpus-per-task=1
-#SBATCH --time=3:00:00
+#SBATCH --time=2:00:00
 #SBATCH --partition=dav
 #SBATCH --mem=256G
 #SBATCH -n 1

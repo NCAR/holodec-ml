@@ -1,5 +1,5 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn/predicted_scaled/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn_new/argmin/"
 model_name: "attn"
 num_particles: "large"
 random_seed: 328942
@@ -20,5 +20,5 @@ attention_network:
 train:
   learning_rate: 0.001
   epochs: 40
-  batch_size: 64
+  batch_size: 16
   verbose: 1
