@@ -23,7 +23,8 @@ custom_losses = {
     "rmse": rmse,
     "weighted_mse": wmse,
     "r2": R2,
-    "attn": attention_net_loss
+    "noisy": noisy_true_particle_loss,
+    "random": random_particle_distance_loss
 }
 
 custom_metrics = {
@@ -231,7 +232,7 @@ class ParticleDecoder(Layer):
         self.output_num = output_num
         for i in range(self.hidden_layers):
             setattr(self, f"dense_{i:02d}", Dense(self.hidden_neurons, activation=activation))
-        self.output_dense = Dense(self.output_num)
+        self.output_dense = Dense(self.output_num, activation=None)
 
     def call(self, inputs, **kwargs):
         out = inputs
@@ -366,7 +367,7 @@ def run_particleattentionnet():
     particle_pos, holo = generate_gaussian_particles(num_images=num_images, num_particles=num_particles,
                                 image_size_pixels=image_size_pixels, gaussian_sd=filter_size)
     particle_pos_noisy = particle_pos * (1 + np.random.normal(0, noise_sd, particle_pos.shape))
-    net.compile(optimizer="adam", loss=custom_losses["attn"])
+    net.compile(optimizer="adam", loss=custom_losses["noisy"], metrics="noisy")
     net.fit([particle_pos_noisy, holo], particle_pos, epochs=15, batch_size=32, verbose=1)
     pred_particle_pos = net.predict([particle_pos_noisy, holo], batch_size=128)
     import matplotlib.pyplot as plt

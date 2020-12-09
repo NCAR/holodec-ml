@@ -1,0 +1,58 @@
+log:
+  save_path: "/glade/p/cisl/aiml/ggantos/holodec/optuna/test/log.txt"
+
+slurm:
+  jobs: 20
+  kernel: "ncar_pylib ncar_20200417"
+  batch:
+    account: "NAML0001"
+    gres: "gpu:v100:1"
+    mem: "256G"
+    n: 8
+    t: "12:00:00"
+    J: "hyper_opt"
+    o: "hyper_opt.out"
+    e: "hyper_opt.err"
+
+optuna:
+  name: "holodec_optimization.db"
+  reload: 0
+  objective: "/glade/work/ggantos/holodec-ml/scripts/ggantos/objective.py"
+  direction: "minimize"
+  metric: "val_loss"
+  n_trials: 20
+  gpu: True
+  save_path: "/glade/p/cisl/aiml/ggantos/holodec/optuna/test/"
+  sampler:
+    type: "TPESampler"
+  parameters:
+    attention_neurons:
+      type: "int"
+      settings:
+          name: "attention_neurons"
+          low: 50
+          high: 150
+    hidden_layers:
+      type: "int"
+      settings:
+        name: "hidden_layers"
+        low: 1
+        high: 4
+    hidden_neurons:
+      type: "int"
+      settings:
+        name: "hidden_neurons"
+        low: 50
+        high: 150
+    min_filters:
+      type: "int"
+      settings:
+        name: "min_filters"
+        low: 8
+        high: 24
+    learning_rate:
+      type: "float"
+      settings:
+        name: "learning_rate"
+        low: 0.00001
+        high: 0.01

@@ -1,12 +1,12 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/holodec/testing/attention/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn_new/argmin/"
 model_name: "attn"
 num_particles: "large"
 random_seed: 328942
 output_cols: ["x", "y", "z", "d", "hid"]
 scaler_out: "MinMaxScaler"
 num_z_bins: False
-subset: 0.1
+subset: False
 mass: False
 metric: "mae"
 noisy_sd: 0.1
@@ -16,9 +16,9 @@ attention_network:
   hidden_neurons: 100
   activation: "relu"
   min_filters: 16
-  output_num: 5 
+  output_num: 5
 train:
   learning_rate: 0.001
-  epochs: 20
-  batch_size: 64
+  epochs: 40
+  batch_size: 16
   verbose: 1
