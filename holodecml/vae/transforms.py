@@ -48,9 +48,13 @@ class RandVerticalFlip(object):
 
     def __call__(self, sample):
         image = sample['image']
+        flipped = False
         if random.random() < self.p:
-            image = np.flip(image, axis=1)
-        return {'image': image}
+            image = np.flip(image, axis=2)
+            flipped = True
+        sample["image"] = image
+        sample["vertical_flip"] = flipped
+        return sample
 
 
 class RandHorizontalFlip(object):
@@ -62,9 +66,13 @@ class RandHorizontalFlip(object):
 
     def __call__(self, sample):
         image = sample['image']
+        flipped = False
         if random.random() < self.p:
-            image = np.flip(image, axis=2)
-        return {'image': image}
+            image = np.flip(image, axis=1)
+            flipped = True
+        sample["image"] = image
+        sample["horizontal_flip"] = flipped
+        return sample
 
 
 class Rescale(object):
@@ -95,7 +103,8 @@ class Rescale(object):
         image = rescale(image, frac, anti_aliasing=False)
         image = image.reshape(1, image.shape[-2], image.shape[-1])
 
-        return {'image': image}
+        sample["image"] = image
+        return sample
 
 
 class RandomCrop(object):
@@ -126,8 +135,10 @@ class RandomCrop(object):
 
         image = image[top: top + new_h,
                       left: left + new_w]
+        
+        sample["image"] = image
 
-        return {'image': image}
+        return sample
 
 
 class Standardize(object):
@@ -140,7 +151,8 @@ class Standardize(object):
     def __call__(self, sample):
         image = sample['image']
         image = (image-image.mean()) / (image.std())
-        return {'image': image}
+        sample["image"] = image
+        return sample
 
 
 class Normalize(object):
@@ -166,7 +178,9 @@ class Normalize(object):
         if self.mode == "sym":
             image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
 
-        return {'image': image}
+        sample["image"] = image
+        
+        return sample
 
 
 class ToTensor(object):
@@ -181,4 +195,5 @@ class ToTensor(object):
         image = sample['image'].astype(np.float32)
         if len(image.shape) == 2:
             image = image.reshape(1, image.shape[0], image.shape[1])
-        return {'image': torch.from_numpy(image)}
+        sample["image"] = torch.from_numpy(image)
+        return sample
