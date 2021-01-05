@@ -9,31 +9,35 @@ from typing import Dict
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
-def LoadOptimizer(optimizer_type: str, parameters: Dict[str, float], learning_rate: float = 0.001, weight_decay=0.0):
+def LoadOptimizer(config: Dict[str, str], parameters: Dict[str, float]):
+    
+    if "type" not in config:
+        logger.warning("In order to load a model you must supply the type field.")
+        raise OSError("Failed to load a data reader. Exiting")
+        
+    optimizer_type = config.pop("type")
 
     if optimizer_type == "lookahead-diffgrad":
-        optimizer = LookaheadDiffGrad(
-            parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = LookaheadDiffGrad(parameters, **config)
     elif optimizer_type == "diffgrad":
-        optimizer = DiffGrad(parameters, lr=learning_rate,
-                             weight_decay=weight_decay)
+        optimizer = DiffGrad(parameters, **config)
     elif optimizer_type == "lookahead-radam":
-        optimizer = LookaheadRAdam(
-            parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = LookaheadRAdam(parameters, **config)
     elif optimizer_type == "radam":
-        optimizer = RAdam(parameters, lr=learning_rate,
-                          weight_decay=weight_decay)
+        optimizer = RAdam(parameters, **config)
     elif optimizer_type == "adam":
-        optimizer = torch.optim.Adam(
-            parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = torch.optim.Adam(parameters, **config)
     elif optimizer_type == "sgd":
-        optimizer = torch.optim.SGD(
-            parameters, lr=learning_rate, weight_decay=weight_decay)
+        optimizer = torch.optim.SGD(parameters, **config)
     else:
         logging.warning(
             f"Optimzer type {optimizer_type} is unknown. Exiting with error."
         )
         sys.exit(1)
+        
+        
+    learning_rate = config["lr"] if "lr" in config else 0.001
+    weight_decay = config["weight_decay"] if "weight_decay" in config else 0.0
 
     logger.info(
         f"Loaded the {optimizer_type} optimizer with learning rate {learning_rate} and L2 penalty {weight_decay}"

@@ -97,18 +97,14 @@ class BaseTrainer:
                  save_test_image_every=1):
         
         # Initialize and build a model
-        model_type = model_conf.pop("type")
-        self.model = LoadModel(model_type, model_conf)
+        self.model = LoadModel(model_conf)
         self.model.build()
         self.model = self.model.to(device)
         
         # Initialize the optimizer
-        optimizer_type = optimizer_conf.pop("type")
         self.optimizer = LoadOptimizer(
-            optimizer_type, 
-            self.model.parameters(), 
-            optimizer_conf["lr"], 
-            optimizer_conf["weight_decay"]
+            optimizer_conf, 
+            self.model.parameters()
         )
         
         self.train_gen = train_gen

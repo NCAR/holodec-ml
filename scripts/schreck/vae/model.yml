@@ -1,4 +1,4 @@
-log: '/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221'
+log: '/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/test'
 
 train_data:
   type: "multi"
@@ -56,12 +56,12 @@ optimizer:
 
 callbacks:
   MetricsLogger:
-    path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221"
+    path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/test"
     reload: False
   EarlyStopping:
     patience: 3
     verbose: True
-    path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221/checkpoint.pt"
+    path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/test/checkpoint.pt"
 #   ExponentialLR:
 #     gamma: 0.99
     
@@ -73,11 +73,12 @@ callbacks:
     verbose: True
 
 trainer:
+  type: "att-vae"
   start_epoch: 0
   epochs: 1000
   batches_per_epoch: 1000
   clip: 50.0
   alpha: 1.0
   beta: 0.00010226128426839442
-  path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221"
+  path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/test"
   test_image: "/glade/work/schreck/repos/holodec-ml/holodecml/vae/images/image_600.pkl"

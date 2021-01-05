@@ -9,14 +9,17 @@ import traceback
 import numpy as np
 
 from overrides import overrides
-from holodecml.vae.losses import *
-from holodecml.vae.visual import *
-from holodecml.vae.models import *
-from holodecml.vae.trainers import *
-from holodecml.vae.transforms import *
-from holodecml.vae.optimizers import *
-from holodecml.vae.data_loader import *
-from holodecml.vae.checkpointer import *
+from holodecml.torch.utils import *
+from holodecml.torch.losses import *
+from holodecml.torch.visual import *
+from holodecml.torch.models import *
+from holodecml.torch.trainers import *
+from holodecml.torch.transforms import *
+from holodecml.torch.optimizers import *
+from holodecml.torch.data_loader import *
+from holodecml.torch.beam_search import *
+
+from aimlutils.torch.checkpoint import *
 from aimlutils.hyper_opt.base_objective import *
 
 from torch import nn
@@ -39,33 +42,24 @@ def train(conf):
     #
     ###########################################################
 
-    # Load custom option for the VAE/compressor models
-    model_type = conf["model"]["type"]
-
     # Load image transformations.
     train_transform = LoadTransformations(conf["train_transforms"], device = device)
     valid_transform = LoadTransformations(conf["validation_transforms"], device = device)
 
     # Load the data readers 
-    train_reader_type = conf["train_data"].pop("type")
     train_gen = LoadReader(
-        reader_type = train_reader_type,
         transform = train_transform,
         scaler = None,
         config = conf["train_data"]
     )
 
-    valid_reader_type = conf["validation_data"].pop("type")
     valid_gen = LoadReader(
-        reader_type = valid_reader_type, 
         transform = valid_transform, 
         scaler = train_gen.get_transform(),
         config = conf["validation_data"],
     )
 
     # Load data iterators from pytorch
-    n_workers = conf['iterator']['num_workers']
-
     train_dataloader = DataLoader(
         train_gen,
         **conf["iterator"]
@@ -76,15 +70,14 @@ def train(conf):
         **conf["iterator"]
     )
 
-    trainer = BaseTrainer(
+    # Load a trainer object
+    trainer = LoadTrainer(
         train_gen, 
         valid_gen, 
-        train_dataloader, 
+        train_dataloader,
         valid_dataloader,
-        conf["model"], 
-        conf["optimizer"],
-        device = device,
-        **conf["trainer"]
+        device, 
+        conf
     )
 
     # Initialize LR annealing scheduler
