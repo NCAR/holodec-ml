@@ -1,0 +1,83 @@
+log: '/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221'
+
+train_data:
+  type: "multi"
+  path_data: [
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_1particle_training.nc',
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_3particle_training.nc',
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_multiparticle_training.nc',
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_12-25particle_gamma_600x400_training.nc'
+    ]
+  output_cols: ["x", "y", "z", "d"]
+  maxnum_particles: 100
+  shuffle: True
+  labels: False
+  null_weight: 0.0
+  
+validation_data:
+  type: "multi"
+  path_data: [
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_multiparticle_validation.nc',
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_12-25particle_gamma_600x400_validation.nc'
+    ]
+  output_cols: ["x", "y", "z", "d"]
+  maxnum_particles: 100
+  shuffle: False
+  labels: False
+  null_weight: 0.0
+  
+train_transforms:
+  RandomVerticalFlip: True
+  RandomHorizontalFlip: True
+  Normalize: 'norm'
+  ToTensor: True
+  
+validation_transforms:
+  Normalize: 'norm'
+  ToTensor: True
+
+iterator:
+  num_workers: 8
+  batch_size: 32
+  pin_memory: True
+  shuffle: True
+
+model:
+  type: "att-vae"
+  image_channels: 1
+  out_image_channels: 2
+  hidden_dims: [50, 73, 96, 304, 906, 1820]
+  z_dim: 1146
+
+optimizer: 
+  type: "lookahead-diffgrad"
+  lr: 9.716679489441079e-05
+  weight_decay: 4.601831238576446e-07
+
+callbacks:
+  MetricsLogger:
+    path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221"
+    reload: False
+  EarlyStopping:
+    patience: 3
+    verbose: True
+    path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221/checkpoint.pt"
+#   ExponentialLR:
+#     gamma: 0.99
+    
+  ReduceLROnPlateau: 
+    mode: "min"
+    factor: 0.2
+    patience: 1
+    min_lr: 0.000000000000001
+    verbose: True
+
+trainer:
+  start_epoch: 0
+  epochs: 1000
+  batches_per_epoch: 1000
+  clip: 50.0
+  alpha: 1.0
+  beta: 0.00010226128426839442
+  path_save: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/results/double_channel_1221"
+  test_image: "/glade/work/schreck/repos/holodec-ml/holodecml/vae/images/image_600.pkl"

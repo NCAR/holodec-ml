@@ -1,0 +1,90 @@
+log:
+  save_path: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/double_channel_1221/log.txt"
+
+slurm:
+  jobs: 20
+  kernel: "ncar_pylib /glade/work/schreck/py37"
+  bash: ["module load ncarenv/1.3 gnu/8.3.0 openmpi/3.1.4 python/3.7.5 cuda/10.1"]
+  batch:
+    account: "NAML0001"
+    gres: "gpu:v100:1"
+    mem: "128G"
+    n: 8
+    t: "12:00:00"
+    J: "holo_opt-1"
+    o: "holo_opt-1.out"
+    e: "holo_opt-1.err"
+    
+optuna:
+  name: "vae_multi.db"
+  reload: 1
+  objective: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/objective.py"
+  direction: "minimize"
+  metric: "val_loss"
+  n_trials: 999
+  gpu: True
+  save_path: '/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/double_channel_1221'
+  sampler:
+    type: "TPESampler"
+    n_startup_trials: 100
+  parameters:
+    dense_hidden_dim1:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim1"
+        low: 1
+        high: 50
+    dense_hidden_dim2:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim2"
+        low: 1
+        high: 250
+    dense_hidden_dim3:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim3"
+        low: 1
+        high: 300
+    dense_hidden_dim4:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim4"
+        low: 1
+        high: 500
+    dense_hidden_dim5:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim5"
+        low: 1
+        high: 1000
+    dense_hidden_dim6:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim6"
+        low: 1
+        high: 2000
+    model:z_dim:
+      type: "int"
+      settings:
+        name: "z_dim"
+        low: 1
+        high: 2000
+    trainer:beta:
+      type: "loguniform"
+      settings:
+        name: "beta"
+        low: 0.0001
+        high: 4200.0
+    optimizer:lr:
+      type: "loguniform"
+      settings:
+        name: "lr"
+        low: 0.00000001
+        high: 0.1
+    optimizer:weight_decay:
+      type: "loguniform"
+      settings:
+        name: "weight_decay"
+        low: 0.00000001
+        high: 0.1

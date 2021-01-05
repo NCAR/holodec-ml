@@ -6,40 +6,13 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 import numpy as np
-from holodecml.vae.spectral import SpectralNorm
-from holodecml.vae.attention import Self_Attention
+from holodecml.torch.models.utils import *
+from holodecml.torch.spectral import SpectralNorm
+from holodecml.torch.attention import Self_Attention
 
 # some pytorch examples - https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
 
-
 logger = logging.getLogger(__name__)
-
-
-def LoadModel(model_type, config):
-    logger.info(f"Loading model-type {model_type} with settings")
-    if model_type == "vae":
-        model = ConvVAE(**config)
-    elif model_type == "att-vae":
-        model = ATTENTION_VAE(**config)
-    elif model_type == "encoder-vae":
-        model = LatentEncoder(**config)
-    else:
-        logger.info(
-            f"Unsupported model type {model_type}. Choose from vae, att-vae, or encoder-vae. Exiting."
-        )
-        sys.exit(1)
-    
-    for key, val in config.items():
-        logger.info(f"{key}: {val}")
-    
-    logger.info(
-        f"The model contains {count_parameters(model)} trainable parameters"
-    )
-    return model
-
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 class CNN_VAE(nn.Module):
@@ -175,7 +148,6 @@ class CNN_VAE(nn.Module):
             z_real = np.sqrt(0.5) * z[:,0,:,:]
             z_imag = z[:,1,:,:]
             z = torch.square(z_real) + torch.square(z_imag)
-            z = torch.sqrt(z)
             z = torch.unsqueeze(z, 1)
         
         return z, mu, logvar
@@ -187,7 +159,8 @@ class ATTENTION_VAE(nn.Module):
                  image_channels=1,
                  hidden_dims=[8, 16, 32, 64, 128, 256],
                  z_dim=10,
-                 out_image_channels = 1):
+                 out_image_channels = 1, 
+                 weights = False):
 
         super(ATTENTION_VAE, self).__init__()
 
@@ -198,6 +171,7 @@ class ATTENTION_VAE(nn.Module):
         
         self.encoder = None
         self.decoder = None
+        self.weights = weights
         
     def build(self):
 
@@ -249,6 +223,8 @@ class ATTENTION_VAE(nn.Module):
             self.hidden_dims[0], self.out_image_channels, 4, 2, 1)
 
         logger.info("Loaded a self-attentive encoder-decoder VAE model")
+        
+        self.load_weights()
 
     def encoder_block(self, dim1, dim2, kernel_size, stride, padding):
         return nn.Sequential(
@@ -322,133 +298,50 @@ class ATTENTION_VAE(nn.Module):
             z_real = np.sqrt(0.5) * z[:,0,:,:]
             z_imag = z[:,1,:,:]
             z = torch.square(z_real) + torch.square(z_imag)
-            z = torch.sqrt(z)
             z = torch.unsqueeze(z, 1)
         
         return z, mu, logvar
+    
+    def load_weights(self):
+        
+        logger.info(
+            f"The model contains {count_parameters(self)} trainable parameters"
+        )
+        
+        # Load weights if supplied
+        if os.path.isfile(self.weights):
+            logger.info(f"Loading weights from {self.weights}")
 
+            # Load the pretrained weights
+            model_dict = torch.load(
+                self.weights,
+                map_location=lambda storage, loc: storage
+            )
+            self.load_state_dict(model_dict["model_state_dict"])
+            return
 
-# class ConvVAE(nn.Module):
-
-#     def __init__(self,
-#                  image_channels=1,
-#                  init_kernel=10,
-#                  kernel_size=2,
-#                  stride=1,
-#                  padding=0):
-
-#         super(ConvVAE, self).__init__()
-
-#         # encoder
-#         self.enc1 = nn.Conv2d(
-#             in_channels=image_channels, out_channels=init_kernel, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.ebn1 = nn.BatchNorm2d(init_kernel)
-#         self.enc2 = nn.Conv2d(
-#             in_channels=init_kernel, out_channels=init_kernel*2, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.ebn2 = nn.BatchNorm2d(init_kernel*2)
-#         self.enc3 = nn.Conv2d(
-#             in_channels=init_kernel*2, out_channels=init_kernel*4, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.ebn3 = nn.BatchNorm2d(init_kernel*4)
-#         self.enc4 = nn.Conv2d(
-#             in_channels=init_kernel*4, out_channels=init_kernel*8, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.ebn4 = nn.BatchNorm2d(init_kernel*8)
-#         self.enc5 = nn.Conv2d(
-#             in_channels=init_kernel*8, out_channels=init_kernel, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-
-#         # decoder
-#         self.dec1 = nn.ConvTranspose2d(
-#             in_channels=init_kernel, out_channels=init_kernel*8, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.dbn1 = nn.BatchNorm2d(init_kernel*8)
-#         self.dec2 = nn.ConvTranspose2d(
-#             in_channels=init_kernel*8, out_channels=init_kernel*4, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.dbn2 = nn.BatchNorm2d(init_kernel*4)
-#         self.dec3 = nn.ConvTranspose2d(
-#             in_channels=init_kernel*4, out_channels=init_kernel*2, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.dbn3 = nn.BatchNorm2d(init_kernel*2)
-#         self.dec4 = nn.ConvTranspose2d(
-#             in_channels=init_kernel*2, out_channels=init_kernel, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-#         self.dbn4 = nn.BatchNorm2d(init_kernel)
-#         self.dec5 = nn.ConvTranspose2d(
-#             in_channels=init_kernel, out_channels=image_channels, kernel_size=kernel_size,
-#             stride=stride, padding=padding
-#         )
-
-#     def reparameterize(self, mu, log_var):
-#         """
-#         :param mu: mean from the encoder's latent space
-#         :param log_var: log variance from the encoder's latent space
-#         """
-#         std = torch.exp(0.5*log_var)  # standard deviation
-#         eps = torch.randn_like(std)  # `randn_like` as we need the same size
-#         sample = mu + (eps * std)  # sampling
-#         return sample
-
-#     def forward(self, x):
-#         # encoding
-
-#         x = self.enc1(x)
-#         x = self.ebn1(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.enc2(x)
-#         x = self.ebn2(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.enc3(x)
-#         x = self.ebn3(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.enc4(x)
-#         x = self.ebn4(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.enc5(x)
-
-#         # get `mu` and `log_var`
-#         mu = x
-#         log_var = x
-
-#         # get the latent vector through reparameterization
-#         z = self.reparameterize(mu, log_var)
-
-#         # decoding
-#         x = self.dec1(z)
-#         x = self.dbn1(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.dec2(x)
-#         x = self.dbn2(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.dec3(x)
-#         x = self.dbn3(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.dec4(x)
-#         x = self.dbn4(x)
-#         x = nn.LeakyReLU()(x)
-#         x = self.dec5(x)
-
-#         reconstruction = torch.sigmoid(x)
-
-#         return reconstruction, mu, log_var
+        elif self.weights:
+            logger.warning(
+                f"The weights file {self.weights} does not exist, and so won't be loaded. Is this what you wanted?"
+            )
+                
+        # Initialize the weights of the model layers to be Xavier
+        logger.info(
+            f"Setting tunable parameter weights according to Xavier's uniform initialization"
+        )
+                
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+        
+        return
 
 
 class LatentEncoder(ATTENTION_VAE):
 
     def __init__(self,
                  image_channels=1,
+                 out_image_channels = 1,
                  hidden_dims=[8, 16, 32, 64, 128, 256],
                  z_dim=10,
                  dense_hidden_dims=[100, 10],
@@ -459,17 +352,17 @@ class LatentEncoder(ATTENTION_VAE):
 
         super(LatentEncoder, self).__init__(
             image_channels=image_channels,
+            out_image_channels=out_image_channels,
             hidden_dims=hidden_dims,
             z_dim=z_dim)
-        build = super().build() # Call inherited base build, then override
-        
-        # Build the base VAE model from the inherited build method
-        self.build()
         
         self.dense_hidden_dims = dense_hidden_dims
         self.dense_dropouts = dense_dropouts
         self.num_outputs = num_outputs
         self.tasks = tasks
+        
+        # Call inherited base build, then override
+        build = super().build() 
         
         if os.path.isfile(pretrained_model):
             # Load params from file
@@ -488,36 +381,39 @@ class LatentEncoder(ATTENTION_VAE):
             logging.info(
                 f"Loaded a fresh VAE  with trainable parameters"
             )
-
+            
+        # Build the base VAE model from the inherited build method
+        self.build()
+            
     def build(self):
         # Build the dense network for predicting particle attributes
         self.task_blocks = nn.ModuleDict({
-            task: self.build_block(self.dense_hidden_dims, self.dense_dropouts)
+            task: self.build_block(task, self.dense_hidden_dims, self.dense_dropouts)
             for task in self.tasks
         })
 
-    def build_block(self, dense_hidden_dims, dense_dropouts):
+    def build_block(self, task, dense_hidden_dims, dense_dropouts):
         blocks = [self.dense_block(
-            self.z_dim, dense_hidden_dims[0], dense_dropouts[0])]
+            task, self.z_dim, dense_hidden_dims[0], dense_dropouts[0])]
         N = len(dense_hidden_dims)
         if N > 1:
             for i in range(N-1):
                 blocks.append(
                     self.dense_block(
-                        dense_hidden_dims[i], dense_hidden_dims[i+1], dense_dropouts[i+1])
+                        task, dense_hidden_dims[i], dense_hidden_dims[i+1], dense_dropouts[i+1])
                 )
         blocks.append(self.dense_block(
-            dense_hidden_dims[-1], self.num_outputs, 0.0, False))
+            task, dense_hidden_dims[-1], self.num_outputs, 0.0, False))
         blocks = [item for sublist in blocks for item in sublist]
         return nn.Sequential(*blocks)
 
-    def dense_block(self, input_dim, output_dim, dr=0.0, activation_layer=True):
+    def dense_block(self, task, input_dim, output_dim, dr=0.0, activation_layer=True):
         block = [nn.Linear(input_dim, output_dim)]
         if dr > 0.0 and activation_layer:
             block.append(nn.Dropout(dr))
         if activation_layer:
             block.append(nn.LeakyReLU())
-        else:
+        elif task == "binary":
             block.append(nn.Sigmoid())
         return block
 
@@ -526,3 +422,15 @@ class LatentEncoder(ATTENTION_VAE):
         task_dict = {task: self.task_blocks[task](z) for task in self.tasks}
         task_dict["encoder_att"] = encoder_att
         return task_dict
+    
+    def image_decoder(self, x):
+        z, mu, logvar, encoder_att = self.encode(x)
+        z, decoder_att = self.decode(z)
+        
+        if self.out_image_channels > 1:
+            z_real = np.sqrt(0.5) * z[:,0,:,:]
+            z_imag = z[:,1,:,:]
+            z = torch.square(z_real) + torch.square(z_imag)
+            z = torch.unsqueeze(z, 1)
+        
+        return z

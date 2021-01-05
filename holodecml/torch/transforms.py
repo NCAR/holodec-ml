@@ -137,7 +137,6 @@ class RandomCrop(object):
                       left: left + new_w]
         
         sample["image"] = image
-
         return sample
 
 
@@ -177,9 +176,7 @@ class Normalize(object):
 
         if self.mode == "sym":
             image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
-
         sample["image"] = image
-        
         return sample
 
 

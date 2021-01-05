@@ -1,0 +1,145 @@
+log:
+  save_path: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/decoder/results/xy/log.txt"
+
+slurm:
+  jobs: 20
+  kernel: "ncar_pylib /glade/work/schreck/py37"
+  bash: ["module load ncarenv/1.3 gnu/8.3.0 openmpi/3.1.4 python/3.7.5 cuda/10.1"]
+  batch:
+    account: "NAML0001"
+    gres: "gpu:v100:1"
+    exclude: "casper36"
+    mem: "128G"
+    n: 8
+    t: "12:00:00"
+    J: "gru-opt"
+    o: "gru-opt.out"
+    e: "gru-opt.err"
+    
+optuna:
+  name: "holodec.db"
+  reload: 1
+  objective: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/decoder/objective.py"
+  direction: "minimize"
+  metric: "val_loss"
+  n_trials: 999
+  gpu: True
+  save_path: '/glade/work/schreck/repos/holodec-ml/scripts/schreck/decoder/results/xy'
+  sampler:
+    type: "TPESampler"
+    n_startup_trials: 140
+  parameters:
+    dense_hidden_dim1:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim1"
+        low: 10
+        high: 20000
+    dense_hidden_dim2:
+      type: "int"
+      settings:
+        name: "dense_hidden_dim2"
+        low: 2
+        high: 500
+    n_layers:
+      type: "int"
+      settings:
+        name: "n_layers"
+        low: 0
+        high: 10
+    dr1:
+      type: "float"
+      settings:
+        name: "dr1"
+        low: 0.0
+        high: 0.5
+    dr2:
+      type: "float"
+      settings:
+        name: "dr2"
+        low: 0.0
+        high: 0.5
+    decoder:dropout:
+      type: "float"
+      settings:
+        name: "rnn_dr"
+        low: 0.0
+        high: 0.5
+    decoder:n_layers:
+      type: "int"
+      settings:
+        name: "n_layers_decoder"
+        low: 1
+        high: 10
+    rnn_optimizer:lr:
+      type: "loguniform"
+      settings:
+        name: "rnn_lr"
+        low: 0.00001
+        high: 0.01
+    particle_optimizer:lr:
+      type: "loguniform"
+      settings:
+        name: "regressor_lr"
+        low: 0.00001
+        high: 0.01
+#     rnn_optimizer:weight_decay:
+#       type: "loguniform"
+#       settings:
+#         name: "rnn_weight_decay"
+#         low: 0.000000001
+#         high: 0.1
+#     particle_optimizer:weight_decay:
+#       type: "loguniform"
+#       settings:
+#         name: "regressor_weight_decay"
+#         low: 0.000000001
+#         high: 0.1
+#     callbacks:ExponentialLR:decoder:gamma:
+#       type: "float"
+#       settings:
+#         name: "rnn_gamma"
+#         low: 0.2
+#         high: 0.99
+#     callbacks:ExponentialLR:regressor:gamma:
+#       type: "float"
+#       settings:
+#         name: "regressor_gamma"
+#         low: 0.2
+#         high: 0.99
+    trainer:forcing:
+      type: "float"
+      settings:
+        name: "teacher_forcing"
+        low: 0.0
+        high: 1.0
+    trainer:label_smoothing:
+      type: "float"
+      settings:
+        name: "label_smoothing"
+        low: 0.0
+        high: 0.5
+    trainer:focal_gamma:
+      type: "float"
+      settings:
+        name: "focal_gamma"
+        low: 0.0
+        high: 5.0
+    trainer:batches_per_epoch:
+      type: "int"
+      settings:
+        name: "batches_per_epoch"
+        low: 10
+        high: 3000
+    train_iterator:batch_size:
+      type: "int"
+      settings:
+        name: "batch_size"
+        low: 4
+        high: 32
+    bins:
+      type: "int"
+      settings:
+        name: "bins"
+        low: 10
+        high: 50
