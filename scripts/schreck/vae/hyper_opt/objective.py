@@ -74,36 +74,25 @@ class Objective(BaseObjective):
         # Load ML pipeline, train the model, and return the result
         #
         ###########################################################
-        
-        # Load custom option for the VAE/compressor models
-        model_type = conf["model"]["type"]
 
         # Load image transformations.
         train_transform = LoadTransformations(conf["train_transforms"], device = self.device)
         valid_transform = LoadTransformations(conf["validation_transforms"], device = self.device)
 
         # Load the data readers 
-        train_reader_type = conf["train_data"].pop("type")
         train_gen = LoadReader(
-            reader_type = train_reader_type,
             transform = train_transform,
             scaler = None,
             config = conf["train_data"]
         )
 
-        valid_reader_type = conf["validation_data"].pop("type")
         valid_gen = LoadReader(
-            reader_type = valid_reader_type, 
             transform = valid_transform, 
             scaler = train_gen.get_transform(),
             config = conf["validation_data"],
         )
 
         # Load data iterators from pytorch
-        n_workers = conf['iterator']['num_workers']
-
-        #logging.info(f"Loading training data iterator using {n_workers} workers")
-
         train_dataloader = DataLoader(
             train_gen,
             **conf["iterator"]
@@ -114,31 +103,7 @@ class Objective(BaseObjective):
             **conf["iterator"]
         )
 
-        # Load the model 
-#         del conf["model"]["type"]
-#         model = LoadModel(model_type, conf["model"], self.device)
-
-#         # Load the optimizer
-#         optimizer_config = conf["optimizer"]
-#         optimizer = LoadOptimizer(
-#             optimizer_config["type"], 
-#             model.parameters(), 
-#             optimizer_config["lr"], 
-#             optimizer_config["weight_decay"]
-#         )
-
         # Load the trainer
-#         trainer = CustomTrainer(
-#             model = model,
-#             optimizer = optimizer,
-#             train_gen = train_gen,
-#             valid_gen = valid_gen,
-#             dataloader = dataloader,
-#             valid_dataloader = valid_dataloader,
-#             device = self.device,
-#             **conf["trainer"]
-#         )
-        
         trainer = CustomTrainer(
             train_gen, 
             valid_gen, 
@@ -180,7 +145,7 @@ class Objective(BaseObjective):
             "val_bce": val_bce
         }
         
-        return results #self.save(trial, results)
+        return results
 
 
 class CustomTrainer(BaseTrainer):
