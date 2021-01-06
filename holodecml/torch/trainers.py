@@ -654,13 +654,6 @@ class DecoderTrainer:
         vae.build()
         self.vae = vae.to(device)
         
-#         # Load the pretrained weights
-#         model_dict = torch.load(
-#             vae_model_weights,
-#             map_location=lambda storage, loc: storage
-#         )
-#         self.vae.load_state_dict(model_dict["model_state_dict"])
-        
         # Build decoder
         decoder_conf["output_size"] = len(train_gen.token_lookup) + 3
         logger.info(

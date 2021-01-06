@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from holodecml.torch.utils import *
 
 from typing import List, Union
+from collections import defaultdict
 
 
 
@@ -262,7 +263,7 @@ class WeightedCrossEntropyLoss(torch.nn.Module):
             
 
 
-def distance_sorted_loss(true, pred, true_tokens, pred_tokens):
+def distance_sorted_loss(true, pred, true_tokens, pred_tokens, return_coordinate_errors = False):
     
     # size (batch, particles, coordinates)
     true = torch.cat([
@@ -274,6 +275,7 @@ def distance_sorted_loss(true, pred, true_tokens, pred_tokens):
     
     accuracy = []
     total_error = []
+    coordinate_errors = defaultdict(list)
     for k in range(true.shape[0]):    
         true_part = true[k]
         pred_part = pred[k]
@@ -302,12 +304,22 @@ def distance_sorted_loss(true, pred, true_tokens, pred_tokens):
                 accuracy.append(int(pred_tokens[k][p1]==true_tokens[k][p2]))
 
         for (x,y) in paired:
-            xe = abs(x.x - y.x)
-            ye = abs(x.y - y.y)
-            ze = abs(x.z - y.z)
-            de = abs(x.d - y.d)
-            total_error += [xe, ye, ze, de]
+            xe = x.x - y.x
+            ye = x.y - y.y
+            ze = x.z - y.z
+            de = x.d - y.d
+            total_error += [abs(xe), abs(ye), abs(ze), abs(de)]
+            
+            if return_coordinate_errors:
+                coordinate_errors["x"].append([x.x.item(), y.x.item()])
+                coordinate_errors["y"].append([x.y.item(), y.y.item()])
+                coordinate_errors["z"].append([x.z.item(), y.z.item()])
+                coordinate_errors["d"].append([x.d.item(), y.d.item()])
         
     total_error = torch.mean(torch.stack(total_error))
     accuracy = np.mean(accuracy)
-    return total_error, accuracy
+    
+    if return_coordinate_errors:
+        return total_error, accuracy, coordinate_errors
+    else:
+        return total_error, accuracy
