@@ -62,12 +62,12 @@ def train(conf):
     # Load data iterators from pytorch
     train_dataloader = DataLoader(
         train_gen,
-        **conf["iterator"]
+        **conf["train_iterator"]
     )
 
     valid_dataloader = DataLoader(
         valid_gen,
-        **conf["iterator"]
+        **conf["validation_iterator"]
     )
 
     # Load a trainer object

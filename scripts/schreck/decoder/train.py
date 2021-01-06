@@ -52,7 +52,7 @@ def train(conf):
     
     train_gen = LoadReader(
         transform = train_transform,
-        scaler = None,
+        scaler = joblib.load(scaler_path) if os.path.isfile(scaler_path) else True,
         config = conf["train_data"]
     )
     
@@ -68,18 +68,18 @@ def train(conf):
     # Load data iterators from pytorch
     train_dataloader = DataLoader(
         train_gen,
-        **conf["iterator"]
+        **conf["train_iterator"]
     )
 
     valid_dataloader = DataLoader(
         valid_gen,
-        **conf["iterator"]
+        **conf["valid_iterator"]
     )
 
     # Load a trainer object
     trainer = LoadTrainer(
         train_gen, 
-        valid_gen, 
+        valid_gen,
         train_dataloader,
         valid_dataloader,
         device, 
