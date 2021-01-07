@@ -1076,16 +1076,13 @@ class DecoderTrainer:
                     real_particles, h_vecs = hidden_vectors[di]
                     x_input = torch.cat([h_vecs.detach(), encoded_image, combined_att], axis = 1)
                     particle_attributes = self.regressor(x_input[real_particles])
-                    batch_pred, batch_true = [], []
+                    batch_true, batch_pred = [], []
                     for task in self.tasks:
-                        batch_pred.append(particle_attributes[task].squeeze(1))
                         batch_true.append(y_out[task][:, di][real_particles].float())
-                    pred_part.append(batch_pred)
+                        batch_pred.append(particle_attributes[task].squeeze(1))
                     true_part.append(batch_true)
-                    
-                regressor_loss, _accuracy = distance_sorted_loss(
-                    true_part, pred_part, target_tensor, reshaped_preds
-                )
+                    pred_part.append(batch_pred)
+                regressor_loss = distance_sorted_loss(true_part, pred_part)
                 
                 seq_acc = []
                 for (true, pred) in zip(target_tensor, reshaped_preds):

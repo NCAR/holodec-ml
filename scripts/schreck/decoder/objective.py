@@ -39,21 +39,31 @@ def custom_updates(trial, conf):
     # Get list of hyperparameters from the config
     hyperparameters = conf["optuna"]["parameters"]
     
+    dense1 = None
     # Now update some via custom rules
-    dense1 = trial_suggest_loader(trial, hyperparameters['dense_hidden_dim1'])
-    dense2 = trial_suggest_loader(trial, hyperparameters['dense_hidden_dim2'])
-    dr1 = trial_suggest_loader(trial, hyperparameters['dr1'])
-    dr2 = trial_suggest_loader(trial, hyperparameters['dr2'])
-    n_layers = trial_suggest_loader(trial, hyperparameters['n_layers'])
+    if 'dense_hidden_dim1' in hyperparameters:
+        dense1 = trial_suggest_loader(trial, hyperparameters['dense_hidden_dim1'])
+        dense2 = trial_suggest_loader(trial, hyperparameters['dense_hidden_dim2'])
+    
+    dr1 = None
+    if 'dr1' in hyperparameters:
+        dr1 = trial_suggest_loader(trial, hyperparameters['dr1'])
+        dr2 = trial_suggest_loader(trial, hyperparameters['dr2'])
+    
+    if 'n_layers' in hyperparameters:
+        n_layers = trial_suggest_loader(trial, hyperparameters['n_layers'])
 
     # Update the config based on optuna suggestions
-    conf["regressor"]["hidden_dims"] = [dense1] + [dense2 for k in range(n_layers)]
-    conf["regressor"]["dropouts"] = [dr1] + [dr2 for k in range(n_layers)]
+    if dense1 is not None:
+        conf["regressor"]["hidden_dims"] = [dense1] + [dense2 for k in range(n_layers)]
+    if dr1 is not None:
+        conf["regressor"]["dropouts"] = [dr1] + [dr2 for k in range(n_layers)]
     
     # Update the number of bins in the image
-    bins = trial_suggest_loader(trial, hyperparameters['bins'])
-    conf["train_data"]["bins"] = bins
-    conf["validation_data"]["bins"] = bins
+    if 'bins' in hyperparameters:
+        bins = trial_suggest_loader(trial, hyperparameters['bins'])
+        conf["train_data"]["bins"] = bins
+        conf["validation_data"]["bins"] = bins
     
     return conf
 
@@ -109,10 +119,13 @@ class Objective(BaseObjective):
         )
         
         # Load a trainer object
+        if "type" in conf["trainer"]:
+            conf["trainer"].pop("type")
+        
         trainer = CustomTrainer(
             train_gen=train_gen,
             valid_gen=valid_gen,
-            dataloader=dataloader,
+            dataloader=train_dataloader,
             valid_dataloader=valid_dataloader,
             vae_conf=conf["vae"],
             decoder_conf=conf["decoder"],
@@ -120,7 +133,7 @@ class Objective(BaseObjective):
             decoder_optimizer_conf=conf["rnn_optimizer"],
             regressor_optimizer_conf=conf["particle_optimizer"],
             device=self.device,
-            **config["trainer"]
+            **conf["trainer"]
         )
         
         # Initialize LR annealing scheduler 

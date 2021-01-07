@@ -274,10 +274,9 @@ class DecoderPredictor(DecoderTrainer):
                     true_part.append(batch_true)
                     real_parts.append(real_particles[0].cpu().numpy())
                     particle_results["tokens"].append(real_particles)
-                    
-                regressor_loss, _accuracy, coordinate_losses = distance_sorted_loss(
-                    true_part, pred_part, 
-                    target_tensor, reshaped_preds, return_coordinate_errors = True
+
+                regressor_loss, coordinate_losses = distance_sorted_loss(
+                    true_part, pred_part, return_coordinate_errors = True
                 )
                 
                 seq_acc = []
@@ -289,7 +288,7 @@ class DecoderPredictor(DecoderTrainer):
 
                 epoch_losses["mse"].append(regressor_loss.item())
                 epoch_losses["seq_acc"].append(seq_acc)
-                
+
                 if return_only_losses:
                     result = {
                         "mae_coordinates": coordinate_losses,
@@ -319,12 +318,18 @@ class DecoderPredictor(DecoderTrainer):
         
         if batch_size == None:
             batch_size = result["image_pred"].shape[0]
-        
+            
+        batched_coors = defaultdict(list)
+        coordinates = result["mae_coordinates"]
         for task in self.valid_gen.output_cols:
-            batch_errors = np.array_split(result["mae_coordinates"][task], batch_size)
-            batch_errors = self.train_gen.scaler[task].inverse_transform(batch_errors)
-            result["mae_coordinates"][task] = np.mean(abs(batch_errors[:,:,0] - batch_errors[:,:,1]), 1)       
-
+            for coordinate_batch in coordinates:
+                batch_errors = np.array(coordinate_batch[task])
+                batch_errors = self.train_gen.scaler[task].inverse_transform(batch_errors)
+                coordinate_batch[task] = abs(batch_errors[:,0] - batch_errors[:,1])
+                batched_coors[task].append(coordinate_batch[task])
+        batched_coors = {key: np.stack(value) for key, value in batched_coors.items()}
+        result["mae_coordinates"] = batched_coors
+      
         for result_key in ["particle_true", "particle_pred"]:
             if result_key in result:
                 result[result_key] = {

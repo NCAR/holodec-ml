@@ -8,6 +8,7 @@ from holodecml.torch.utils import *
 
 from typing import List, Union
 from collections import defaultdict
+from itertools import groupby
 
 
 
@@ -261,65 +262,57 @@ class WeightedCrossEntropyLoss(torch.nn.Module):
             per_batch_loss = negative_log_likelihood.sum(non_batch_dims) / (weights_batch_sum + 1e-13)
             return per_batch_loss / weights.shape[0]
             
-
-
-def distance_sorted_loss(true, pred, true_tokens, pred_tokens, return_coordinate_errors = False):
-    
-    # size (batch, particles, coordinates)
-    true = torch.cat([
-        torch.cat([x.unsqueeze(0) for x in y]).unsqueeze(0) for y in true
-    ]).permute(2, 0, 1)
-    pred = torch.cat([
-        torch.cat([x.unsqueeze(0) for x in y]).unsqueeze(0) for y in pred
-    ]).permute(2, 0, 1)
-    
-    accuracy = []
-    total_error = []
-    coordinate_errors = defaultdict(list)
-    for k in range(true.shape[0]):    
-        true_part = true[k]
-        pred_part = pred[k]
-
-        tosort = []
-        for p1 in range(len(true_part)):
-            for p2 in range(len(true_part)):
-                predicted_coors = Point(pred_part[p1])
-                truth_coors = Point(true_part[p2])
-                if (pred_tokens[k][p1] == true_tokens[k][p2]): # if token is correct, force select the pair (dist = 0)
-                    dist = 0.0
-                else:
-                    dist = distance(predicted_coors, truth_coors)
-                tosort.append([
-                    dist, p1, p2,
-                    predicted_coors, truth_coors
-                ])
-
-        tokens, paired, seen_true, seen_pred = [], [], [], []
-        for (dist, p1, p2, p, t) in sorted(tosort): # sort by distance
-            if p1 not in seen_pred and p2 not in seen_true:
-                paired.append([p, t])
-                tokens.append([p1, p2])
-                seen_pred.append(p1)
-                seen_true.append(p2)
-                accuracy.append(int(pred_tokens[k][p1]==true_tokens[k][p2]))
-
-        for (x,y) in paired:
-            xe = x.x - y.x
-            ye = x.y - y.y
-            ze = x.z - y.z
-            de = x.d - y.d
-            total_error += [abs(xe), abs(ye), abs(ze), abs(de)]
             
-            if return_coordinate_errors:
-                coordinate_errors["x"].append([x.x.item(), y.x.item()])
-                coordinate_errors["y"].append([x.y.item(), y.y.item()])
-                coordinate_errors["z"].append([x.z.item(), y.z.item()])
-                coordinate_errors["d"].append([x.d.item(), y.d.item()])
-        
-    total_error = torch.mean(torch.stack(total_error))
-    accuracy = np.mean(accuracy)
+def batcher(part):
+    part = sorted([
+        (i, j, coordinates) for j, particle in enumerate(part) for i, coordinates in enumerate(torch.stack(particle, 1))
+    ])
+    part = [
+        torch.stack(list(zip(*group))[2]) for key, group in groupby(part, lambda x: x[0])
+    ]
+    return part
+
+
+def distance_sorted_loss(true_part, pred_part, return_coordinate_errors=False):
+    
+    true = batcher(true_part)
+    pred = batcher(pred_part)
+    
+    batch_loss = []
+    total_coordinate_errors = []
+    for k in range(len(true)):
+        t = true[k]
+        p = pred[k]
+
+        # Compute the distance matrix
+        dist_x = (p[:, 0:1] - t.permute(1, 0)[0:1, :]) ** 2
+        dist_y = (p[:, 1:2] - t.permute(1, 0)[1:2, :]) ** 2
+        dist_xy = dist_x + dist_y
+
+        # Compute the min loss
+        losses, _ = torch.min(dist_xy, 1)
+        loss_xy = torch.sum(losses)
+        batch_loss.append(loss_xy)
+
+        if return_coordinate_errors:
+            # Determine index of true particle that matched with pred particle
+            max_idx = torch.argmin(dist_xy, axis=1)
+
+            # Compute the coordinate losses
+            #torch.mean(torch.abs(true[0][max_idx] - pred[0]), 0)
+            coordinate_errors = defaultdict(list)
+            t = t[max_idx]
+            for (_t, _p) in zip(t, p):
+                coordinate_errors["batch_id"].append(k)
+                coordinate_errors["x"].append([_t[0].item(), _p[0].item()])
+                coordinate_errors["y"].append([_t[1].item(), _p[1].item()])
+                coordinate_errors["z"].append([_t[2].item(), _p[2].item()])
+                coordinate_errors["d"].append([_t[3].item(), _p[3].item()])
+            total_coordinate_errors.append(coordinate_errors)
+            
+    batch_loss = torch.mean(torch.stack(batch_loss))
     
     if return_coordinate_errors:
-        return total_error, accuracy, coordinate_errors
+        return batch_loss, total_coordinate_errors
     else:
-        return total_error, accuracy
+        return batch_loss
