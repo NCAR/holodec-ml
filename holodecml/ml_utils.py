@@ -37,6 +37,7 @@ class MinMaxScalerX:
         self.max = in_array.max(dim=dim)
         self.delta = self.max-self.min
         self.mid = 0.5*(self.max+self.min)
+
     def fit_transform(self,new_array):
         """
         Apply rescaling to data

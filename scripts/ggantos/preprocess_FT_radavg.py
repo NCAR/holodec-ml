@@ -55,35 +55,44 @@ settings = {    'data_file':'synthetic_holograms_1particle_gamma_training.nc'
 """
 
 paths = {   'data':'/glade/scratch/mhayman/holodec/holodec-ml-data/',
-            'save':'/glade/p/cisl/aiml/ggantos/holodec/ft_rad_bidis_z_realimag/'}
+            'save':'/glade/p/cisl/aiml/ai4ess_hackathon/holodec/ft_rad_bidis/'}
 
-settings = {    'data_file':['synthetic_holograms_50-100particle_gamma_training.nc',
-                            'synthetic_holograms_50-100particle_gamma_validation.nc',
-                            'synthetic_holograms_50-100particle_gamma_test.nc'],
+settings = {    'data_file':['synthetic_holograms_50-100particle_bidisperse_training.nc',
+                            'synthetic_holograms_50-100particle_bidisperse_validation.nc',
+                            'synthetic_holograms_50-100particle_bidisperse_test.nc'],
+                'var': 'd',
+                'hist_bin_num': 20,
                 'FourierTransform':True,
-                'hist_edges': np.arange(0,200,10),# np.logspace(0,3,41),
                 'max_hist_count':5000,
                 'log_hist':False,
                 'log_in':False
                 }
 
-func_list = [np.abs,np.angle,np.real,np.imag]
-in_chan = ['abs','angle','real','imag']
-# func_list = [np.abs,]
-# in_chan = ['abs',]
-
-histogram_edges = settings['hist_edges']
-histogram_centers = 0.5*np.diff(histogram_edges) \
-                    +histogram_edges[:-1]
-
-run_date_str = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
+# func_list = [np.abs,np.angle,np.real,np.imag]
+# in_chan = ['abs','angle','real','imag']
+func_list = [np.abs,]
+in_chan = ['abs',]
 
 if isinstance(settings['data_file'],str):
     data_file_list = [settings['data_file']]
 else:
     # assume a list of data files were passed in
     data_file_list = settings['data_file']
-    
+
+# ds = xr.open_dataset(paths['data'] + data_file_list[0])
+# delta = (round(ds[settings['var']].values.max()+1000) -
+#          round(ds[settings['var']].values.min()-1000))
+# step = int(delta / settings['hist_bin_num'])
+# histogram_edges = np.arange(round(ds[settings['var']].values.min()-1000),
+#                             round(ds[settings['var']].values.max()+1000),
+#                             step)
+# del ds
+
+histogram_edges = np.arange(0,200,5)
+histogram_centers = 0.5*np.diff(histogram_edges) \
+                    +histogram_edges[:-1]
+
+run_date_str = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 
 for fn in data_file_list:
 
@@ -114,8 +123,8 @@ for fn in data_file_list:
         print("       ["+str(histogram_centers[0])+', '+str(histogram_centers[-1])+']') # '2.5, 192.5'
         print()
         
-        print('   max particle size: %d'%ds['z'].values.max())
-        print('   min particle size: %d'%ds['z'].values.min())
+        print(f"   max particle {settings['var']}: %d"%ds[settings['var']].values.max())
+        print(f"   min particle {settings['var']}: %d"%ds[settings['var']].values.min())
         print()
 
         # define x (columns) and y (rows) coordinates and calculate radial coordinate
@@ -132,17 +141,18 @@ for fn in data_file_list:
         print("Performing Fourier Transform")
         ft_start_time = datetime.datetime.now()
         for im in ds['hologram_number'].values[slice(None,settings['max_hist_count'])]:
+            print(f"IMAGE: {im}")
             # find the particles in this hologram
             # hologram indexing is base 1
             particle_index = np.nonzero(ds['hid'].values==im+1)[0] # indices of particles for hologram in flat array of coordinates
 
-            particle_count = ds['z'].values[particle_index].size # number of particles per hologram
-            print(particle_count)
+            particle_count = ds[settings['var']].values[particle_index].size # number of particles per hologram
+            print("\t", particle_count)
             # print(f'  found {particle_count} particles')
 
             h_moments = []
             for m in settings.get('moments',[0,1,2,3,4,5,6]):
-                h_moments += [np.sum((ds['z'].values[particle_index]/2)**m)]
+                h_moments += [np.sum((ds[settings['var']].values[particle_index]/2)**m)]
             h_moments = np.array(h_moments)
 
             # make a histogram of particles and store it in the data set
@@ -150,8 +160,9 @@ for fn in data_file_list:
             # 65,  70,  75,  80,  85,  90,  95, 100, 105, 110, 115, 120, 125,
             # 130, 135, 140, 145, 150, 155, 160, 165, 170, 175, 180, 185, 190,
             # 195]
-            hist0 = np.histogram(ds['z'].values[particle_index],
+            hist0 = np.histogram(ds[settings['var']].values[particle_index],
                         bins=histogram_edges)[0]
+            print("\t", hist0)
             if settings.get('log_hist',False):
                 hist0 = np.log(hist0+1e-12)
             if im == 0:
