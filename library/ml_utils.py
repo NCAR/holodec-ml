@@ -79,3 +79,70 @@ def ensure_path(path:str):
                 print('tried creating data directory but it already exists')
                 print(path)
                 print()
+
+
+def calculate_d_moments(x_arr,y_arr,z_arr,d_arr,moments_arr=None,
+                        zlim=None,circ_center=None,circ_radius=None):
+    """
+    Calculate the diameter moments for particles with
+    corresponding x,y,z positions in a single hologram.  
+    The particle positions are used to determine
+    which particles are in the predefined sample volume.
+    The sample volume can be constrained to a cylinder with user
+    defined center, radius and depth
+
+
+    inputs:
+        x_arr : array of x positions of particles in the hologram
+        
+        y_arr : array of y positions of particles in the hologram
+        
+        z_arr : array of z positions of particles in the hologram
+        
+        d_arr : array of the particle diameters in the hologram
+        
+        moments_arr : array of the desired diameter moments.
+            If not specified, uses 0-3.
+        
+        z_lim : list defining the maximum and minimum z values 
+            to be included in the sample volume
+            e.g. [z_min, z_max]
+        
+        circ_center : list or tuple of center of the sample volume 
+            in the x-y plane [x_center, y_center]
+            default does not filter particles based on x,y position
+            e.g. set to [255,255] for 512 x 512 image grid
+        
+        circ_radius : radius of the sample volume in the x-y plane
+            default does not filter particles based on x,y position
+            e.g. set to 255 to use a circle inscribed in a 
+            512x512 hologram
+
+    returns:
+        array corresponding to the evaluated diameter moments
+    """
+
+    # evaluated moments defaults to 0-3
+    if moments_arr is None:
+        moments_arr = np.arange(4)
+
+    if zlim is not None:
+        # identify particles contained in sample volume depth
+        in_z = ( z_arr >= np.min(zlim) ) & ( z_arr <= np.max(zlim) )
+    else:
+        # default to assuming all particles are contained in
+        # the sample volume depth
+        in_z = np.ones(z_arr.shape, dtype=bool)
+
+    if circ_center is not None and circ_radius is not None:
+        in_r = ( x_arr - circ_center[0] )**2 + ( y_arr - circ_center[1] )**2 <= circ_radius**2
+    else:
+        in_r = np.ones(x_arr.shape, dtype=bool)
+    
+    in_particles_idx = np.where(in_z & in_r)
+
+    diam_moments = np.sum(d_arr[in_particles_idx].reshape(1,-1) ** moments_arr.reshape(-1,1),axis=1)
+
+    return diam_moments
+    
+
