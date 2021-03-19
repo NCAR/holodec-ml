@@ -19,7 +19,7 @@ from holodecml.torch.optimizers import *
 from holodecml.torch.data_loader import *
 from holodecml.torch.beam_search import *
 
-from aimlutils.hyper_opt.base_objective import *
+from aimlutils.echo.src.base_objective import *
 from aimlutils.torch.checkpoint import *
 #from aimlutils.torch.losses import *
 

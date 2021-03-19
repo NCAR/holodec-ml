@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import scipy
 import logging
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,6 +16,45 @@ from itertools import groupby
 logger = logging.getLogger(__name__)
 
 
+def LoadLoss(_type):
+    
+    if _type == "mae":
+        return nn.L1Loss()
+    
+    elif _type == "mse":  
+        return nn.MSELoss()
+    
+    elif _type == "logcosh":
+        return LogCoshLoss()
+    
+    elif _type == "xsigmoid":
+        return XSigmoidLoss()
+    
+    elif _type == "xtanh":
+        return XTanhLoss()
+    
+    elif _type == "huber":
+        return nn.SmoothL1Loss()
+    
+    elif _type == "log_mse":
+        return RMSLELoss()
+    
+    else:
+        logger.info(
+            f"Unsupported loss type {_type}. Choose from mae, mse, logcosh, xsigmoid, xtanh, huber, log_mse. Exiting.")
+        sys.exit(1)
+        
+
+        
+class RMSLELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss()
+        
+    def forward(self, pred, actual):
+        return torch.sqrt(self.mse(torch.log(torch.abs(pred) + 1), torch.log(torch.abs(actual) + 1)))
+    
+        
 def loss_fn(recon_x, x, mu, logvar):
     criterion = nn.BCELoss(reduction='sum')
     BCE = criterion(recon_x, x)
@@ -79,40 +119,102 @@ class SymmetricMAE:
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         norm = self.alpha + self.kld_weight * self.gamma
         return (self.alpha * BCE + self.kld_weight * self.gamma * KLD) / norm, BCE, KLD
+    
+class SymmetricLogCosh:
+
+    def __init__(self, alpha, gamma, kld_weight=1.0):
+        self.alpha = alpha
+        self.gamma = gamma
+        self.kld_weight = kld_weight
+
+        logger.info(f"Loaded Symmetric LogCosh loss ...")
+        logger.info(
+            f"... with alpha = {alpha}, gamma = {gamma}, and kld_weight = {kld_weight}")
+
+    def __call__(self, recon_x, x, mu, logvar):
+        criterion = LogCoshLoss(reduction='sum')
+        BCE = criterion(recon_x, x)
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        norm = self.alpha + self.kld_weight * self.gamma
+        return (self.alpha * BCE + self.kld_weight * self.gamma * KLD) / norm, BCE, KLD
+    
+class SymmetricXSigmoid:
+    def __init__(self, alpha, gamma, kld_weight=1.0):
+        self.alpha = alpha
+        self.gamma = gamma
+        self.kld_weight = kld_weight
+
+        logger.info(f"Loaded Symmetric XSigmoid loss ...")
+        logger.info(
+            f"... with alpha = {alpha}, gamma = {gamma}, and kld_weight = {kld_weight}")
+
+    def __call__(self, recon_x, x, mu, logvar):
+        criterion = XSigmoidLoss(reduction='sum')
+        BCE = criterion(recon_x, x)
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        norm = self.alpha + self.kld_weight * self.gamma
+        return (self.alpha * BCE + self.kld_weight * self.gamma * KLD) / norm, BCE, KLD
+    
+    
+class SymmetricXTanh:
+    def __init__(self, alpha, gamma, kld_weight=1.0):
+        self.alpha = alpha
+        self.gamma = gamma
+        self.kld_weight = kld_weight
+
+        logger.info(f"Loaded Symmetric XTanh loss ...")
+        logger.info(
+            f"... with alpha = {alpha}, gamma = {gamma}, and kld_weight = {kld_weight}")
+
+    def __call__(self, recon_x, x, mu, logvar):
+        criterion = XTanhLoss(reduction='sum')
+        BCE = criterion(recon_x, x)
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        norm = self.alpha + self.kld_weight * self.gamma
+        return (self.alpha * BCE + self.kld_weight * self.gamma * KLD) / norm, BCE, KLD
 
     
 class LogCoshLoss(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, reduction = None):
         super().__init__()
+        self.reduction = reduction
 
     def forward(self, y_t, y_prime_t, weights = None):
         ey_t = y_t - y_prime_t
         if weights is not None:
             ey_t *= weights
-        return torch.mean(torch.log(torch.cosh(ey_t + 1e-12)))
+        if self.reduction == "sum":
+            return torch.sum(torch.log(torch.cosh(ey_t + 1e-12)))
+        else:
+            return torch.mean(torch.log(torch.cosh(ey_t + 1e-12)))
 
 
 class XTanhLoss(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, reduction = None):
         super().__init__()
-
+        self.reduction = reduction
     def forward(self, y_t, y_prime_t, weights = None):
         ey_t = y_t - y_prime_t
         if weights is not None:
             ey_t *= weights
-        return torch.mean(ey_t * torch.tanh(ey_t))
+        if self.reduction == "sum":
+            return torch.sum(ey_t * torch.tanh(ey_t))
+        else:
+            return torch.mean(ey_t * torch.tanh(ey_t))
 
-
+        
 class XSigmoidLoss(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, reduction = None):
         super().__init__()
-
+        self.reduction = reduction
     def forward(self, y_t, y_prime_t, weights = None):
         ey_t = y_t - y_prime_t
         if weights is not None:
             ey_t *= weights
-        loss = torch.mean(2 * ey_t / (1 + torch.exp(-ey_t)) - ey_t)
-        return loss
+        if self.reduction == "sum":
+            return torch.sum(2 * ey_t / (1 + torch.exp(-ey_t)) - ey_t)
+        else:
+            return torch.mean(2 * ey_t / (1 + torch.exp(-ey_t)) - ey_t)
     
 
 class WeightedCrossEntropyLoss(torch.nn.Module):
@@ -263,45 +365,69 @@ class WeightedCrossEntropyLoss(torch.nn.Module):
             return per_batch_loss / weights.shape[0]
             
             
-def batcher(part):
-    part = sorted([
-        (i, j, coordinates) for j, particle in enumerate(part) for i, coordinates in enumerate(torch.stack(particle, 1))
-    ])
-    part = [
-        torch.stack(list(zip(*group))[2]) for key, group in groupby(part, lambda x: x[0])
-    ]
-    return part
-
-
-def distance_sorted_loss(true_part, pred_part, return_coordinate_errors=False):
+# def batcher(true, pred, real):
     
-    true = batcher(true_part)
-    pred = batcher(pred_part)
+#     true = [torch.stack(x).permute(1, 0) for x in true]
+#     pred = [torch.stack(x).permute(1, 0) for x in pred]
+
+#     t = defaultdict(list)
+#     p = defaultdict(list)
+    
+#     for x, y, r in zip(true, pred, real):
+#         for sx, sy, real_index in zip(x, y, r):
+#             t[real_index.item()].append(sx)
+#             p[real_index.item()].append(sy)
+            
+#     t = [torch.stack(value) for value in t.values()]
+#     p = [torch.stack(value) for value in p.values()]
+    
+#     return t, p
+
+
+def batcher(true, pred, real):
+    
+    t, p = defaultdict(list), defaultdict(list)
+    
+    def fill_dict(x, y, r):
+        x = torch.stack(x).permute(1, 0)
+        y = torch.stack(y).permute(1, 0)
+        for sx, sy, real_index in zip(x, y, r):
+            t[real_index.item()].append(sx)
+            p[real_index.item()].append(sy)
+            
+    [fill_dict(x, y, r) for x, y, r in zip(true, pred, real)]
+    
+    t, p = zip(*[[torch.stack(t1), torch.stack(p1)] for (t1, p1) in zip(t.values(), p.values())])
+    
+    return t, p
+
+
+def distance_sorted_loss(true_part, pred_part, real, return_coordinate_errors=False):    
+    
+    true, pred = batcher(true_part, pred_part, real)
     
     batch_loss = []
     total_coordinate_errors = []
-    for k in range(len(true)):
-        t = true[k]
-        p = pred[k]
-
+    for k, (t, p) in enumerate(zip(true, pred)):
         # Compute the distance matrix
-        dist_x = (p[:, 0:1] - t.permute(1, 0)[0:1, :]) ** 2
-        dist_y = (p[:, 1:2] - t.permute(1, 0)[1:2, :]) ** 2
-        dist_xy = dist_x + dist_y
+        dist_x = torch.abs(p[:, 0:1] - t.permute(1, 0)[0:1, :]) #** 2
+        dist_y = torch.abs(p[:, 1:2] - t.permute(1, 0)[1:2, :]) #** 2
+        dist_z = torch.abs(p[:, 2:3] - t.permute(1, 0)[2:3, :]) #** 2
+        dist_d = torch.abs(p[:, 3:4] - t.permute(1, 0)[3:4, :]) #** 2
+        dist_xy = (dist_x + dist_y) / 2.
+        dist_xyzd = (dist_x + dist_y + dist_z + dist_d) / 4.
 
-        # Compute the min loss
-        losses, _ = torch.min(dist_xy, 1)
-        loss_xy = torch.sum(losses)
-        batch_loss.append(loss_xy)
-
+        # Compute the min loss using Hungarian algorithm
+        row_ind, col_ind = scipy.optimize.linear_sum_assignment(dist_xy.cpu())
+        
+        #losses, col_ind = torch.min(dist_xy, 1)
+        #loss = [dist_xyzd[k,i] for k,i in enumerate(col_ind)]
+        #batch_loss += loss
+        batch_loss.append(dist_xyzd[col_ind, row_ind])
+        
         if return_coordinate_errors:
-            # Determine index of true particle that matched with pred particle
-            max_idx = torch.argmin(dist_xy, axis=1)
-
-            # Compute the coordinate losses
-            #torch.mean(torch.abs(true[0][max_idx] - pred[0]), 0)
             coordinate_errors = defaultdict(list)
-            t = t[max_idx]
+            t = t[col_ind]
             for (_t, _p) in zip(t, p):
                 coordinate_errors["batch_id"].append(k)
                 coordinate_errors["x"].append([_t[0].item(), _p[0].item()])
@@ -310,7 +436,7 @@ def distance_sorted_loss(true_part, pred_part, return_coordinate_errors=False):
                 coordinate_errors["d"].append([_t[3].item(), _p[3].item()])
             total_coordinate_errors.append(coordinate_errors)
             
-    batch_loss = torch.mean(torch.stack(batch_loss))
+    batch_loss = torch.mean(torch.cat(batch_loss))
     
     if return_coordinate_errors:
         return batch_loss, total_coordinate_errors

@@ -1,8 +1,8 @@
 log:
-  save_path: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/double_channel_1221/log.txt"
+  save_path: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/double_channel_0203/log.txt"
 
 slurm:
-  jobs: 20
+  jobs: 10
   kernel: "ncar_pylib /glade/work/schreck/py37"
   bash: ["module load ncarenv/1.3 gnu/8.3.0 openmpi/3.1.4 python/3.7.5 cuda/10.1"]
   batch:
@@ -10,30 +10,31 @@ slurm:
     gres: "gpu:v100:1"
     mem: "128G"
     n: 8
-    t: "12:00:00"
-    J: "holo_opt-1"
-    o: "holo_opt-1.out"
-    e: "holo_opt-1.err"
+    t: "24:00:00"
+    J: "holo_opt"
+    o: "holo_opt.out"
+    e: "holo_opt.err"
     
 optuna:
-  name: "vae_multi.db"
+  study_name: "holodec"
+  storage: "sqlite:///double_channel_0203/holodec.db"
   reload: 1
   objective: "/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/objective.py"
   direction: "minimize"
   metric: "val_loss"
   n_trials: 999
   gpu: True
-  save_path: '/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/double_channel_1221'
+  save_path: '/glade/work/schreck/repos/holodec-ml/scripts/schreck/vae/hyper_opt/double_channel_0203'
   sampler:
     type: "TPESampler"
-    n_startup_trials: 100
+    n_startup_trials: 200
   parameters:
     dense_hidden_dim1:
       type: "int"
       settings:
         name: "dense_hidden_dim1"
         low: 1
-        high: 50
+        high: 200
     dense_hidden_dim2:
       type: "int"
       settings:
@@ -45,13 +46,13 @@ optuna:
       settings:
         name: "dense_hidden_dim3"
         low: 1
-        high: 300
+        high: 500
     dense_hidden_dim4:
       type: "int"
       settings:
         name: "dense_hidden_dim4"
         low: 1
-        high: 500
+        high: 1000
     dense_hidden_dim5:
       type: "int"
       settings:
@@ -76,6 +77,12 @@ optuna:
         name: "beta"
         low: 0.0001
         high: 4200.0
+    train_iterator:batch_size:
+      type: "int"
+      settings:
+        name: "batch_size"
+        low: 2
+        high: 40
     optimizer:lr:
       type: "loguniform"
       settings:
@@ -88,3 +95,13 @@ optuna:
         name: "weight_decay"
         low: 0.00000001
         high: 0.1
+    optimizer:type:
+      type: "categorical"
+      settings: 
+        name: "optimizer_type"
+        choices: ["lookahead-diffgrad", "diffgrad", "lookahead-radam", "radam", "adam", "sgd", "adadelta", "adagrad", "adamw", "adamax", "asgd", "rmsprop"]
+    trainer:training_loss:
+      type: "categorical"
+      settings: 
+        name: "loss"
+        choices: ["mse", "mae", "logcosh", "xsigmoid", "xtanh"]

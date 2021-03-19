@@ -25,7 +25,7 @@ from torch.optim.lr_scheduler import *
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
 
-from aimlutils.hyper_opt.base_objective import *
+from aimlutils.echo.src.base_objective import *
 from aimlutils.torch.checkpoint import *
 from aimlutils.torch.losses import *
 from aimlutils.utils.tqdm import *
@@ -59,20 +59,27 @@ def custom_updates(trial, conf):
     if dr1 is not None:
         conf["regressor"]["dropouts"] = [dr1] + [dr2 for k in range(n_layers)]
     
+#     # Update the number of bins in the image
+#     if 'bins' in hyperparameters:
+#         bins = trial_suggest_loader(trial, hyperparameters['bins'])
+#         conf["train_data"]["bins"] = bins
+#         conf["validation_data"]["bins"] = bins
+
     # Update the number of bins in the image
-    if 'bins' in hyperparameters:
-        bins = trial_suggest_loader(trial, hyperparameters['bins'])
-        conf["train_data"]["bins"] = bins
-        conf["validation_data"]["bins"] = bins
+    if 'bins_x' in hyperparameters:
+        bins_x = trial_suggest_loader(trial, hyperparameters['bins_x'])
+        bins_y = trial_suggest_loader(trial, hyperparameters['bins_y'])
+        conf["train_data"]["bins"] = [bins_x, bins_y]
+        conf["validation_data"]["bins"] = [bins_x, bins_y]
     
     return conf
 
 
 class Objective(BaseObjective):
     
-    def __init__(self, study, config, metric = "val_loss", device = "cpu"):
+    def __init__(self, config, metric = "val_loss", device = "cpu"):
         
-        BaseObjective.__init__(self, study, config, metric, device)
+        BaseObjective.__init__(self, config, metric, device)
         
         if self.device != "cpu":
             torch.backends.cudnn.benchmark = True

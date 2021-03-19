@@ -1,4 +1,5 @@
 import math
+import copy
 import torch
 import logging
 import torch.nn as nn
@@ -15,6 +16,7 @@ def LoadOptimizer(config: Dict[str, str], parameters: Dict[str, float]):
         logger.warning("In order to load a model you must supply the type field.")
         raise OSError("Failed to load a data reader. Exiting")
         
+    config = copy.deepcopy(config)
     optimizer_type = config.pop("type")
 
     if optimizer_type == "lookahead-diffgrad":
@@ -29,12 +31,23 @@ def LoadOptimizer(config: Dict[str, str], parameters: Dict[str, float]):
         optimizer = torch.optim.Adam(parameters, **config)
     elif optimizer_type == "sgd":
         optimizer = torch.optim.SGD(parameters, **config)
+    elif optimizer_type == "adadelta":
+        optimizer = torch.optim.Adadelta(parameters, **config)
+    elif optimizer_type == "adagrad":
+        optimizer = torch.optim.Adagrad(parameters, **config)
+    elif optimizer_type == "adamw":
+        optimizer = torch.optim.AdamW(parameters, **config)
+    elif optimizer_type == "adamax":
+        optimizer = torch.optim.Adamax(parameters, **config)
+    elif optimizer_type == "asgd":
+        optimizer = torch.optim.ASGD(parameters, **config)
+    elif optimizer_type == "rmsprop":
+        optimizer = torch.optim.RMSprop(parameters, **config)
     else:
         logging.warning(
             f"Optimzer type {optimizer_type} is unknown. Exiting with error."
         )
         sys.exit(1)
-        
         
     learning_rate = config["lr"] if "lr" in config else 0.001
     weight_decay = config["weight_decay"] if "weight_decay" in config else 0.0

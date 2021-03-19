@@ -9,15 +9,15 @@ import traceback
 import numpy as np
 
 from overrides import overrides
-from holodecml.vae.losses import *
-from holodecml.vae.visual import *
-from holodecml.vae.models import *
-from holodecml.vae.trainers import *
-from holodecml.vae.transforms import *
-from holodecml.vae.optimizers import *
-from holodecml.vae.data_loader import *
-from holodecml.vae.checkpointer import *
-from aimlutils.hyper_opt.base_objective import *
+from holodecml.torch.losses import *
+from holodecml.torch.visual import *
+from holodecml.torch.models.cnn import *
+from holodecml.torch.trainers import *
+from holodecml.torch.transforms import *
+from holodecml.torch.optimizers import *
+from holodecml.torch.data_loader import *
+from holodecml.torch.checkpointer import *
+from aimlutils.echo.src.base_objective import *
 
 from torch import nn
 from torch.optim.lr_scheduler import *
@@ -49,9 +49,9 @@ def custom_updates(trial, conf):
 
 class Objective(BaseObjective):
     
-    def __init__(self, study, config, metric = "val_loss", device = "cpu"):
+    def __init__(self, config, metric = "val_loss", device = "cpu"):
         
-        BaseObjective.__init__(self, study, config, metric, device)
+        BaseObjective.__init__(self, config, metric, device)
         
         if self.device != "cpu":
             torch.backends.cudnn.benchmark = True
@@ -95,12 +95,12 @@ class Objective(BaseObjective):
         # Load data iterators from pytorch
         train_dataloader = DataLoader(
             train_gen,
-            **conf["iterator"]
+            **conf["train_iterator"]
         )
 
         valid_dataloader = DataLoader(
             valid_gen,
-            **conf["iterator"]
+            **conf["valid_iterator"]
         )
 
         # Load the trainer
@@ -165,12 +165,14 @@ class CustomTrainer(BaseTrainer):
             try:
                 train_loss, train_mse, train_bce = self.train_one_epoch(epoch)
                 test_loss, test_mae, test_mse, test_bce = self.test(epoch)
+            
             except Exception as E: # CUDA memory overflow
                 if "CUDA" in str(E) or "cublas" in str(E):
                     logger.info(
                         "Failed to train the model due to GPU memory overflow."
                     )
-                    raise ValueError(f"{str(E)}") # FAIL the trial, but do not stop the study
+                    raise optuna.TrialPruned()
+                    #raise ValueError(f"{str(E)}") # FAIL the trial, but do not stop the study
                 else:
                     raise OSError(f"{str(E)}") # FAIL the trial and stop the study
                     

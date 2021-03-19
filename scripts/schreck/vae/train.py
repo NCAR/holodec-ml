@@ -20,7 +20,7 @@ from holodecml.torch.data_loader import *
 from holodecml.torch.beam_search import *
 
 from aimlutils.torch.checkpoint import *
-from aimlutils.hyper_opt.base_objective import *
+from aimlutils.echo.src.base_objective import *
 
 from torch import nn
 from torch.optim.lr_scheduler import *
@@ -30,7 +30,7 @@ from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
 
 def train(conf):   
         
-    random.seed(5000)
+    #random.seed(5000)
     
     is_cuda = torch.cuda.is_available()
     device = torch.device(torch.cuda.current_device()) if is_cuda else torch.device("cpu")
@@ -67,7 +67,7 @@ def train(conf):
 
     valid_dataloader = DataLoader(
         valid_gen,
-        **conf["validation_iterator"]
+        **conf["valid_iterator"]
     )
 
     # Load a trainer object
