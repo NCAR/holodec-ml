@@ -2,6 +2,8 @@
 import pandas as pd
 import numpy as np
 import joblib
+import signal
+import copy
 
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.keypoint_rcnn import KeypointRCNNPredictor
@@ -26,19 +28,10 @@ import yaml
 import sys
 import os
 
-#from holodecml.torch.losses import *
-#from holodecml.torch.transforms import *
-#from holodecml.torch.optimizers import *
-
-#from aimlutils.echo.src.base_objective import *
-#from aimlutils.torch.checkpoint import *
-#from aimlutils.utils.tqdm import *
-
 import matplotlib.pyplot as plt 
 import matplotlib.patches as patches
 
 sys.path.append("./utils")
-from utils.losses import *
 from utils.transforms import *
 from utils.optimizers import * 
 from utils.checkpointer import *
@@ -114,6 +107,11 @@ def collate_fn(batch):
     # utility to turn a batch into a batch tuple
     return tuple(zip(*batch))
 
+
+def worker_init(x):
+    # this will make the torch iterators die on a keyboard interrupt
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     
 def train(conf):
     
@@ -161,13 +159,15 @@ def train(conf):
     train_dataloader = DataLoader(
         train_gen,
         **conf["train_iterator"],
-        collate_fn = collate_fn
+        collate_fn = collate_fn,
+        worker_init_fn = worker_init
     )
 
     valid_dataloader = DataLoader(
         valid_gen,
         **conf["valid_iterator"],
-        collate_fn = collate_fn
+        collate_fn = collate_fn,
+        worker_init_fn = worker_init
     )
     
     # Load an object detection model
@@ -447,6 +447,13 @@ if __name__ == '__main__':
     with open(sys.argv[1]) as config_file:
         config = yaml.load(config_file, Loader=yaml.FullLoader)
         
+    try:
+        assert os.path.isdir(config["log"])
+    except:
+        print(f"Please create the results directory ({config['log']}) and try again:")
+        sys.exit(0)
+    
+        
     # Copy the current model config file to the model weights save location
     save_location = os.path.join(
         config["callbacks"]["MetricsLogger"]["path_save"],
@@ -481,4 +488,8 @@ if __name__ == '__main__':
     ############################################################
     
     # Train and validate a model 
-    best_model_results = train(config)
+    try:
+        best_model_results = train(config)
+        
+    except KeyboardInterrupt:
+        sys.exit(0)

@@ -19,6 +19,7 @@ def load_checkpoint(checkpoint_path: str):
 
 
 class EarlyStopping:
+    """Saves the model after each epoch and keep track of the best model"""
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
     def __init__(self,
