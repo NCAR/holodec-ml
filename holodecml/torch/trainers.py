@@ -130,7 +130,7 @@ class BaseTrainer:
         if len(kld_weight) == 0:
             self.kld_weight = [
                 self.batch_size/self.train_gen.__len__(),
-                self.batch_size/self.valid_gen.__len__()
+                self.valid_dataloader.batch_size/self.valid_gen.__len__()
             ]
             
         logger.info(f"Using mse/kld weights {self.alpha}/{self.beta} during training")
@@ -237,7 +237,7 @@ class BaseTrainer:
 
         self.model.eval()
         batches_per_epoch = int(
-            np.ceil(self.valid_gen.__len__() / self.batch_size))
+            np.ceil(self.valid_gen.__len__() / self.valid_dataloader.batch_size))
 
         with torch.no_grad():
 
@@ -527,7 +527,7 @@ class BaseEncoderTrainer:
         
         self.model.eval()
         batches_per_epoch = int(
-            np.ceil(self.valid_gen.__len__() / self.batch_size))
+            np.ceil(self.valid_gen.__len__() / self.valid_dataloader.batch_size))
         
         bce_weight = 1.0 #/ batches_per_epoch
 

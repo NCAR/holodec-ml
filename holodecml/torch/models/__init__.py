@@ -37,9 +37,11 @@ def LoadModel(config):
         model = MultiHeadDenseOutput(**config)
     elif model_type == "gru-decoder":
         model = DecoderRNN(**config)
+    elif model_type == "resnet-vae":
+        model = ResNetVAE(**config)
     else:
         logger.info(
-            f"Unsupported model type {model_type}. Choose from vae, att-vae, encoder-vae, multi-head-dense, or gru-decoder. Exiting."
+            f"Unsupported model type {model_type}. Choose from vae, att-vae, encoder-vae, resnet-vae, multi-head-dense, or gru-decoder. Exiting."
         )
         sys.exit(1)
     
