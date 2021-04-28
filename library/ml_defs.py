@@ -366,3 +366,9 @@ def cum_poisson_nll(y_true,y_pred):
     """
     return K.sum(K.cumsum(y_pred,axis=1)-K.cumsum(K.cast(y_true,'float32'),axis=1)*K.log(K.cumsum(y_pred,axis=1)+1e-9),axis=1)
 
+def cum_mse(y_true,y_pred):
+    """
+    mean square error of CDF of output
+    """
+    return K.sum(K.square(K.cumsum(y_pred,axis=1)-K.cumsum(K.cast(y_true,'float32'),axis=1)),axis=1)
+
