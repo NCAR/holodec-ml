@@ -22,9 +22,9 @@ settings = {
 
             # optimization definitions: high, low and initial value
             'learning_rate':[1e-4,1e-2,1e-3], 
-            'num_dense_layers':[0,4,2],
-            'num_input_nodes':[1,1028,512],
-            'num_dense_nodes':[1,1028,128],
+            'num_dense_layers':[0,10,4],
+            'num_input_nodes':[1,4096,1024],
+            'num_dense_nodes':[1,4096,512],
             'activation':['relu', 'sigmoid','relu'], # categorical list, last is initial value
             'batch_size':[16,256,32],
             'adam_decay':[1e-6,1e-2,1e-3],
