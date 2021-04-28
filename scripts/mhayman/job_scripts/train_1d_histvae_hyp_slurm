@@ -1,21 +1,14 @@
 #!/bin/bash -l
 ### Job Name
-#PBS -N hypvae
+#SBATCH --job-name=hypvae
 ### Project code
-#PBS -A NEOL0007
-#PBS -l walltime=12:00:00
-#PBS -q casper
-### Merge output and error files
-###PBS -j oe
-###PBS -k eod
-#PBS -o hypvae.o
-#PBS -e hypvae.e
-### Select 1 node with 36 CPUs
-#PBS -l select=1:ngpus=1 -l gpu_type=v100
-### Send email on abort, begin and end
-###PBS -m abe
-### Specify mail recipient
-#PBS -M mhayman@ucar.edu
+#SBATCH --account=NEOL0007
+#SBATCH --ntasks=1
+###SBATCH --cpus-per-task=16
+#SBATCH --time=12:00:00
+#SBATCH --gres=gpu:v100:1
+#SBATCH --output=hypvae.o%j
+
 
 export TMPDIR=/glade/scratch/$USER/temp
 mkdir -p $TMPDIR

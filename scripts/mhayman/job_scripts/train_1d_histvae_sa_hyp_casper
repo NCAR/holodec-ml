@@ -8,8 +8,8 @@
 ### Merge output and error files
 ###PBS -j oe
 ###PBS -k eod
-#PBS -o hypvae.o
-#PBS -e hypvae.e
+#PBS -o hypvaeSA.o
+#PBS -e hypvaeSA.e
 ### Select 1 node with 36 CPUs
 #PBS -l select=1:ngpus=1 -l gpu_type=v100
 ### Send email on abort, begin and end
@@ -33,4 +33,4 @@ source activate ml-casper
 #pip install -e .
 
 ### Run the executable
-python run_opt_hyp_histvae_d.py
+python run_opt_hyp_histvae_sa_d.py

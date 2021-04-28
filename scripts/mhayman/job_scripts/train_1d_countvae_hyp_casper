@@ -1,6 +1,6 @@
 #!/bin/bash -l
 ### Job Name
-#PBS -N hypvae
+#PBS -N countvae
 ### Project code
 #PBS -A NEOL0007
 #PBS -l walltime=12:00:00
@@ -8,8 +8,8 @@
 ### Merge output and error files
 ###PBS -j oe
 ###PBS -k eod
-#PBS -o hypvae.o
-#PBS -e hypvae.e
+#PBS -o countvae.o
+#PBS -e countvae.e
 ### Select 1 node with 36 CPUs
 #PBS -l select=1:ngpus=1 -l gpu_type=v100
 ### Send email on abort, begin and end
@@ -33,4 +33,4 @@ source activate ml-casper
 #pip install -e .
 
 ### Run the executable
-python run_opt_hyp_histvae_d.py
+python run_opt_hyp_countvae_d.py
