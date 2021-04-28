@@ -47,8 +47,8 @@ import ml_defs as mldef
 start_time = datetime.datetime.now()
 
 # multiplier and bias
-# input_dct = {'mu':[1.0,0.0],'logsig':[1.0,0.0]} 
-input_dct = {'z_latent':[1.0,0.0]} 
+input_dct = {'mu':[1.0,0.0],'logsig':[1.0,0.0]} 
+# input_dct = {'z_latent':[1.0,0.0]} 
 # dmin=0
 input_variable = list(input_dct.keys())
 # input_variable = ['mu','logsig']  # data variable used as an input
@@ -535,7 +535,7 @@ for holo_num in settings['holo_examples']:
     ax_lst[0].pcolormesh(ds['d_bin_edges'],ds['z_bin_edges'],preds_original.isel(hologram_number=holo_num).values.T)
     ax_lst[0].set_xlabel('diameter [$mu m$]')
     ax_lst[0].set_ylabel('z position [$mu m$]')
-    ax_lst[0].title('Predicted')
+    ax_lst[0].set_title('Predicted')
 
     ax_lst[1].pcolormesh(ds['d_bin_edges'],ds['z_bin_edges'],test_labels.isel(hologram_number=holo_num).values.T)
     ax_lst[1].set_xlabel('diameter [$mu m$]')
