@@ -159,11 +159,15 @@ z_decoded = Conv2D(1,(1,1),padding="same",activation=settings['out_act'])(return
 
 class CustomVariationalLayer(Layer):
     def vae_loss(self,x,z_decoded,z_mean,z_log_var):
-        x_mse_loss = tensorflow.keras.metrics.mse(x,z_decoded)
-        x_mse_loss = K.mean(K.square(x-z_decoded),axis=[1,2,3])
+        x_mse_loss = K.mean(K.square(x-z_decoded),axis=[-1,-2,-3]) # ,axis=[-1,-2,-3]
+        # assert np.sum(np.isnan(x_mse_loss)) == 0,('Nan in mse term')
+            
         beta = settings['beta']
         kl_loss = -beta*K.mean(1+z_log_var-K.square(z_mean) - K.exp(z_log_var),axis=-1)
-        return K.mean(x_mse_loss+ kl_loss)
+        # assert np.sum(np.isnan(kl_loss)) == 0, ('Nan found in kl_loss term')
+        
+        # K.mean(x_mse_loss + kl_loss)
+        return K.mean(x_mse_loss + kl_loss)
 
     def call(self,inputs):
         x = inputs[0]
