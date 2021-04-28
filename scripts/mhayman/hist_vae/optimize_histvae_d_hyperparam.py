@@ -46,8 +46,13 @@ import ml_defs as mldef
 
 start_time = datetime.datetime.now()
 
-input_variable = ['mu','logsig']  # data variable used as an input
-label_variable = ['d_hist']  # data variable used labels for training
+# multiplier and bias
+input_dct = {'mu':[1.0,0.0],'logsig':[1.0,0.0]} 
+# input_dct = {'z_latent':[1.0,0.0]} 
+dmin=0
+input_variable = list(input_dct.keys())
+# input_variable = ['mu','logsig']  # data variable used as an input
+label_variable = ['d_hist']  # data variable used labels for training, 'd_hist'
 moment_label = 'moments_nolim'  # name of the moment deat in the file
 
 save_file_base = settings['data_file'].replace('.nc','')+'_HypOpt_NN_'+start_time.strftime('%Y%m%dT%H%M%S')
@@ -76,7 +81,7 @@ fit_kwargs = {}
 
 if settings.get('early_stopping',False):
     # implement early stopping in fit routine
-    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50)
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
     fit_kwargs['callbacks'] =[es]     #model.fit(..., callbacks=cb_list)
 
 
@@ -88,6 +93,8 @@ elif settings['loss_function'].lower() == 'poisson':
     loss_func = mldef.poisson_nll
 elif settings['loss_function'].lower() == 'cum_poisson':
     loss_func = mldef.cum_poisson_nll
+elif settings['loss_function'].lower() == 'cum_mse':
+    loss_func = mldef.cum_mse
 else:
     loss_func = settings['loss_function']
 
@@ -118,55 +125,69 @@ with xr.open_dataset(paths['load_data']+settings['data_file'],chunks={'hologram_
         train_moments = ds[moment_label]
         train_lab_lst = []
         lab_size_lst = []
+        print('training labels:')
         for lab_var in label_variable:
-            train_lab_lst += [ds[lab_var].rename({ds[lab_var].dims[1]:'dense_output'})]
+            print(lab_var+': %f,%f'%(ds[lab_var].max(),ds[lab_var].min()))
+            train_lab_lst += [ds[lab_var].sel(d_bin_centers=slice(dmin,None)).rename({ds[lab_var].dims[1]:'dense_output'})]
             lab_size_lst+=[ds[lab_var].shape[1]]
         train_labels = xr.concat(train_lab_lst,dim=('dense_output'))
-        train_labels.transpose('hologram_number','dense_output')
+        train_labels = train_labels.transpose('hologram_number','dense_output')
+        hist_axes = ds['d_bin_centers']
 
         train_data_lst = []
         data_size_lst = []
+        print('training inputs:')
         for in_var in input_variable:
-            train_data_lst += [ds[in_var].rename({ds[in_var].dims[1]:'dense_input'})]
+            print(in_var+': %f,%f'%(ds[in_var].max(),ds[in_var].min()))
+            train_data_lst += [input_dct[in_var][0]*(ds[in_var].rename({ds[in_var].dims[1]:'dense_input'})+input_dct[in_var][1])]
             data_size_lst+=[ds[in_var].shape[1]]
-        train_data = xr.concat(train_lab_lst,dim=('dense_input'))
-        train_data.transpose('hologram_number','dense_input')
+        train_data = xr.concat(train_data_lst,dim=('dense_input'))
+        train_data = train_data.transpose('hologram_number','dense_input')
 
-        input_scaler = ml.MinMaxScalerX(train_data,dim=train_data.dims[:-1])
-        scaled_train_input = input_scaler.fit_transform(train_data)
+        if settings['scale_inputs']:
+            # input_scaler = ml.MinMaxScalerX(train_data,dim=train_data.dims[:-1])
+            input_scaler = ml.MinMaxScalerX(train_data)
+            scaled_train_input = input_scaler.fit_transform(train_data)
+        else:
+            scaled_train_input = train_data
 
         with xr.open_dataset(paths['load_data']+settings['test_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_test:
             test_moments = ds_test[moment_label]
 
             test_lab_lst = []
             for lab_var in label_variable:
-                test_lab_lst += [ds_test[lab_var].rename({ds_test[lab_var].dims[1]:'dense_output'})]
+                test_lab_lst += [ds_test[lab_var].sel(d_bin_centers=slice(dmin,None)).rename({ds_test[lab_var].dims[1]:'dense_output'})]
             test_labels = xr.concat(test_lab_lst,dim=('dense_output'))
-            test_labels.transpose('hologram_number','dense_output')
+            test_labels=test_labels.transpose('hologram_number','dense_output')
 
             test_data_lst = []
             for in_var in input_variable:
-                train_data_lst += [ds_test[in_var].rename({ds_test[in_var].dims[1]:'dense_input'})]
-            test_data = xr.concat(test_lab_lst,dim=('dense_input'))
-            test_data.transpose('hologram_number','dense_input')
-            
-            scaled_test_input = input_scaler.fit_transform(test_data)
+                test_data_lst += [input_dct[in_var][0]*(ds_test[in_var].rename({ds_test[in_var].dims[1]:'dense_input'})+input_dct[in_var][1])]
+            test_data = xr.concat(test_data_lst,dim=('dense_input'))
+            test_data=test_data.transpose('hologram_number','dense_input')
+            if settings['scale_inputs']:
+                scaled_test_input = input_scaler.fit_transform(test_data)
+            else:
+                scaled_test_input = test_data
         with xr.open_dataset(paths['load_data']+settings['validation_file'],chunks={'hologram_number':settings['h_chunk']}) as ds_valid:
             valid_moments = ds_valid[moment_label]
             
             valid_lab_lst = []
             for lab_var in label_variable:
-                valid_lab_lst += [ds_valid[lab_var].rename({ds_valid[lab_var].dims[1]:'dense_output'})]
+                valid_lab_lst += [ds_valid[lab_var].sel(d_bin_centers=slice(dmin,None)).rename({ds_valid[lab_var].dims[1]:'dense_output'})]
             valid_labels = xr.concat(valid_lab_lst,dim=('dense_output'))
-            valid_labels.transpose('hologram_number','dense_output')
+            valid_labels=valid_labels.transpose('hologram_number','dense_output')
 
             valid_data_lst = []
             for in_var in input_variable:
-                valid_data_lst += [ds_valid[in_var].rename({ds_valid[in_var].dims[1]:'dense_input'})]
-            valid_data = xr.concat(valid_lab_lst,dim=('dense_input'))
-            valid_data.transpose('hologram_number','dense_input')
+                valid_data_lst += [input_dct[in_var][0]*(ds_valid[in_var].rename({ds_valid[in_var].dims[1]:'dense_input'})+input_dct[in_var][1])]
+            valid_data = xr.concat(valid_data_lst,dim=('dense_input'))
+            valid_data=valid_data.transpose('hologram_number','dense_input')
 
-            scaled_valid_input = input_scaler.fit_transform(valid_data)
+            if settings['scale_inputs']:
+                scaled_valid_input = input_scaler.fit_transform(valid_data)
+            else:
+                scaled_valid_input = valid_data
 
         # train_labels = ds[label_variable]
         # train_moments = ds['histogram_moments']
@@ -453,11 +474,23 @@ cnn_stop = datetime.datetime.now()
 print(f"{scaled_test_input.sizes['hologram_number']} samples in {(cnn_stop-cnn_start).total_seconds()} seconds")
 print(f"for {(cnn_stop-cnn_start).total_seconds()/scaled_test_input.sizes['hologram_number']} seconds per hologram")
 
-if len(preds_out.shape)==2:
-    preds_out = preds_out[...,np.newaxis]
+# if len(preds_out.shape)==2:
+#     preds_out = preds_out[...,np.newaxis]
+# 
+# preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','dense_output'),
+#                             coords=scaled_test_labels.coords)
 
-preds_out_da = xr.DataArray(preds_out,dims=('hologram_number','histogram_bin_centers'),
-                            coords=scaled_test_labels.coords)
+# diameter
+preds_out_da = xr.DataArray(preds_out,
+                            dims=('hologram_number','d_bin_centers'),
+                            coords={'hologram_number':scaled_test_labels.coords['hologram_number'],
+                                'd_bin_centers':hist_axes})
+
+# z
+# preds_out_da = xr.DataArray(preds_out,
+#                             dims=('hologram_number','z_bin_centers'),
+#                             coords={'hologram_number':scaled_test_labels.coords['hologram_number'],
+#                                 'z_bin_centers':hist_axes})
 
 if settings.get('scale_labels',True):
     preds_original = output_scaler.inverse_transform(preds_out_da)
@@ -518,6 +551,11 @@ for holo_num in settings['holo_examples']:
     if np.mean(np.diff(ds['d_bin_edges'].values)) != np.diff(ds['d_bin_edges'].values[0:2])[0]:
         plt.xscale('log')
     plt.savefig(save_file_path+save_file_base+f"_ExampleCDF_ih{holo_num}.png", dpi=200, bbox_inches="tight")
+
+    plt.figure()
+    plt.plot(scaled_test_input.isel(hologram_number=holo_num).values)
+    # plt.legend()
+    plt.savefig(save_file_path+save_file_base+f"_ExampleInput_ih{holo_num}.png", dpi=200, bbox_inches="tight")
 
     # if scaled_test_input.isel(hologram_number=holo_num,input_channels=0).values.ndim == 2:
     #     plt.figure()
