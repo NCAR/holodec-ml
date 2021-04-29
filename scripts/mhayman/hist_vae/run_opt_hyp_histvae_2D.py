@@ -17,18 +17,18 @@ settings = {
             'loss_function':'binary_crossentropy',     # loss function 'cum_poisson', 'kstest'
             'log_input':False,     # include log of the input data as input
             'early_stopping':True,  # implement early stopping
-            'h_chunk':32,      # xarray chunk size when loading
+            'h_chunk':128,      # xarray chunk size when loading
             'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267],  # example outputs
 
             # optimization definitions: high, low and initial value
             'learning_rate':[1e-4,1e-2,1e-3], 
-            'num_dense_layers':[0,10,4],
-            'num_input_nodes':[1,4096,1024],
-            'num_dense_nodes':[1,4096,512],
+            'num_dense_layers':[1,15,9],
+            'num_input_nodes':[512,4096,2048],
+            'num_dense_nodes':[512,4096,2048],
             'activation':['relu', 'sigmoid','relu'], # categorical list, last is initial value
             'batch_size':[16,256,32],
             'adam_decay':[1e-6,1e-2,1e-3],
-            'epoch_count':[10,500,100],
+            'epoch_count':[100,500,400],
 
             # gp_minimize arguments
             'n_calls':12,
