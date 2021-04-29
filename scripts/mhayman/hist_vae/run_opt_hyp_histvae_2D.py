@@ -19,12 +19,14 @@ settings = {
             'early_stopping':True,  # implement early stopping
             'h_chunk':128,      # xarray chunk size when loading
             'holo_examples':[1, 4, 9, 50, 53, 77, 91, 101, 105, 267],  # example outputs
+            'output_regularizer':1e-4,  # L1 regularization of last node
+            'dense_regularizer':1e-6,   # L1 regularization of dense nodes
 
             # optimization definitions: high, low and initial value
             'learning_rate':[1e-4,1e-2,1e-3], 
             'num_dense_layers':[1,15,9],
-            'num_input_nodes':[512,4096,2048],
-            'num_dense_nodes':[512,4096,2048],
+            'num_input_nodes':[512,4096,3000],
+            'num_dense_nodes':[512,4096,3000],
             'activation':['relu', 'sigmoid','relu'], # categorical list, last is initial value
             'batch_size':[16,256,32],
             'adam_decay':[1e-6,1e-2,1e-3],

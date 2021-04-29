@@ -29,6 +29,7 @@ from tensorflow.keras.utils import plot_model
 import tensorflow.keras.losses
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras import regularizers
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -322,11 +323,11 @@ def create_model(learning_rate, num_dense_layers,num_input_nodes,
 
     for lyr_cnt in range(num_dense_layers):
         print(f'   Layer {lyr_cnt+1}: '+str(num_dense_nodes)+', '+activation)
-        mod.add(Dense(num_dense_nodes,activation=activation))
+        mod.add(Dense(num_dense_nodes,activation=activation,activity_regularizer=regularizers.l1(settings['dense_regularizer'])))
 
     # add the output layer
     print('   Output Layer: '+str(np.prod(scaled_train_labels.shape[1:]))+', '+settings['output_activation'])
-    mod.add(Dense(np.prod(scaled_train_labels.shape[1:]),activation=settings['output_activation']))
+    mod.add(Dense(np.prod(scaled_train_labels.shape[1:]),activation=settings['output_activation'],activity_regularizer=regularizers.l1(settings['output_regularizer'])))
 
     adam = Adam(lr=learning_rate, decay= adam_decay)
     mod.compile(optimizer=adam, loss=loss_func, metrics=['acc'])
