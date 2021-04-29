@@ -537,7 +537,7 @@ for holo_num in settings['holo_examples']:
     ax_lst[0].set_ylabel('z position [$mu m$]')
     ax_lst[0].set_title('Predicted')
 
-    ax_lst[1].pcolormesh(ds['d_bin_edges'],ds['z_bin_edges'],test_labels.isel(hologram_number=holo_num).values.T)
+    ax_lst[1].pcolormesh(ds['d_bin_edges'],ds['z_bin_edges'],test_labels.unstack('dense_output').isel(hologram_number=holo_num).values.T)
     ax_lst[1].set_xlabel('diameter [$mu m$]')
     # ax_lst[1].set_ylabel('z position [$mu m$]')
     ax_lst[1].set_title('Actual')
