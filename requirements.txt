@@ -8,3 +8,5 @@ netcdf4
 Pillow
 torch
 tqdm
+torch
+torchvision
