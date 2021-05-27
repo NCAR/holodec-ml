@@ -16,7 +16,7 @@ train_data:
     '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_12-25particle_gamma_600x400_training.nc': 80000
     }
   output_cols: ["x", "y", "z", "d"]
-  maxnum_particles: 100
+  maxnum_particles: 25
   shuffle: True
   labels: False
   
@@ -36,7 +36,27 @@ validation_data:
     '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_12-25particle_gamma_600x400_validation.nc': 8000
     }
   output_cols: ["x", "y", "z", "d"]
-  maxnum_particles: 10
+  maxnum_particles: 25
+  shuffle: False
+  labels: False
+  
+test_data:
+  type: "multi"
+  path_data: {
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_1particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_2particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_3particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_4particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_5particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_6particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_7particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_8particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_9particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_10particle_gamma_600x400_test.nc': 1000,
+    '/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_12-25particle_gamma_600x400_test.nc': 8000
+    }
+  output_cols: ["x", "y", "z", "d"]
+  maxnum_particles: 25
   shuffle: False
   labels: False
   
