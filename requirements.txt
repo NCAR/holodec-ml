@@ -8,8 +8,3 @@ netcdf4
 Pillow
 torch
 tqdm
-PyYAML
-scikit-learn
-scikit-image
-opencv-python
-torchvision
