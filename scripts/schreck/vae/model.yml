@@ -1,4 +1,4 @@
-log: '/glade/work/schreck/repos/HOLO/holodec-ml/scripts/schreck/vae/result/18_self_att'
+log: '/glade/work/schreck/repos/HOLO/merge/holodec-ml/scripts/schreck/vae'
 
 train_data:
   type: "multi"
@@ -73,13 +73,11 @@ test_iterator:
   shuffle: False
   
 model:
-  type: "resnet-vae"
+  type: "att-vae"
   image_channels: 1
   out_image_channels: 2
   hidden_dims: [114, 59, 34, 627, 544, 2000]
   z_dim: 1014
-  resnet: 18
-  pretrained: True
   weights: False
 
 optimizer:
@@ -89,12 +87,12 @@ optimizer:
 
 callbacks:
   MetricsLogger:
-    path_save: "/glade/work/schreck/repos/HOLO/holodec-ml/scripts/schreck/vae/result/18_self_att"
+    path_save: "/glade/work/schreck/repos/HOLO/merge/holodec-ml/scripts/schreck/vae"
     reload: False
   EarlyStopping:
     patience: 3
     verbose: True
-    path_save: "/glade/work/schreck/repos/HOLO/holodec-ml/scripts/schreck/vae/result/18_self_att/checkpoint.pt"
+    path_save: "/glade/work/schreck/repos/HOLO/merge/holodec-ml/scripts/schreck/vae/checkpoint.pt"
 #   ExponentialLR:
 #     gamma: 0.99
     
@@ -110,9 +108,8 @@ trainer:
   training_loss: "xtanh"
   start_epoch: 0
   epochs: 1000
-  batches_per_epoch: 1000
+  batches_per_epoch: 10
   clip: 2.0
   alpha: 1.0
   beta: 29.73333480107324
-  path_save: "/glade/work/schreck/repos/HOLO/holodec-ml/scripts/schreck/vae/result/18_self_att"
-  test_image: "/glade/work/schreck/repos/HOLO/holodec-ml/holodecml/torch/images/image_600.pkl"
+  path_save: "/glade/work/schreck/repos/HOLO/merge/holodec-ml/scripts/schreck/vae"

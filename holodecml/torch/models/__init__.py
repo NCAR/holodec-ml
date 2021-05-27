@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 import logging
 import torch.nn as nn
@@ -10,10 +11,7 @@ from holodecml.torch.spectral import SpectralNorm
 from holodecml.torch.attention import Self_Attention
 
 from .cnn import *
-from .dense import *
-from .rnn import *
 
-# some pytorch examples - https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +27,12 @@ def LoadModel(config):
     
     if model_type == "vae":
         model = CNN_VAE(**config)
+    
     elif model_type == "att-vae":
         model = ATTENTION_VAE(**config)
-    elif model_type == "encoder-vae":
-        model = LatentEncoder(**config)
-    elif model_type == "multi-head-dense":
-        model = MultiHeadDenseOutput(**config)
-    elif model_type == "gru-decoder":
-        model = DecoderRNN(**config)
-    elif model_type == "resnet-vae":
-        model = ResNetVAE(**config)
     else:
         logger.info(
-            f"Unsupported model type {model_type}. Choose from vae, att-vae, encoder-vae, resnet-vae, multi-head-dense, or gru-decoder. Exiting."
+            f"Unsupported model type {model_type}. Choose from vae, att-vae. Exiting."
         )
         sys.exit(1)
     

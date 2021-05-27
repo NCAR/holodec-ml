@@ -5,8 +5,6 @@ import logging
 import torch.nn as nn
 import torch.nn.functional as F
 
-from holodecml.torch.utils import *
-
 from typing import List, Union
 from collections import defaultdict
 from itertools import groupby
@@ -363,82 +361,4 @@ class WeightedCrossEntropyLoss(torch.nn.Module):
             # shape : (batch_size,)
             per_batch_loss = negative_log_likelihood.sum(non_batch_dims) / (weights_batch_sum + 1e-13)
             return per_batch_loss / weights.shape[0]
-            
-            
-# def batcher(true, pred, real):
-    
-#     true = [torch.stack(x).permute(1, 0) for x in true]
-#     pred = [torch.stack(x).permute(1, 0) for x in pred]
-
-#     t = defaultdict(list)
-#     p = defaultdict(list)
-    
-#     for x, y, r in zip(true, pred, real):
-#         for sx, sy, real_index in zip(x, y, r):
-#             t[real_index.item()].append(sx)
-#             p[real_index.item()].append(sy)
-            
-#     t = [torch.stack(value) for value in t.values()]
-#     p = [torch.stack(value) for value in p.values()]
-    
-#     return t, p
-
-
-def batcher(true, pred, real):
-    
-    t, p = defaultdict(list), defaultdict(list)
-    
-    def fill_dict(x, y, r):
-        x = torch.stack(x).permute(1, 0)
-        y = torch.stack(y).permute(1, 0)
-        for sx, sy, real_index in zip(x, y, r):
-            t[real_index.item()].append(sx)
-            p[real_index.item()].append(sy)
-            
-    [fill_dict(x, y, r) for x, y, r in zip(true, pred, real)]
-    
-    t, p = zip(*[[torch.stack(t1), torch.stack(p1)] for (t1, p1) in zip(t.values(), p.values())])
-    
-    return t, p
-
-
-def distance_sorted_loss(true_part, pred_part, real, return_coordinate_errors=False):    
-    
-    true, pred = batcher(true_part, pred_part, real)
-    
-    batch_loss = []
-    total_coordinate_errors = []
-    for k, (t, p) in enumerate(zip(true, pred)):
-        # Compute the distance matrix
-        dist_x = torch.abs(p[:, 0:1] - t.permute(1, 0)[0:1, :]) #** 2
-        dist_y = torch.abs(p[:, 1:2] - t.permute(1, 0)[1:2, :]) #** 2
-        dist_z = torch.abs(p[:, 2:3] - t.permute(1, 0)[2:3, :]) #** 2
-        dist_d = torch.abs(p[:, 3:4] - t.permute(1, 0)[3:4, :]) #** 2
-        dist_xy = (dist_x + dist_y) / 2.
-        dist_xyzd = (dist_x + dist_y + dist_z + dist_d) / 4.
-
-        # Compute the min loss using Hungarian algorithm
-        row_ind, col_ind = scipy.optimize.linear_sum_assignment(dist_xy.cpu())
         
-        #losses, col_ind = torch.min(dist_xy, 1)
-        #loss = [dist_xyzd[k,i] for k,i in enumerate(col_ind)]
-        #batch_loss += loss
-        batch_loss.append(dist_xyzd[col_ind, row_ind])
-        
-        if return_coordinate_errors:
-            coordinate_errors = defaultdict(list)
-            t = t[col_ind]
-            for (_t, _p) in zip(t, p):
-                coordinate_errors["batch_id"].append(k)
-                coordinate_errors["x"].append([_t[0].item(), _p[0].item()])
-                coordinate_errors["y"].append([_t[1].item(), _p[1].item()])
-                coordinate_errors["z"].append([_t[2].item(), _p[2].item()])
-                coordinate_errors["d"].append([_t[3].item(), _p[3].item()])
-            total_coordinate_errors.append(coordinate_errors)
-            
-    batch_loss = torch.mean(torch.cat(batch_loss))
-    
-    if return_coordinate_errors:
-        return batch_loss, total_coordinate_errors
-    else:
-        return batch_loss
