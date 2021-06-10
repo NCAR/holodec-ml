@@ -29,9 +29,9 @@ savePath = '/glade/scratch/mhayman/holodec/holodec-ml-data/hist-from-vae/'
 # dataFile = "training_1_25particles_gamma.pkl"
 dataFile = "validation_1_25particles_gamma.pkl"
 
-d_bin_wid = 5
-d_max = 200
-z_bin_wid = 1000
+d_bin_wid = 10
+d_max = 100
+z_bin_wid = 2000
 z_min = 14000
 z_max = 160000
 max_count=4
