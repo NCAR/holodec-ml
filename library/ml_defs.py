@@ -370,5 +370,6 @@ def cum_mse(y_true,y_pred):
     """
     mean square error of CDF of output
     """
-    return K.sum(K.square(K.cumsum(y_pred,axis=1)-K.cumsum(K.cast(y_true,'float32'),axis=1)),axis=1)
+    # return K.sum(K.square(K.cumsum(y_pred,axis=1)-K.cumsum(K.cast(y_true,'float32'),axis=1)),axis=1)
+    return K.sum(K.square(K.cumsum(K.cumsum(y_pred,axis=2),axis=1)-K.cumsum(K.cumsum(K.cast(y_true,'float32'),axis=2),axis=1)),axis=(1,2))
 
