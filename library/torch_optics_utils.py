@@ -4,6 +4,7 @@ Calculations
 """
 
 import torch
+import numpy as np
 
 def torch_holo_set(Ein:torch.tensor,
         fx:torch.tensor,
