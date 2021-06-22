@@ -22,7 +22,8 @@ num_particles_dict = {
     '1-3': ['multiparticle'],
     '12-25': ['12-25particle_gamma_600x400'],
     '50-100': ['50-100particle_gamma'],
-    'patches': ['10particle_gamma_512x512','patches128x128']
+    'patches': ['10particle_gamma_512x512','patches128x128'],
+    'real': ['real_holograms_CSET_RF07_20150719_200000-210000_512x512']
 }
 
 split_dict = {
@@ -49,10 +50,16 @@ def dataset_name(num_particles, split, file_extension='nc'):
         ds_name: (str) Dataset name
     """
     
-    valid = [1,2,3,4,5,6,7,8,9,10,'1-3','12-25','50-100','patches']
+    valid = [1,2,3,4,5,6,7,8,9,10,'1-3','12-25','50-100','patches', 'real']
     if num_particles not in valid:
         raise ValueError("results: num_particles must be one of %r." % valid)
+    
+    if num_particles=='real':
+        ds_name = f'{num_particles_dict[num_particles][0]}.{file_extension}'
+        return ds_name
+
     num_particles = num_particles_dict[num_particles]
+
 
     valid = ['train','test','valid']
     if split not in valid:
