@@ -38,6 +38,8 @@ def torch_holo_set(Ein:torch.tensor,
     
     """
     Etfft = torch.fft.fft2(Ein)
+    # mult = 2*np.pi/lam*torch.sqrt(1-lam**2*(fx**2+fy**2))
+    # Eofft = Etfft*torch.exp(1j*mult*z_tnsr)
     Eofft = Etfft*torch.exp(1j*2*np.pi*z_tnsr/lam*torch.sqrt(1-lam**2*(fx**2+fy**2)))
     
     # It might be helpful if we could omit this step.  It would save an inverse fft.
