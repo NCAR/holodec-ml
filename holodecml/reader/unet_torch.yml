@@ -1,0 +1,13 @@
+fn_train: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/training_512x512_128_40000.pkl"
+fn_valid: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/validation_512x512_128_10000.pkl"
+
+out_path: "/glade/p/cisl/aiml/ggantos/holodec/unet_torch/echo_base/"
+
+unet:
+  epochs: 2
+  batches_per_epoch: 100
+  stopping_patience: 5
+  retain_dim: True
+  mask_size: (512,512)
+  weight_decay: 0.0
+  
