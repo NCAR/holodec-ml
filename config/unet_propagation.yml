@@ -1,0 +1,52 @@
+data:
+    n_bins: 1000
+    data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
+    raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_203600-203700.nc"
+    tile_size: 512
+    step_size: 128
+    marker_size: 10
+    total_positive: 5
+    total_negative: 5
+    total_training: 50000
+    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
+    cores: 16
+    
+train_transforms:
+    RandomVerticalFlip: True
+    RandomHorizontalFlip: True
+    Normalize: 
+        mode: '255'
+    GaussianBlur:
+        rate: 0.2
+        kernel_size: 1
+        sigma: 1
+    GaussianNoise:
+        rate: 0.2
+        noise: 0.1
+    AdjustBrightness:
+        rate: 0.2
+        brightness_factor: 2.0
+    ToTensor: True
+    
+model:
+    name: "Resnet-18-U-Net"
+    color_dim: 2
+    mode: "mask"
+    
+optimizer:
+    learning_rate: 1.0e-04
+    weight_decay: 0.0
+    
+trainer:
+    epochs: 200
+    train_batch_size: 8
+    valid_batch_size: 32
+    batches_per_epoch: 200
+    stopping_patience: 5
+    output_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/unet"
+    
+inference:
+    batch_size: 32
+    workers: 1
+    save_arrays: False
+    plot: False

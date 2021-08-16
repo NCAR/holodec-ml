@@ -1,8 +1,21 @@
 import os
 import socket
 
+import torch
+import random
+import joblib
+import logging
 import numpy as np
 import xarray as xr
+
+from scipy.sparse import csr_matrix
+from torch.utils.data import Dataset, DataLoader
+
+
+
+logger = logging.getLogger(__name__)
+
+
 
 num_particles_dict = {
     1 : '1particle',
@@ -14,6 +27,21 @@ split_dict = {
     'train' : 'training',
     'test'   : 'test',
     'valid': 'validation'}
+
+
+
+def save_sparse_csr(filename, array):
+    # note that .npz extension is added automatically
+    np.savez(filename, data=array.data, indices=array.indices,
+             indptr=array.indptr, shape=array.shape)
+    
+
+def load_sparse_csr(filename):
+    # here we need to add .npz extension manually
+    loader = np.load(filename + '.npz')
+    return csr_matrix((loader['data'], loader['indices'], loader['indptr']),
+                      shape=loader['shape'])
+
 
 def get_dataset_path():
     if 'casper' in socket.gethostname():
@@ -295,3 +323,101 @@ def load_scaled_datasets(path_data, num_particles, output_cols,
             valid_outputs = scaler_out.transform(valid_outputs)
         
     return train_inputs, train_outputs, valid_inputs, valid_outputs
+
+
+
+class PickleReader(Dataset):
+    
+    def __init__(self, 
+                 fn, 
+                 max_buffer_size = 5000, 
+                 max_images = 40000, 
+                 shuffle = True, 
+                 transform = False,
+                 normalize = True):
+        
+        self.fn = fn
+        self.buffer = []
+        self.max_buffer_size = max_buffer_size
+        self.shuffle = shuffle
+        self.max_images = max_images
+        self.transform = transform
+            
+        self.fid = open(self.fn, "rb")
+        self.loaded = 0 
+        self.epoch = 0
+        
+        self.normalize = normalize
+        self.mean = np.mean([0.485, 0.456, 0.406])
+        self.std = np.mean([0.229, 0.224, 0.225])
+        
+    def __getitem__(self, idx):    
+        
+        self.on_epoch_end()
+        
+        while True:
+        
+            try:
+                data = joblib.load(self.fid)
+                image, label, mask = data
+                
+                im = {
+                    "image": image, 
+                    "horizontal_flip": False, 
+                    "vertical_flip": False
+                }
+                
+                if self.transform:
+                    for image_transform in self.transform:
+                        im = image_transform(im)
+                        
+                image = im["image"]
+                mask = mask.toarray()
+                
+                # Update the mask if we flipped the original image
+                if im["horizontal_flip"]:
+                    mask = np.flip(mask, axis=0)
+                if im["vertical_flip"]:
+                    mask = np.flip(mask, axis=1)
+                        
+                image = torch.FloatTensor(image)
+                #label = torch.LongTensor([label])
+                mask = torch.FloatTensor(mask.copy())
+                
+                
+                #######
+                
+                
+                data = (image, mask)
+
+                self.loaded += 1
+
+                if not self.shuffle:
+                    return data
+                
+                self.buffer.append(data)
+                random.shuffle(self.buffer)
+
+                if len(self.buffer) > self.max_buffer_size:
+                    self.buffer = self.buffer[:self.max_buffer_size]
+
+                if self.epoch > 0:
+                    return self.buffer.pop()
+
+                else: # wait until all data has been seen before sampling from the buffer
+                    return data
+
+
+            except EOFError:
+                self.fid = open(self.fn, "rb")
+                self.loaded = 0
+                continue
+                    
+    def __len__(self):
+        return self.max_images
+    
+    def on_epoch_end(self):
+        if self.loaded == self.__len__():
+            self.fid = open(self.fn, "rb")
+            self.loaded = 0
+            self.epoch += 1
