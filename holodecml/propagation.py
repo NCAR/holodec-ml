@@ -42,8 +42,17 @@ class WavePropagator:
                  device = "cpu"):
                 
         self.h_ds = xr.open_dataset(data_path)
+        
+        if 'zMin' in self.h_ds.attrs:
+            self.zMin = self.h_ds.attrs['zMin']  # minimum z in sample volume
+            self.zMax = self.h_ds.attrs['zMax'] 
+        else: # some of the raw data does not have this parameter
+            # should warn the user here through the logger
+            self.zMin = 0.014
+            self.zMax = 0.158
+        
         self.n_bins = n_bins
-        self.z_bins = np.linspace(self.h_ds.attrs['zMin'],self.h_ds.attrs['zMax'], n_bins+1)*1e6  # histogram bin edges
+        self.z_bins = np.linspace(self.zMin, self.zMax, n_bins+1)*1e6  # histogram bin edges
         self.z_centers = self.z_bins[:-1] + 0.5*np.diff(self.z_bins)  # histogram bin centers
 
         self.tile_size = tile_size  # size of tiled images in pixels
@@ -59,8 +68,6 @@ class WavePropagator:
         self.Nx = int(self.h_ds.attrs['Nx']) # number of horizontal pixels
         self.Ny = int(self.h_ds.attrs['Ny']) # number of vertical pixels
         self.lam = self.h_ds.attrs['lambda'] # wavelength
-        self.zMin = self.h_ds.attrs['zMin']  # minimum z in sample volume
-        self.zMax = self.h_ds.attrs['zMax'] 
         self.image_norm = 255.0
 
         self.x_arr = np.arange(-self.Nx//2, self.Nx//2)*self.dx
@@ -122,6 +129,7 @@ class InferencePropagator(WavePropagator):
                  marker_size = 10, 
                  device = "cuda", 
                  model = None, 
+                 transforms = None,
                  mode = None):
         
         super(InferencePropagator, self).__init__(
@@ -135,6 +143,7 @@ class InferencePropagator(WavePropagator):
         
         self.model = model
         self.model.eval()
+        self.transforms = transforms
         self.mode = mode
         self.create_mapping()
         
@@ -212,6 +221,7 @@ class InferencePropagator(WavePropagator):
             phase = torch.angle(E_out).unsqueeze(1)
             stacked_image = torch.cat([
                 torch.abs(E_out).unsqueeze(1), torch.angle(E_out).unsqueeze(1)], 1)
+            stacked_image = self.apply_transforms(stacked_image.squeeze(0)).unsqueeze(0)
 
             size = (E_out.shape[1], E_out.shape[2])
             true_output = torch.zeros(size).to(self.device)
@@ -313,7 +323,7 @@ class InferencePropagator(WavePropagator):
             torch.LongTensor([int(label[row_idx, col_idx])]))
             for ((row_idx, col_idx), (row_slice, col_slice)) in batch
         ])
-        return batch, torch.stack(x) / self.image_norm, torch.stack(y)
+        return batch, torch.stack(x), torch.stack(y) #  / self.image_norm
     
     
     def collate_masks(self, batch, image = None, mask = None):
@@ -321,9 +331,18 @@ class InferencePropagator(WavePropagator):
             (image[:, row_slice, col_slice], mask[row_slice, col_slice])
             for ((row_idx, col_idx), (row_slice, col_slice)) in batch
         ])
-        return batch, torch.stack(x) / self.image_norm, torch.stack(y)
-
+        return batch, torch.stack(x), torch.stack(y) # / self.image_norm
+    
+    
+    def apply_transforms(self, image):
+        if self.transforms:
+            im = {"image": image}
+            for image_transform in self.transforms:
+                im = image_transform(im)
+            image = im["image"]
+        return image
             
+    
     def get_next_z_planes_labeled(self, 
                                   h_idx, 
                                   z_planes_lst, 

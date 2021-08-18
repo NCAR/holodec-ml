@@ -11,22 +11,32 @@ data:
     output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
     cores: 16
     
-train_transforms:
-    RandomVerticalFlip: True
-    RandomHorizontalFlip: True
-    Normalize: 
-        mode: '255'
-    GaussianBlur:
-        rate: 0.2
-        kernel_size: 1
-        sigma: 1
-    GaussianNoise:
-        rate: 0.2
-        noise: 0.1
-    AdjustBrightness:
-        rate: 0.2
-        brightness_factor: 2.0
-    ToTensor: True
+transforms:
+    training:
+        RandomVerticalFlip: 
+            rate: 0.5 
+        RandomHorizontalFlip: 
+            rate: 0.5
+        Normalize:
+            mode: '255'
+        GaussianBlur:
+            rate: 0.0
+            kernel_size: 1
+            sigma: 1
+        GaussianNoise:
+            rate: 0.0
+            noise: 0.1
+        AdjustBrightness:
+            rate: 0.0
+            brightness_factor: 2.0
+        ToTensor: True
+    validation:
+        Normalize:
+            mode: '255'
+        ToTensor: True
+    inference:
+        Normalize:
+            mode: '255'
     
 model:
     name: "Resnet-18-U-Net"
@@ -46,7 +56,13 @@ trainer:
     output_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/unet"
     
 inference:
+    holograms: 10
     batch_size: 32
     workers: 1
-    save_arrays: False
-    plot: False
+    save_arrays: True
+    plot: True
+    data_set: 
+        #path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
+        #name: "synthetic"
+        path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_203600-203700.nc"
+        name: "raw"

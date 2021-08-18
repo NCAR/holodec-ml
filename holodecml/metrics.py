@@ -8,7 +8,7 @@ from hagelslag.evaluation.MetricPlotter import *
 
 class DistributedROC(DistributedROC):
     
-    def binary_metrics(self):
+    def binary_metrics(self, tol = 1e-12):
         
         TP = self.contingency_tables["TP"]
         FP = self.contingency_tables["FP"]
@@ -16,12 +16,12 @@ class DistributedROC(DistributedROC):
         FN = self.contingency_tables["FN"]
         
         metrics = {
-            "precision": TP / (TP+FP),
-            "recall": TP / (TP+FN),
-            "specificity": TN / (TN+FP),
-            "accuracy": (TP+TN) / (TP+FP+FN+TN)
+            "precision": TP / (TP + FP + tol),
+            "recall": TP / (TP + FN + tol),
+            "specificity": TN / (TN + FP + tol),
+            "accuracy": (TP + TN) / (TP + FP + FN + TN + tol)
         }
-        metrics["f1"] = 2 * (metrics["recall"] * metrics["precision"]) / (metrics["recall"] + metrics["precision"])
+        metrics["f1"] = 2 * (metrics["recall"] * metrics["precision"]) / (metrics["recall"] + metrics["precision"] + tol)
         
         return metrics
     

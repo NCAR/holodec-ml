@@ -14,30 +14,37 @@ logger = logging.getLogger(__name__)
 def LoadTransformations(transform_config: str):
     tforms = []
     if "RandomVerticalFlip" in transform_config:
-        tforms.append(RandVerticalFlip(0.5))
+        rate = transform_config["RandomVerticalFlip"]["rate"]
+        if rate > 0.0:
+            tforms.append(RandVerticalFlip(rate))
     if "RandomHorizontalFlip" in transform_config:
-        tforms.append(RandHorizontalFlip(0.5))
+        rate = transform_config["RandomVerticalFlip"]["rate"]
+        if rate > 0.0:
+            tforms.append(RandHorizontalFlip(rate))
     if "Rescale" in transform_config:
         rescale = transform_config["Rescale"]
         tforms.append(Rescale(rescale))
     if "Normalize" in transform_config:
-        mode = transform_config["Normalize"]
+        mode = transform_config["Normalize"]["mode"]
         tforms.append(Normalize(mode))
     if "GaussianNoise" in transform_config:
         rate = transform_config["GaussianNoise"]["rate"]
         noise = transform_config["GaussianNoise"]["noise"]
-        tforms.append(GaussianNoise(rate,noise))
+        if rate > 0.0:
+            tforms.append(GaussianNoise(rate,noise))
     if "ToTensor" in transform_config:
         tforms.append(ToTensor())
     if "AdjustBrightness" in transform_config:
         rate = transform_config["AdjustBrightness"]["rate"]
         brightness = transform_config["AdjustBrightness"]["brightness_factor"]
-        tforms.append(AdjustBrightness(rate, brightness))
+        if rate > 0.0:
+            tforms.append(AdjustBrightness(rate, brightness))
     if "GaussianBlur" in transform_config:
         rate = transform_config["GaussianBlur"]["rate"]
         k_sz = transform_config["GaussianBlur"]["kernel_size"]
         sigma = transform_config["GaussianBlur"]["sigma"]
-        tforms.append(GaussianBlur(rate, k_sz, brightness))
+        if rate > 0.0:
+            tforms.append(GaussianBlur(rate, k_sz, brightness))
     if "RandomCrop" in transform_config:
         tforms.append(RandomCrop())
     if "Standardize" in transform_config:
@@ -48,15 +55,15 @@ def LoadTransformations(transform_config: str):
 
 class RandVerticalFlip(object):
 
-    def __init__(self, p):
+    def __init__(self, rate):
         logger.info(
-            f"Loaded RandomVerticalFlip transformation with probability {p}")
-        self.p = p
+            f"Loaded RandomVerticalFlip transformation with probability {rate}")
+        self.rate = rate
 
     def __call__(self, sample):
         image = sample['image']
         flipped = False
-        if random.random() < self.p:
+        if random.random() < self.rate:
             image = np.flip(image, axis=2)
             flipped = True
         sample["image"] = image
@@ -66,15 +73,15 @@ class RandVerticalFlip(object):
 
 class RandHorizontalFlip(object):
 
-    def __init__(self, p):
+    def __init__(self, rate):
         logger.info(
-            f"Loaded RandomHorizontalFlip transformation with probability {p}")
-        self.p = p
+            f"Loaded RandomHorizontalFlip transformation with probability {rate}")
+        self.rate = rate
 
     def __call__(self, sample):
         image = sample['image']
         flipped = False
-        if random.random() < self.p:
+        if random.random() < self.rate:
             image = np.flip(image, axis=1)
             flipped = True
         sample["image"] = image
@@ -171,12 +178,15 @@ class Normalize(object):
         if mode == "sym":
             logger.info(
                 f"Loaded Normalize transformation that normalizes data in the range -1 to 1")
+        if mode == "255":
+            logger.info(
+                f"Loaded Normalize transformation that normalizes data color channel by dividing by 255.0 and phase pi")
         self.mode = mode
 
     def __call__(self, sample):
-
-        image = sample['image'].astype(np.float32)
-
+        
+        image = sample['image'] #.astype(np.float32)
+        
         if self.mode == "norm":
             image -= image.min()
             image /= image.max()
@@ -185,7 +195,9 @@ class Normalize(object):
             image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
             
         if self.mode == "255":
-            image /= 255.0
+            #image /= 255.0
+            image[0] /= 255.0
+            image[1] = (1.0 + image[1] / np.pi) / 2.0
         
         sample["image"] = image
         return sample
