@@ -1,0 +1,28 @@
+path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/unet/jnet_gauss_d/"
+model_name: "unet"
+num_particles: "12-25"
+random_seed: 328942
+output_cols: ["x", "y", "z", "d", "hid"]
+scaler_out: "MinMaxScaler"
+bin_factor: 10
+subset: False
+input_col: "image"
+gauss: "d"
+mass: False
+loss: "unet_loss_xy"
+unet:
+  use_batch_norm: True
+  num_classes: 1
+  filters: 64
+  dropout: 0.2
+  output_activation: 'sigmoid'
+  use_attention: True
+  pool_down: [2,2,2,5]
+  pool_up: [2,2]
+  skip_pool: 10
+train:
+  learning_rate: 0.001
+  epochs: 5
+  batch_size: 8
+  verbose: 2

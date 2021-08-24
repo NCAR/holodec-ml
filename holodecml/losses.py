@@ -88,4 +88,39 @@ def random_particle_distance_loss(y_true, y_pred):
     valid_error = loss_xy + loss_z + loss_d
     print(f"ERROR SHAPE: {valid_error.shape}")
 
-    return valid_error 
+    return valid_error
+
+def unet_loss(y_true, y_pred):
+    y_true_p = y_true[:, :, :, 0]
+    y_true_z = y_true[:, :, :, 1]
+    y_true_d = y_true[:, :, :, 2]
+    y_pred_p = y_pred[:, :, :, 0] + 1e-8 # to avoid log(0)
+    y_pred_z = y_pred[:, :, :, 1]
+    y_pred_d = y_pred[:, :, :, 2]
+
+#     bce = y_true_p * -tf.math.log(y_pred_p)
+    bce = (y_true_p - y_pred_p) ** 2
+    loss_z = y_true_p * (y_true_z - y_pred_z) ** 2
+    loss_d = y_true_p * (y_true_d - y_pred_d) ** 2
+    loss = bce + loss_z + loss_d
+    loss = tf.reduce_sum(loss) / tf.reduce_sum(y_true_p)
+    
+    return loss
+
+def unet_loss_xy(y_true, y_pred):
+    y_true_p = y_true[:, :, :, 0]
+    y_pred_p = y_pred[:, :, :, 0] + 1e-8 # to avoid log(0)
+    
+    bce = (y_true_p - y_pred_p) ** 2
+    loss = tf.reduce_sum(bce) / tf.reduce_sum(y_true_p)
+    
+    return loss
+
+def unet_loss_xy_log(y_true, y_pred):
+    y_true_p = y_true[:, :, :, 0]
+    y_pred_p = y_pred[:, :, :, 0] + 1e-8 # to avoid log(0)
+    
+    bce = (tf.math.log(y_true_p + 1) - tf.math.log(y_pred_p + 1)) ** 2
+    loss = tf.reduce_sum(bce) / tf.reduce_sum(y_true_p)
+    
+    return loss

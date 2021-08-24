@@ -75,17 +75,17 @@ def main():
                                          config["mass"])
     
     # add noise to the outputs
-    train_outputs_noisy = make_random_outputs(train_outputs)
-    train_outputs_noisy = train_outputs_noisy * (1 + np.random.normal(0, config['noisy_sd'], train_outputs_noisy.shape))
-    valid_outputs_noisy = make_random_outputs(valid_outputs)
-    valid_outputs_noisy = valid_outputs_noisy * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs_noisy.shape))
+#     train_outputs_noisy = make_random_outputs(train_outputs)
+    train_outputs_noisy = train_outputs * (1 + np.random.normal(0, config['noisy_sd'], train_outputs.shape))
+#     valid_outputs_noisy = make_random_outputs(valid_outputs)
+    valid_outputs_noisy = valid_outputs * (1 + np.random.normal(0, config['noisy_sd'], valid_outputs.shape))
 
     model_start = datetime.now()
     net = ParticleAttentionNet(**config["attention_network"])
     net.compile(optimizer=Adam(lr=config["train"]['learning_rate']), loss=random_particle_distance_loss,
                metrics=[noisy_true_particle_loss, random_particle_distance_loss])
-    hist = net.fit([train_outputs_noisy, train_inputs], train_outputs,
-                   validation_data=([valid_outputs_noisy, valid_inputs], valid_outputs),
+    hist = net.fit([train_outputs_noisy[:,:,:-1], train_inputs], train_outputs[:,:,:-1],
+                   validation_data=([valid_outputs_noisy[:,:,:-1], valid_inputs], valid_outputs[:,:,:-1]),
                    epochs=config["train"]['epochs'],
                    batch_size=config["train"]['batch_size'],
                    verbose=config["train"]['verbose'])
@@ -93,32 +93,35 @@ def main():
     
     # predict outputs
     print("Predicting outputs..")
-    valid_outputs_pred = net.predict([valid_outputs_noisy, valid_inputs],
+    valid_outputs_pred = net.predict([valid_outputs_noisy[:,:,:-1], valid_inputs],
                                      batch_size=config['train']["batch_size"])
+    print(valid_outputs_pred.shape)
     raw = valid_outputs_pred.reshape(-1, valid_outputs_pred.shape[-1])
-    raw = scaler_out.inverse_transform(raw[:,:-1])
+    raw = scaler_out.inverse_transform(raw)
     raw = raw.reshape(valid_outputs_pred.shape[0], valid_outputs_pred.shape[1], -1)
     valid_outputs_pred_raw = valid_outputs_pred.copy()
-    valid_outputs_pred_raw[:,:,:-1] = raw
+    valid_outputs_pred_raw = raw
     valid_outputs_pred_da = xr.DataArray(valid_outputs_pred,
                                          coords={"hid": np.arange(valid_inputs.shape[0]),
                                                  "particle": np.arange(valid_outputs.shape[1]),
-                                                 "output": output_cols},
+                                                 "output": output_cols[:-1]},
                                          dims=("hid", "particle", "output"),
                                          name="valid_pred_scaled")
     valid_outputs_pred_raw_da = xr.DataArray(valid_outputs_pred_raw,
                                              coords={"hid": np.arange(valid_inputs.shape[0]),
                                                      "particle": np.arange(valid_outputs.shape[1]),
-                                                     "output": output_cols},
+                                                     "output": output_cols[:-1]},
                                              dims=("hid", "particle", "output"),
                                              name="valid_pred_raw")
     
     # calculate errors
     print("Calculating errors..")
     scaled_scores = pd.DataFrame(0, index=["mae", "rmse", "r2"], columns=output_cols, dtype=np.float64)
+    print("valid_outputs.shape", valid_outputs.shape)
+    print("valid_outputs_pred.shape", valid_outputs_pred.shape)
     for metric in scaled_scores.index:
-        for c, col in enumerate(output_cols):
-            scaled_scores.loc[metric, col] = metrics[metric](valid_outputs[:, c], valid_outputs_pred[:, c])
+        for c, col in enumerate(output_cols[:-1]):
+            scaled_scores.loc[metric, col] = metrics[metric](valid_outputs[:, :, c], valid_outputs_pred[:, :, c])
             print(f"{metric} {col}: {scaled_scores.loc[metric, col]: 0.3f}")
     
     # save outputs to files

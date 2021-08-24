@@ -1,0 +1,28 @@
+path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/jnet/zd/1to25_nodense/"
+model_name: "cnn"
+num_particles: "12-25"
+random_seed: 328942
+output_cols: ["x", "y", "z", "d", "hid"]
+scaler_out: "MinMaxScaler"
+num_z_bins: False
+subset: False
+mass: False
+rad: 64
+scale_image: False
+FFT: False
+metric: "mae"
+conv2d_network:
+  filters: [8, 16, 32, 64, 128]
+  kernel_sizes: [5, 5, 5, 5, 5]
+  conv2d_activation: "relu"
+  pool_sizes: [2, 2, 2, 2, 2]
+  dense_sizes: []
+  dense_activation: "relu"
+  lr: 0.001
+  optimizer: "adam"
+  loss: "mae"
+  batch_size: 256
+  metrics: ["TP","FP","TN","FN"]
+  epochs: 10
+  verbose: 1

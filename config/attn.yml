@@ -1,5 +1,5 @@
 path_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/"
-path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn_new/argmin/"
+path_save: "/glade/p/cisl/aiml/ggantos/holodec/attn_new/noisy/"
 model_name: "attn"
 num_particles: "large"
 random_seed: 328942
@@ -16,7 +16,7 @@ attention_network:
   hidden_neurons: 100
   activation: "relu"
   min_filters: 16
-  output_num: 5
+  output_num: 4
 train:
   learning_rate: 0.001
   epochs: 40
