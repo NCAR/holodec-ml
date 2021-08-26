@@ -56,13 +56,15 @@ trainer:
     output_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/unet"
     
 inference:
-    holograms: 10
     batch_size: 32
-    workers: 1
+    n_nodes: 1
+    gpus_per_node: 1
+    threads_per_gpu: 4
     save_arrays: True
     plot: True
     data_set: 
         #path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
         #name: "synthetic"
-        path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_203600-203700.nc"
-        name: "raw"
+        path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
+        name: "raw_angle_normed"
+        holograms: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
