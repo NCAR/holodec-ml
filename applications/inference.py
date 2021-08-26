@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
+from argparse import ArgumentParser
 
 from torch import nn
 from collections import defaultdict
@@ -255,15 +256,70 @@ def main(worker_info = (0, "cuda:0"), conf = None, h_idx = 10, delay = 30):
 
 if __name__ == '__main__':
     
-    with open(sys.argv[1]) as cf:
+    description = "Perform model inference on a list of hologram planes using N workers"
+    description += " where N = (number of nodes) * (number of GPUs / node) * (models / GPU)"
+    
+    parser = ArgumentParser(
+        description=description
+    )
+    parser.add_argument(
+        "-c",
+        dest="model_config",
+        type=str,
+        default=False,
+        help="Path to the model configuration (yml) containing your inputs."
+    )
+    parser.add_argument(
+        "-n",
+        dest="n_nodes",
+        type=int,
+        default=-1,
+        help="The number of GPU nodes (workers) to use to train model(s). Default is to use the values in the yml."
+    )
+    parser.add_argument(
+        "-nid",
+        dest="node_id",
+        type=int,
+        default=0,
+        help="The (int) ID of a node. If using 5 nodes, the IDs that can be passed are {0, ..., 4}. Default is 0."
+    )
+    parser.add_argument(
+        "-g",
+        dest="gpus_per_node",
+        type=int,
+        default=-1,
+        help="The number of threads to use to train model(s). Default is to use the values in the yml."
+    )
+    parser.add_argument(
+        "-t",
+        dest="threads_per_gpu",
+        type=int,
+        default=-1,
+        help="The number of threads to use to train model(s). Default is to use the values in the yml."
+    )
+        
+    args_dict = vars(parser.parse_args())
+    config_file = args_dict.pop("model_config")
+    
+    with open(config_file) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
     
-    n_nodes = conf["inference"]["n_nodes"]
-    n_gpus = conf["inference"]["gpus_per_node"]
-    threads_per_gpu = conf["inference"]["threads_per_gpu"]
+    n_nodes = int(args_dict.pop("n_nodes"))
+    node_id = int(args_dict.pop("node_id"))
+    n_gpus = int(args_dict.pop("gpus_per_node"))
+    threads_per_gpu = int(args_dict.pop("threads_per_gpu"))
+    
+    n_nodes = conf["inference"]["n_nodes"] if n_nodes == -1 else n_nodes
+    n_gpus = conf["inference"]["gpus_per_node"] if n_nodes == -1 else n_gpus
+    threads_per_gpu = conf["inference"]["threads_per_gpu"] if threads_per_gpu == -1 else threads_per_gpu
     workers = int(n_nodes * n_gpus * threads_per_gpu)
     n_bins = conf["data"]["n_bins"]
-
+    
+    # Perform a check if we are using > 1 node (here one has to pass the extra argument)
+    if node_id >= n_nodes:
+        raise OSError(f"The id of this worker ({node_id}) exceeded the number of nodes + 1 ({n_nodes + 1}).")
+    
+    ### Set up directories to save results
     model_loc = conf["trainer"]["output_path"]
     model_name = conf["model"]["name"]
     data_set = conf["inference"]["data_set"]["path"]
@@ -275,7 +331,7 @@ if __name__ == '__main__':
     for directory in [prop_data_loc, roc_data_loc, image_data_loc]:
         if not os.path.exists(directory):
             os.makedirs(directory)
-            
+
     ### Configuration settings for which holograms to process
     h_conf = conf["inference"]["data_set"]["holograms"]
     if isinstance(h_range, dict):
@@ -310,25 +366,23 @@ if __name__ == '__main__':
     fh.setFormatter(formatter)
     root.addHandler(fh)
     ############################################################    
-    
-    if n_nodes == 1:
-        this_node = 0
-    else:
-        try:
-            this_node = int(sys.argv[2]) 
-        except Exception as E:
-            raise OSError(f"The number of nodes {n_nodes} is larger than 1; you must specify which split to use (0,...,n_nodes-1).")
-
-    if this_node >= n_nodes:
-        raise OSError(f"The id of this worker ({this_node}) exceeded the number of nodes + 1 ({n_nodes + 1}).")
         
-    ######
-    
+    # Print details to the logger
+    logger.info(f"Using a total of {workers} models (workers) to perform inference")
+    logger.info(f"... {n_nodes} nodes. The identity of the current node is {node_id}")
+    logger.info(f"... {n_gpus} GPUs / node")
+    logger.info(f"... {threads_per_gpu} models per GPU")
+    logger.info(f"Using the data set {data_set_name} located at {data_set}")
+    logger.info(f"Saving any result arrays to {prop_data_loc}")
+    logger.info(f"Saving any ROC objects to {roc_data_loc}")
+    logger.info(f"Saving any images created to {image_data_loc}")
+    logger.info(f"Using the following values for the threshold range: {str(h_range)}")
     logger.info(f"Performing model inference using {model_name} on {n_bins} reconstructed planes")
     
+    # Construct list of worker IDs and the GPU device to use
     total_workers = list(range(workers))
     list_of_devices = [x for gpu in range(n_gpus) for x in [f"cuda:{gpu}"] * threads_per_gpu]
-    available_workers = np.array_split(total_workers, int(n_nodes * n_gpus))[this_node]
+    available_workers = np.array_split(total_workers, int(n_nodes * n_gpus))[node_id]
     gpu_worker_list = list(zip(available_workers, list_of_devices))
         
     # Run models in parallel on the GPU(s)
