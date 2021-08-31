@@ -14,15 +14,15 @@ data:
 transforms:
     training:
         RandomVerticalFlip: 
-            rate: 0.5 
+            rate: 0.0
         RandomHorizontalFlip: 
-            rate: 0.5
+            rate: 0.0
         Normalize:
             mode: '255'
         GaussianBlur:
             rate: 0.0
             kernel_size: 1
-            sigma: 1
+            sigma: 3
         GaussianNoise:
             rate: 0.0
             noise: 0.1
@@ -53,18 +53,20 @@ trainer:
     valid_batch_size: 32
     batches_per_epoch: 200
     stopping_patience: 5
-    output_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/unet"
+    output_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/unet_baseline"
     
 inference:
-    batch_size: 32
+    batch_size: 6
     n_nodes: 1
     gpus_per_node: 1
     threads_per_gpu: 4
     save_arrays: True
-    plot: True
+    save_probs: False
+    plot: False
+    verbose: True
     data_set: 
         #path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
         #name: "synthetic"
         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
-        name: "raw_angle_normed"
-        holograms: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        name: "./"
+        holograms: [10]

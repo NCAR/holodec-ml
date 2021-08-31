@@ -31,6 +31,9 @@ from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
 from .metrics import DistributedROC
 
 
+logger = logging.getLogger(__name__)
+
+
 class WavePropagator:
     
     def __init__(self, 
@@ -239,6 +242,9 @@ class InferencePropagator(WavePropagator):
                 
                     unet_mask = torch.zeros(E_out.shape[1:]).to(self.device)  # initialize the UNET mask
                     part_in_plane_idx = np.where(z_part_bin_idx==z_idx+z_counter)[0]  # locate all particles in this plane
+                    
+#                     if len(part_in_plane_idx) > 0:
+#                         logger.info(f"{z_sub_set[z_idx]} {part_in_plane_idx}")
 
                     # build the UNET mask for this z plane
                     for part_idx in part_in_plane_idx:
@@ -311,10 +317,10 @@ class InferencePropagator(WavePropagator):
                 "pred_output": pred_output,
                 "pred_proba": pred_proba,
                 "true_output": true_output,
-                "z_plane": z_sub_set[z_idx],
+                "z_plane": int(z_sub_set[z_idx]),
                 "roc": roc
             }
-                    
+                       
         return return_dict
     
     def collate_labels(self, batch, image = None, label = None):
@@ -348,7 +354,8 @@ class InferencePropagator(WavePropagator):
                                   z_planes_lst, 
                                   batch_size = 32,
                                   thresholds = np.arange(0.0, 1.1, 0.1),
-                                  obs_threshold = 1.0):
+                                  obs_threshold = 1.0, 
+                                  start_z_counter = 0):
         """
         Generator that returns reconstructed z patches
         input_image - 2D image array of the original captured hologam 
@@ -388,9 +395,10 @@ class InferencePropagator(WavePropagator):
 
         input_image = self.h_ds['image'].isel(hologram_number=h_idx).values
 
-        z_counter = 0 # the number of planes reconstructed in this generator
+        z_counter = start_z_counter # the number of planes reconstructed in this generator
         image_tnsr = torch.tensor(input_image, device=self.device).unsqueeze(0)
         for z_sub_set in z_planes_lst:
+            
             yield self.get_sub_images_labeled(
                 image_tnsr, 
                 z_sub_set, 
@@ -402,6 +410,9 @@ class InferencePropagator(WavePropagator):
                 obs_threshold = obs_threshold
             )
             z_counter+=z_sub_set.size
+            
+            # clear the cached memory from the gpu
+            torch.cuda.empty_cache()
             
             
     def create_z_plane_lst(self, planes_per_call=1):
