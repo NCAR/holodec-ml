@@ -1,3 +1,7 @@
+import warnings
+warnings.filterwarnings("ignore")
+
+
 import os
 import socket
 
@@ -10,6 +14,8 @@ import xarray as xr
 
 from scipy.sparse import csr_matrix
 from torch.utils.data import Dataset, DataLoader
+
+from .propagation import *
 
 
 
@@ -332,9 +338,9 @@ class PickleReader(Dataset):
                  fn, 
                  max_buffer_size = 5000, 
                  max_images = 40000, 
+                 color_dim = 2,
                  shuffle = True, 
-                 transform = False,
-                 normalize = True):
+                 transform = False):
         
         self.fn = fn
         self.buffer = []
@@ -342,14 +348,11 @@ class PickleReader(Dataset):
         self.shuffle = shuffle
         self.max_images = max_images
         self.transform = transform
+        self.color_dim = color_dim
             
         self.fid = open(self.fn, "rb")
         self.loaded = 0 
         self.epoch = 0
-        
-        self.normalize = normalize
-        self.mean = np.mean([0.485, 0.456, 0.406])
-        self.std = np.mean([0.229, 0.224, 0.225])
         
     def __getitem__(self, idx):    
         
@@ -360,6 +363,7 @@ class PickleReader(Dataset):
             try:
                 data = joblib.load(self.fid)
                 image, label, mask = data
+                image = image[:self.color_dim]
                 
                 im = {
                     "image": image, 
@@ -421,3 +425,92 @@ class PickleReader(Dataset):
             self.fid = open(self.fn, "rb")
             self.loaded = 0
             self.epoch += 1
+            
+            
+            
+class UpsamplingReader(Dataset):
+    
+    def __init__(self, conf = None, transform = None, max_size = 10000, device = "cpu"):
+        
+        config = conf["data"]
+        n_bins = config["n_bins"]
+        data_path = config["data_path"]
+        tile_size = config["tile_size"]  # size of tiled images in pixels
+        step_size = config["step_size"]  # amount that we shift the tile to make a new tile
+        marker_size = config["marker_size"] # UNET gaussian marker width (standard deviation) in um
+        
+        self.part_per_holo = config["total_positive"]
+        self.empt_per_holo = config["total_negative"]
+        self.color_dim = conf["model"]["color_dim"]
+        
+        self.prop = UpsamplingPropagator(
+            data_path, 
+            n_bins = n_bins, 
+            tile_size = tile_size,
+            step_size = step_size,
+            marker_size = marker_size,
+            device = device
+        )
+        
+        self.xy = []
+        self.max_size = max_size
+        self.transform = transform
+    
+    def __getitem__(self, h_idx):
+        
+        h_idx = int(self.prop.h_ds["hid"].values[h_idx]) - 1
+        
+        if len(self.xy) > 0:
+            random.shuffle(self.xy)
+            x, y = self.xy.pop()
+            return x, y
+        
+        data = self.prop.get_reconstructed_sub_images(
+            h_idx, self.part_per_holo, self.empt_per_holo
+        )
+        for idx in range(len(data[0])):
+            #result_dict["label"].append(int(data[0][idx]))
+            image = np.expand_dims(np.abs(data[1][idx]), 0)
+            if self.color_dim == 2:
+                phase = np.expand_dims(np.angle(data[1][idx]), 0)
+                image = np.vstack([image, phase])
+            mask = data[4][idx]
+            image, mask = self.apply_transforms(image, mask)
+            self.xy.append((image, mask))
+
+        random.shuffle(self.xy)
+        x, y = self.xy.pop()
+        return x, y
+    
+    def apply_transforms(self, image, mask):
+        
+        if self.transform == None:
+            
+            image = torch.FloatTensor(image)
+            mask = torch.FloatTensor(mask)
+            
+            return image, mask
+        
+        im = {
+            "image": image, 
+            "horizontal_flip": False, 
+            "vertical_flip": False
+        }
+
+        for image_transform in self.transform:
+            im = image_transform(im)
+
+        # Update the mask if we flipped the original image
+        if im["horizontal_flip"]:
+            mask = np.flip(mask, axis=0)
+        if im["vertical_flip"]:
+            mask = np.flip(mask, axis=1)
+
+        image = torch.FloatTensor(im["image"])
+        mask = torch.FloatTensor(mask.copy())
+        
+        return image, mask
+    
+    def __len__(self):
+        #return int(self.prop.h_ds["hid"].values[-1])
+        return len(list(self.prop.h_ds["hid"].values))

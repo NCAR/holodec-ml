@@ -3,12 +3,6 @@ warnings.filterwarnings("ignore")
 
 import sys 
 sys.path.append("/glade/work/schreck/repos/HOLO/clean/holodec-ml")
-# from holodecml.data import *
-# from holodecml.losses import *
-# from holodecml.models import *
-# from holodecml.metrics import *
-# from holodecml.transforms import *
-# from holodecml.propagation import *
 
 import os
 import glob
@@ -54,7 +48,7 @@ def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def main(worker_info = (0, "cuda:0"), conf = None, delay = 20):
+def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
     
     # unpack the worker and GPU ids 
     this_worker, device = worker_info
@@ -70,6 +64,7 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 20):
     from torch import nn
 
     if torch.cuda.is_available():
+        torch.backends.cudnn.enabled = True
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = True
     
@@ -104,6 +99,12 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 20):
     batch_size = conf["inference"]["batch_size"]
     save_arrays = conf["inference"]["save_arrays"]
     save_prob = conf["inference"]["save_probs"]
+    
+    if "probability_threshold" in conf["inference"]: 
+        probability_threshold = conf["inference"]["probability_threshold"]
+    else:
+        probability_threshold = 0.5
+    
     plot = conf["inference"]["plot"]
     verbose = conf["inference"]["verbose"]
     data_set = conf["inference"]["data_set"]["path"]
@@ -115,7 +116,7 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 20):
 
     for directory in [prop_data_loc, roc_data_loc, image_data_loc]:
         if not os.path.exists(directory):
-            os.makedirs(directory)
+            os.makedirs(directory, exist_ok = True)
 
     # roc threshold
     obs_threshold = 1.0
@@ -138,17 +139,17 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 20):
     else:
         raise OSError(f"Unidentified h-range settings {h_conf}")
         
-    # take a nap before trying to load the model onto the GPU
-    nap_time = delay * (this_worker % threads_per_gpu)
-    logger.info(f"Worker {this_worker}: Napping for {nap_time} s before mounting the model")
-    time.sleep(nap_time)
-
     ### Load the model 
     logger.info(f"Worker {this_worker}: Loading and moving model to device {device}")
     model = ResNetUNet(
         n_class = 1, 
         color_dim = color_dim
     ).to(device)
+    
+    # take a nap before trying to load the data onto the GPU
+    nap_time = delay * (this_worker % threads_per_gpu)
+    logger.info(f"Worker {this_worker}: Napping for {nap_time} s before mounting the model")
+    time.sleep(nap_time)
 
     ### Load the weights from the training location
     checkpoint = torch.load(
@@ -175,12 +176,14 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 20):
             prop = InferencePropagator(
                 data_set, 
                 n_bins = n_bins,
+                color_dim = color_dim,
                 tile_size = tile_size,
                 step_size = step_size,
                 marker_size = marker_size,
                 device = device,
                 model = model,
                 mode = inference_mode,
+                probability_threshold = probability_threshold,
                 transforms = inference_transforms
             )
 
@@ -315,7 +318,7 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 20):
 if __name__ == '__main__':
     
     description = "Perform model inference on a list of hologram planes using N workers"
-    description += " where N = (number of nodes) * (number of GPUs / node) * (models / GPU)"
+    description += " where N = (number of nodes) * (number of GPUs per node) * (threads per GPU)"
     
     parser = ArgumentParser(
         description=description
@@ -346,14 +349,14 @@ if __name__ == '__main__':
         dest="gpus_per_node",
         type=int,
         default=-1,
-        help="The number of threads to use to train model(s). Default is to use the values in the yml."
+        help="The number of GPUs per node available to use to train model(s). Default is to use the values in the yml."
     )
     parser.add_argument(
         "-t",
         dest="threads_per_gpu",
         type=int,
         default=-1,
-        help="The number of threads to use to train model(s). Default is to use the values in the yml."
+        help="The number of threads (models / GPU) to use to train model(s). Default is to use the values in the yml."
     )
     
     import torch
@@ -390,7 +393,7 @@ if __name__ == '__main__':
 
     for directory in [prop_data_loc, roc_data_loc, image_data_loc]:
         if not os.path.exists(directory):
-            os.makedirs(directory)
+            os.makedirs(directory, exist_ok = True)
 
     ### Configuration settings for which holograms to process
     h_conf = conf["inference"]["data_set"]["holograms"]
@@ -479,44 +482,3 @@ if __name__ == '__main__':
             sys.exit(0)
         except SystemExit:
             os._exit(0)
-            
-    
-#     t0 = time.time()
-#     for nc, h_idx in enumerate(h_range):
-#         t1 = time.time()
-#         logger.info(f"Working on hologram {h_idx}")
-#         worker = partial(main, conf = conf, h_idx = h_idx)
-#         if threads_per_gpu > 1:
-            
-# #             with mp.Pool(threads_per_gpu) as p:
-# #                 results = [r for r in p.imap(worker, gpu_worker_list)]
-            
-#             processes = []
-#             for r in gpu_worker_list:
-#                 p = mp.Process(target=worker, args=(r,))
-#                 p.start()
-#                 #p.join()
-#                 processes.append(p)
-                
-#             while True:
-#                 stop = 0
-#                 for p in processes:
-#                     if p and p.is_alive():
-#                         continue
-#                     else:
-#                         stop += 1
-#                 if stop == len(processes):
-#                     break
-#                 else:
-#                     time.sleep(1)       
-
-#         else:
-#             results = [worker(r) for r in gpu_worker_list]
-            
-#         logger.info(f"Finished hologram {h_idx} ({nc+1} / {len(h_range)}) in {time.time() - t1} s")
-#         logger.info(f"Total time elapsed so far: {time.time() - t0} s")
-        
-#         # clear the cached memory from the gpu
-#         torch.cuda.empty_cache()
-            
-#     logger.info(f"Node {node_id} finished in {time.time()-t0} s")
