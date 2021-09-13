@@ -154,7 +154,6 @@ class ResNetUNet(nn.Module):
         self.conv_last = nn.Conv2d(64, n_class, 1)
 
     def forward(self, input):
-        
         x_original = self.conv_original_size0(input)
         x_original = self.conv_original_size1(x_original)
 

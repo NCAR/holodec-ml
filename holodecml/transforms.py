@@ -197,7 +197,8 @@ class Normalize(object):
         if self.mode == "255":
             #image /= 255.0
             image[0] /= 255.0
-            image[1] = (1.0 + image[1] / np.pi) / 2.0
+            if image.shape[0] > 1:
+                image[1] = (1.0 + image[1] / np.pi) / 2.0
         
         sample["image"] = image
         return sample
@@ -227,7 +228,14 @@ class AdjustBrightness(object):
         self.brightness = brightness
 
     def __call__(self, sample):
-        if random.random() < self.rate:
+        if self.rate >= 1.0:
+            image = sample['image']
+            brightness = random.uniform(0.0, self.brightness)
+            image = torchvision.transforms.functional.adjust_brightness(
+                image, brightness
+            )
+            sample["image"] = image
+        elif random.random() < self.rate:
             image = sample['image']
             image = torchvision.transforms.functional.adjust_brightness(
                 image, self.brightness
@@ -245,7 +253,16 @@ class GaussianBlur(object):
         self.sigma = sigma
 
     def __call__(self, sample):
-        if random.random() < self.rate:
+        if self.rate >= 1.0:
+            image = sample['image']
+            sigma = random.uniform(0.0, self.sigma)
+            image = torchvision.transforms.functional.gaussian_blur(
+                image, 
+                kernel_size = self.kernel_size, 
+                sigma = sigma
+            )
+            sample["image"] = image
+        elif random.random() < self.rate:
             image = sample['image']
             image = torchvision.transforms.functional.gaussian_blur(
                 image, 
@@ -265,7 +282,13 @@ class GaussianNoise(object):
         self.noise = noise
 
     def __call__(self, sample):
-        if random.random() < self.rate:
+        if self.rate >= 1.0:
+            image = sample['image']
+            noise = random.uniform(0.0, self.noise)
+            noise = np.random.normal(0, noise, image.shape)
+            image += noise
+            sample["image"] = image
+        elif random.random() < self.rate:
             image = sample['image']
             noise = np.random.normal(0, self.noise, image.shape)
             image += noise

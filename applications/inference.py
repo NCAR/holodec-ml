@@ -91,7 +91,7 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
     synthetic_path = conf["data"]["data_path"]
     raw_path = conf["data"]["raw_data"]
 
-    model_loc = conf["trainer"]["output_path"]
+    model_loc = conf["save_loc"]
     model_name = conf["model"]["name"]
     color_dim = conf["model"]["color_dim"]
     inference_mode = conf["model"]["mode"]
@@ -231,6 +231,8 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
 
                     if save_prob:
                         pred_prob = results_dict["pred_proba"]
+                        pred_prob = np.where(pred_prob < 0.5, 0.0, 1000 * pred_prob)
+                        pred_prob = pred_prob.astype(int)
 
                     if save_arrays:
                         # Save the giant matrices as sparse arrays, as most elements are zero
@@ -383,7 +385,7 @@ if __name__ == '__main__':
         raise OSError(f"The id of this worker ({node_id}) exceeded the number of nodes + 1 ({n_nodes + 1}).")
     
     ### Set up directories to save results
-    model_loc = conf["trainer"]["output_path"]
+    model_loc = conf["save_loc"]
     model_name = conf["model"]["name"]
     data_set = conf["inference"]["data_set"]["path"]
     data_set_name = conf["inference"]["data_set"]["name"]

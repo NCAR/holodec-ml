@@ -512,5 +512,4 @@ class UpsamplingReader(Dataset):
         return image, mask
     
     def __len__(self):
-        #return int(self.prop.h_ds["hid"].values[-1])
         return len(list(self.prop.h_ds["hid"].values))

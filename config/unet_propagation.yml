@@ -1,3 +1,6 @@
+seed: 1000
+save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/1_to_4"
+
 data:
     n_bins: 1000
     data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
@@ -5,15 +8,16 @@ data:
     tile_size: 512
     step_size: 128
     marker_size: 10
-    total_positive: 5
-    total_negative: 5
+    total_positive: 1
+    total_negative: 4
     total_training: 50000
     output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
-    cores: 16
-    
+    device: "cpu"
+    cores: 32
+
 transforms:
     training:
-        RandomVerticalFlip: 
+        RandomVerticalFlip:
             rate: 0.5
         RandomHorizontalFlip: 
             rate: 0.5
@@ -39,7 +43,7 @@ transforms:
             mode: '255'
     
 model:
-    name: "R18-U-Net-Const-Noise-No-Phase"
+    name: "R18-U-Net-No-Noise-No-Phase"
     color_dim: 1
     mode: "mask"
     
@@ -49,11 +53,10 @@ optimizer:
     
 trainer:
     epochs: 200
-    train_batch_size: 8
+    train_batch_size: 32
     valid_batch_size: 32
     batches_per_epoch: 500
     stopping_patience: 5
-    output_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/baseline_upsampled"
     
 inference:
     batch_size: 16

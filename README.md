@@ -15,6 +15,7 @@ The code is designed to run on Python 3.7. It reqires the following external Pyt
 * scikit-learn
 * tensorflow>=2.0.0
 * torch
+* torchvision
 * netcdf4
 * tqdm
 * Pillow
@@ -39,7 +40,9 @@ conda install -c conda-forge --yes \
     "numpy<1.19" \
     pandas \
     netcdf4 \
-    scikit-learn
+    scikit-learn \
+    torch \
+    torchvision
 
 ```
 
@@ -64,3 +67,19 @@ cd holodec-ml
 pip install .
 ```
 
+## Using holodec-ml
+The repository contains python scripts and notebooks that allow users to train U-net and Resnet models, and to perform inference with models on holograms.
+
+##### Configuration file
+A user-supplied yml file is the basis for setting different parameters pertaining to datasets, resource usage, etc. For example, ```config/unet_propagation.yml``` contains the fields: seed, save_loc, data, transforms, model, optimizer, training, and inference.
+
+##### Data
+There are two sets of data available: synthetically generated holograms, and real holograms from HOLODEC.
+
+##### Model training 
+
+
+##### Inference
+
+
+##### Clustering and post-processing

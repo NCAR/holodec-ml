@@ -165,7 +165,7 @@ class WavePropagator(WavePropagator):
             step_size = self.step_size
             tile_size = self.tile_size
 
-            for sub_idx,z_idx in enumerate(z_full_idx):
+            for sub_idx, z_idx in enumerate(z_full_idx):
                 part_set_idx = np.where(loc_z_idx == z_idx)[0]
                 empt_set_idx = np.where(empt_z_idx == z_idx)[0]
 
@@ -246,9 +246,9 @@ if __name__ == '__main__':
         sys.exit(1)
         
     with open(config_file) as cf:
-        config = yaml.load(cf, Loader=yaml.FullLoader)
+        conf = yaml.load(cf, Loader=yaml.FullLoader)
         
-    config = config["data"]
+    config = conf["data"]
     ############################################################
     
     root = logging.getLogger()
@@ -274,7 +274,7 @@ if __name__ == '__main__':
     
     n_bins = config["n_bins"]
     data_path = config["data_path"]
-    output_path = config["output_path"]
+    output_path = conf["save_loc"]
     tile_size = config["tile_size"]  # size of tiled images in pixels
     step_size = config["step_size"]  # amount that we shift the tile to make a new tile
     marker_size = config["marker_size"] # UNET gaussian marker width (standard deviation) in um
