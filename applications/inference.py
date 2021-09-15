@@ -240,7 +240,7 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
                             save_sparse_csr(f"{prop_data_loc}/prob_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_prob))
                         save_sparse_csr(f"{prop_data_loc}/pred_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_label))
                         save_sparse_csr(f"{prop_data_loc}/true_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(true_label))
-
+                        
                     # Merge the ROC result 
                     this_roc = results_dict["roc"]
                     roc.merge(this_roc)

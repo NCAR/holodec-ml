@@ -1,5 +1,5 @@
 seed: 1000
-save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/1_to_4"
+save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo"
 
 data:
     n_bins: 1000
@@ -8,12 +8,12 @@ data:
     tile_size: 512
     step_size: 128
     marker_size: 10
-    total_positive: 1
-    total_negative: 4
+    total_positive: 2
+    total_negative: 2
     total_training: 50000
     output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
     device: "cpu"
-    cores: 32
+    cores: 18
 
 transforms:
     training:
@@ -24,14 +24,14 @@ transforms:
         Normalize:
             mode: '255'
         GaussianBlur:
-            rate: 0.0
+            rate: 1.0
             kernel_size: 1
             sigma: 3
         GaussianNoise:
-            rate: 0.0
+            rate: 1.0
             noise: 0.1
         AdjustBrightness:
-            rate: 0.0
+            rate: 1.0
             brightness_factor: 2.0
         ToTensor: True
     validation:
@@ -52,11 +52,13 @@ optimizer:
     weight_decay: 0.0
     
 trainer:
-    epochs: 200
-    train_batch_size: 32
-    valid_batch_size: 32
+    epochs: 100
+    train_batch_size: 16
+    valid_batch_size: 16
     batches_per_epoch: 500
     stopping_patience: 5
+    training_loss: "dice-bce"
+    validation_loss: "dice"
     
 inference:
     batch_size: 16

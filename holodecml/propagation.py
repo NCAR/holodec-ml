@@ -517,7 +517,7 @@ class UpsamplingPropagator(WavePropagator):
             #### Add nearly in focus cases to the training data ####
             sel_empt_idx = np.random.choice(np.arange(near_empt_idx[0].size,dtype=int), size=empt_near_cnt, replace=False)  # select nearly in focus cases
             ####
-            sel_empt_idx = np.concatenate([np.random.choice(np.arange(empt_idx[0].size,dtype=int), size=(empt_per_holo-empt_near_cnt), replace=False),sel_empt_idx])  # select random out of focus cases
+            sel_empt_idx = np.concatenate([np.random.choice(np.arange(empt_idx[0].size,dtype=int), size=(empt_per_holo-empt_near_cnt), replace=False), sel_empt_idx])  # select random out of focus cases
             empt_x_idx = empt_idx[0][sel_empt_idx]
             empt_y_idx = empt_idx[1][sel_empt_idx]
             empt_z_idx = empt_idx[2][sel_empt_idx]

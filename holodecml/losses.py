@@ -12,6 +12,32 @@ logger = logging.getLogger(__name__)
 
 ## See also: https://github.com/JunMa11/SegLoss/blob/master/losses_pytorch/dice_loss.py
 
+def load_loss(loss_name, split = "training"):
+    
+    supported = ["dice", "dice-bce", "iou", "focal", "tyversky", 
+                 "focal-tyversky", "lovasz-hinge", "combo"]
+    
+    logger.info(f"Loading {split} loss function {loss_name}")
+    
+    if loss_name == "dice":
+        return DiceLoss()
+    elif loss_name == "dice-bce":
+        return DiceBCELoss()
+    elif loss_name == "iou":
+        return IoULoss()
+    elif loss_name == "focal":
+        return FocalLoss()
+    elif loss_name == "tyversky":
+        return TverskyLoss()
+    elif loss_name == "focal-tyversky":
+        return FocalTverskyLoss()
+    elif loss_name == "lovasz-hinge":
+        return LovaszHingeLoss()
+    elif loss_name == "combo":
+        return ComboLoss()
+    else:
+        raise OSError(f"Loss name {loss_name} not recognized. Please choose from {supported}")
+
 
 class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
@@ -172,7 +198,7 @@ class ComboLoss(nn.Module):
         dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
         
         inputs = torch.clamp(inputs, eps, 1.0 - eps)       
-        out = - (ALPHA * ((targets * torch.log(inputs)) + ((1 - ALPHA) * (1.0 - targets) * torch.log(1.0 - inputs))))
+        out = - (alpha * ((targets * torch.log(inputs)) + ((1 - alpha) * (1.0 - targets) * torch.log(1.0 - inputs))))
         weighted_ce = out.mean(-1)
         combo = (CE_RATIO * weighted_ce) - ((1 - CE_RATIO) * dice)
         

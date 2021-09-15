@@ -15,6 +15,7 @@ import tqdm
 import time
 import yaml
 import torch
+import psutil
 import shutil
 import pickle
 import joblib
@@ -40,6 +41,9 @@ from torch.optim.lr_scheduler import *
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
+
+
+available_ncpus = len(psutil.Process().cpu_affinity())
 
 
 # ### Set seeds for reproducibility
@@ -86,6 +90,13 @@ if __name__ == '__main__':
     tile_size = conf["data"]["tile_size"]
     step_size = conf["data"]["step_size"]
     data_path = conf["data"]["output_path"]
+    
+    # Set up number of CPU cores available
+    if config_ncpus > available_ncpus:
+        ncpus = int(2 * available_ncpus)
+    else:
+        ncpus = int(2 * config_ncpus)
+    logging.info(f"Using {ncpus // 2} CPU cores to run {ncpus} data workers")
 
     fn_train = f"{data_path}/training_{tile_size}_{step_size}.pkl"
     fn_valid = f"{data_path}/validation_{tile_size}_{step_size}.pkl"
@@ -135,6 +146,7 @@ if __name__ == '__main__':
         conf,
         transform = train_transforms,
         max_size = 100,
+        
         device = data_device
     )
 
@@ -151,7 +163,7 @@ if __name__ == '__main__':
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=train_batch_size, 
-        num_workers=int(conf["data"]["cores"]),
+        num_workers=ncpus,
         pin_memory=True,
         shuffle=True) 
 
