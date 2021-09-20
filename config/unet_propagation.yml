@@ -1,4 +1,5 @@
 seed: 1000
+
 save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/optimized_noisy"
 
 data:
@@ -12,6 +13,7 @@ data:
     total_negative: 5
     total_training: 50000
     output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
+    use_cached: True
     device: "cpu"
     cores: 0
 
@@ -41,8 +43,7 @@ transforms:
     inference:
         Normalize:
             mode: '255'
-            
-            
+                       
 model:
     name: "manet"
     encoder_name: "xception"
@@ -50,11 +51,6 @@ model:
     in_channels: 1
     classes: 1
     activation: "sigmoid"
-    
-# model:
-#     name: "R18-U-Net-No-Noise-No-Phase"
-#     color_dim: 1
-#     mode: "mask"
     
 optimizer:
     learning_rate: 0.0006145337230850794

@@ -90,20 +90,29 @@ if __name__ == '__main__':
     seed = 1000 if "seed" not in conf else conf["seed"]
     seed_everything(seed)
     
-    tile_size = conf["data"]["tile_size"]
-    step_size = conf["data"]["step_size"]
+    tile_size = int(conf["data"]["tile_size"])
+    step_size = int(conf["data"]["step_size"])
     data_path = conf["data"]["output_path"]
+    total_positive = int(conf["data"]["total_positive"])
+    total_negative = int(conf["data"]["total_negative"])
+    total_examples = int(conf["data"]["total_training"])
     config_ncpus = int(conf["data"]["cores"])
+    use_cached = False if "use_cached" not in conf["data"] else conf["data"]["use_cached"]
     
     # Set up number of CPU cores available
     if config_ncpus > available_ncpus:
-        ncpus = int(2 * available_ncpus)
+        ncpus = available_ncpus
+        #ncpus = int(2 * available_ncpus)
     else:
-        ncpus = int(2 * config_ncpus)
-    logging.info(f"Using {ncpus // 2} CPU cores to run {ncpus} data workers")
+        ncpus = config_ncpus
+        #ncpus = int(2 * config_ncpus)
+    logging.info(f"Using {available_ncpus} CPU cores to run {ncpus} data workers")
 
-    fn_train = f"{data_path}/training_{tile_size}_{step_size}.pkl"
-    fn_valid = f"{data_path}/validation_{tile_size}_{step_size}.pkl"
+    name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}.pkl"
+    fn_train = f"{data_path}/training_{name_tag}.pkl"
+    fn_valid = f"{data_path}/validation_{name_tag}.pkl"
+    #fn_train = f"{data_path}/training_{tile_size}_{step_size}.pkl"
+    #fn_valid = f"{data_path}/validation_{tile_size}_{step_size}.pkl"
 
     epochs = conf["trainer"]["epochs"]
     start_epoch = 0 if "start_epoch" not in conf["trainer"] else conf["trainer"]["start_epoch"]
@@ -148,7 +157,7 @@ if __name__ == '__main__':
     valid_transforms = LoadTransformations(conf["transforms"]["validation"])
     
     ### Load the data class for reading and preparing the data as needed to train the u-net
-    if conf["data"]["total_positive"] == 5 and conf["data"]["total_negative"] == 5:
+    if use_cached: #if conf["data"]["total_positive"] == 5 and conf["data"]["total_negative"] == 5:
         logging.info(f"Reading training data from a cached dataset at {fn_train}")
         train_dataset = PickleReader(
             fn_train, 
