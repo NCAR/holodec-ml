@@ -4,6 +4,8 @@ warnings.filterwarnings("ignore")
 import sys 
 sys.path.append("/glade/work/schreck/repos/HOLO/clean/holodec-ml")
 
+from holodecml.models import *
+
 import os
 import glob
 import tqdm
@@ -93,12 +95,12 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
 
     model_loc = conf["save_loc"]
     model_name = conf["model"]["name"]
-    color_dim = conf["model"]["color_dim"]
-    inference_mode = conf["model"]["mode"]
+    color_dim = conf["model"]["in_channels"]
 
     batch_size = conf["inference"]["batch_size"]
     save_arrays = conf["inference"]["save_arrays"]
     save_prob = conf["inference"]["save_probs"]
+    inference_mode = conf["inference"]["mode"]
     
     if "probability_threshold" in conf["inference"]: 
         probability_threshold = conf["inference"]["probability_threshold"]
@@ -141,10 +143,7 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
         
     ### Load the model 
     logger.info(f"Worker {this_worker}: Loading and moving model to device {device}")
-    model = ResNetUNet(
-        n_class = 1, 
-        color_dim = color_dim
-    ).to(device)
+    model = load_model(conf["model"]).to(device)
     
     # take a nap before trying to load the data onto the GPU
     nap_time = delay * (this_worker % threads_per_gpu)

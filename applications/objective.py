@@ -1,6 +1,9 @@
 import warnings
 warnings.filterwarnings("ignore")
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import sys 
 sys.path.append("/glade/work/schreck/repos/HOLO/clean/holodec-ml")
 from holodecml.data import *
@@ -9,7 +12,6 @@ from holodecml.models import *
 from holodecml.metrics import *
 from holodecml.transforms import *
 
-import os
 import glob
 import tqdm
 import time
@@ -100,9 +102,9 @@ class Objective(BaseObjective):
         valid_loss = "dice" if "validation_loss" not in conf["trainer"] else conf["trainer"]["validation_loss"]
         model_loc = conf["save_loc"]
 
+        model_loc = conf["save_loc"]
         model_name = conf["model"]["name"]
-        color_dim = conf["model"]["color_dim"]
-        inference_mode = conf["model"]["mode"]
+        color_dim = conf["model"]["in_channels"]
 
         learning_rate = conf["optimizer"]["learning_rate"]
         weight_decay = conf["optimizer"]["weight_decay"]
@@ -128,13 +130,25 @@ class Objective(BaseObjective):
         valid_transforms = LoadTransformations(conf["transforms"]["validation"])
 
         ### Load the data class for reading and preparing the data as needed to train the u-net
-        train_dataset = UpsamplingReader(
-            conf,
-            transform = train_transforms,
-            max_size = 100,
-            device = data_device
-        )
-
+        if conf["data"]["total_positive"] == 5 and conf["data"]["total_negative"] == 5:
+            logging.info(f"Reading training data from a cached dataset at {fn_train}")
+            train_dataset = PickleReader(
+                fn_train, 
+                transform = train_transforms,
+                max_images = int(0.8 * conf["data"]["total_training"]), 
+                max_buffer_size = int(0.1 * conf["data"]["total_training"]), 
+                color_dim = color_dim,
+                shuffle = True
+            )
+        else:
+            logging.info(f"Preprocessing the training data on the fly with an upsampling generator")
+            train_dataset = UpsamplingReader(
+                conf,
+                transform = train_transforms,
+                max_size = 100,
+                device = data_device
+            )
+        
         test_dataset = PickleReader(
             fn_valid,
             transform = valid_transforms,
@@ -160,8 +174,14 @@ class Objective(BaseObjective):
             shuffle=False)
 
         ### Load a u-net model (resnet based on https://www.kaggle.com/bigironsphere/loss-function-library-keras-pytorch)
-        unet = ResNetUNet(n_class = 1, color_dim = color_dim)
-
+        #unet = ResNetUNet(n_class = 1, color_dim = color_dim)
+        try:
+            unet = load_model(conf["model"])
+        except Exception as E:
+            logging.warning(f"Failed to load model {conf['model']} with error {str(E)}... completing with val_loss = 1.0 (worst)")
+            trial.report(1.0, step = 0)
+            return {"val_loss": 1.0}
+        
         if start_epoch > 0:
             # Load weights
             logging.info(f"Restarting training starting from epoch {start_epoch}")
@@ -239,8 +259,8 @@ class Objective(BaseObjective):
 
             for k, (inputs, y) in batch_group_generator:
                 # Move data to the GPU, if not there already
-                inputs = inputs.to(device).float()
-                y = y.to(device).float()
+                inputs = inputs.to(device)
+                y = y.to(device)
 
                 # Clear gradient
                 optimizer.zero_grad()
@@ -249,7 +269,7 @@ class Objective(BaseObjective):
                 pred_mask = unet(inputs)
 
                 # get loss for the predicted output
-                loss = train_criterion(pred_mask, y)
+                loss = train_criterion(pred_mask, y.float())
 
                 # get gradients w.r.t to parameters
                 loss.backward()
@@ -296,12 +316,12 @@ class Objective(BaseObjective):
 
                 for k, (inputs, y) in batch_group_generator:
                     # Move data to the GPU, if not there already
-                    inputs = inputs.to(device).float()
-                    y = y.to(device).float()
+                    inputs = inputs.to(device)
+                    y = y.to(device)
                     # get output from the model, given the inputs
                     pred_mask = unet(inputs)
                     # get loss for the predicted output
-                    loss = test_criterion(pred_mask, y)
+                    loss = test_criterion(pred_mask, y.float())
                     batch_loss.append(loss.item())
                     # update tqdm
                     to_print = "Epoch {} test_loss: {:.6f}".format(epoch, np.mean(batch_loss))
@@ -324,7 +344,16 @@ class Objective(BaseObjective):
             lr_scheduler.step(test_loss)
             
             # Report result to the trial 
-            trial.report(test_loss, step = epoch)
+            attempt = 0
+            while attempt < 10:
+                try:
+                    trial.report(float(test_loss), step = epoch)
+                    break
+                except Exception as E:
+                    logging.warning(f"WARNING failed to update the trial with loss {test_loss} at epoch {epoch}. Error {str(E)}")
+                    logging.warning(f"Trying again ... {attempt + 1} / 10")
+                    time.sleep(1)
+                    attempt += 1
 
             # Stop training if we have not improved after X epochs (stopping patience)
             best_epoch = [i for i,j in enumerate(epoch_test_losses) if j == min(epoch_test_losses)][0]
@@ -335,9 +364,12 @@ class Objective(BaseObjective):
             # Custom management of optuna parameters 
             if trial.should_prune() and ((epoch + 1) >= 5) and (trial.number > 20):
                 raise optuna.TrialPruned()
-
+    
+        if len(epoch_test_losses) == 0:
+            trial.should_prune()
+                
         result = {
-            "val_loss": min(epoch_test_losses)
+            "val_loss": float(min(epoch_test_losses))
         }
     
         return result

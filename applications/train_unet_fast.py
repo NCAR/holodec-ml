@@ -1,6 +1,9 @@
 import warnings
 warnings.filterwarnings("ignore")
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import sys 
 sys.path.append("/glade/work/schreck/repos/HOLO/clean/holodec-ml")
 from holodecml.data import *
@@ -9,7 +12,6 @@ from holodecml.models import *
 from holodecml.metrics import *
 from holodecml.transforms import *
 
-import os
 import glob
 import tqdm
 import time
@@ -27,6 +29,7 @@ import datetime
 import torch.fft
 import torchvision
 import torchvision.models as models
+import segmentation_models_pytorch as smp
 
 import numpy as np
 import pandas as pd
@@ -90,6 +93,7 @@ if __name__ == '__main__':
     tile_size = conf["data"]["tile_size"]
     step_size = conf["data"]["step_size"]
     data_path = conf["data"]["output_path"]
+    config_ncpus = int(conf["data"]["cores"])
     
     # Set up number of CPU cores available
     if config_ncpus > available_ncpus:
@@ -107,11 +111,13 @@ if __name__ == '__main__':
     valid_batch_size = conf["trainer"]["valid_batch_size"]
     batches_per_epoch = conf["trainer"]["batches_per_epoch"]
     stopping_patience = conf["trainer"]["stopping_patience"]
+    
     model_loc = conf["save_loc"]
-
     model_name = conf["model"]["name"]
-    color_dim = conf["model"]["color_dim"]
-    inference_mode = conf["model"]["mode"]
+    color_dim = conf["model"]["in_channels"]
+    
+    training_loss = "dice-bce" if "training_loss" not in conf["trainer"] else conf["trainer"]["training_loss"]
+    valid_loss = "dice" if "validation_loss" not in conf["trainer"] else conf["trainer"]["validation_loss"]
 
     learning_rate = conf["optimizer"]["learning_rate"]
     weight_decay = conf["optimizer"]["weight_decay"]
@@ -142,13 +148,24 @@ if __name__ == '__main__':
     valid_transforms = LoadTransformations(conf["transforms"]["validation"])
     
     ### Load the data class for reading and preparing the data as needed to train the u-net
-    train_dataset = UpsamplingReader(
-        conf,
-        transform = train_transforms,
-        max_size = 100,
-        
-        device = data_device
-    )
+    if conf["data"]["total_positive"] == 5 and conf["data"]["total_negative"] == 5:
+        logging.info(f"Reading training data from a cached dataset at {fn_train}")
+        train_dataset = PickleReader(
+            fn_train, 
+            transform = train_transforms,
+            max_images = int(0.8 * conf["data"]["total_training"]), 
+            max_buffer_size = int(0.1 * conf["data"]["total_training"]), 
+            color_dim = color_dim,
+            shuffle = True
+        )
+    else:
+        logging.info(f"Preprocessing the training data on the fly with an upsampling generator")
+        train_dataset = UpsamplingReader(
+            conf,
+            transform = train_transforms,
+            max_size = 100,
+            device = data_device
+        )
 
     test_dataset = PickleReader(
         fn_valid,
@@ -175,7 +192,24 @@ if __name__ == '__main__':
         shuffle=False)
 
     ### Load a u-net model (resnet based on https://www.kaggle.com/bigironsphere/loss-function-library-keras-pytorch)
-    unet = ResNetUNet(n_class = 1, color_dim = color_dim)
+    unet = load_model(conf["model"]).to(device)
+    
+#     for modely in ["unet", "unet++", "manet", "linknet", "fpn", "pspnet", "pan", "deeplabv3", "deeplabv3+"]:
+#         for namer in ["resnet18", "densenet121", "xception", "efficientnet-b0", "mobilenet_v2", "dpn68", "vgg11"]:
+#             conf["model"]["name"] = modely
+#             conf["model"]["encoder_name"] = namer
+#             try:
+#                 unet = load_model(conf["model"]).to(device)
+#                 memory = torch.cuda.max_memory_allocated()
+#                 print(f"{modely} {namer} {memory}")
+#             except:
+#                 print(f"{modely} {namer} 0")
+#     raise
+
+#     unet = ResNetUNet(
+#         n_class = 1, 
+#         color_dim = color_dim
+#     )
     
     if start_epoch > 0:
         # Load weights
@@ -208,9 +242,9 @@ if __name__ == '__main__':
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
     ### Specify the training and validation losses
-    train_criterion = DiceBCELoss()
-    test_criterion = DiceLoss()
-
+    train_criterion = load_loss(training_loss) #DiceBCELoss()
+    test_criterion = load_loss(valid_loss, split = "validation") #DiceLoss()
+        
     ### Load a learning rate scheduler
     lr_scheduler = ReduceLROnPlateau(
         optimizer, 
@@ -254,8 +288,8 @@ if __name__ == '__main__':
 
         for k, (inputs, y) in batch_group_generator:
             # Move data to the GPU, if not there already
-            inputs = inputs.to(device).float()
-            y = y.to(device).float()
+            inputs = inputs.to(device)
+            y = y.to(device)
 
             # Clear gradient
             optimizer.zero_grad()
@@ -264,7 +298,7 @@ if __name__ == '__main__':
             pred_mask = unet(inputs)
 
             # get loss for the predicted output
-            loss = train_criterion(pred_mask, y)
+            loss = train_criterion(pred_mask, y.float())
 
             # get gradients w.r.t to parameters
             loss.backward()
@@ -309,12 +343,12 @@ if __name__ == '__main__':
 
             for k, (inputs, y) in batch_group_generator:
                 # Move data to the GPU, if not there already
-                inputs = inputs.to(device).float()
-                y = y.to(device).float()
+                inputs = inputs.to(device)
+                y = y.to(device)
                 # get output from the model, given the inputs
                 pred_mask = unet(inputs)
                 # get loss for the predicted output
-                loss = test_criterion(pred_mask, y)
+                loss = test_criterion(pred_mask, y.float())
                 batch_loss.append(loss.item())
                 # update tqdm
                 to_print = "Epoch {} test_loss: {:.4f}".format(epoch, np.mean(batch_loss))

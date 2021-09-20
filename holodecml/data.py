@@ -1,8 +1,9 @@
 import warnings
 warnings.filterwarnings("ignore")
 
-
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import socket
 
 import torch
@@ -49,6 +50,20 @@ split_dict = {
     'train' : 'training',
     'test' : 'test',
     'valid' : 'validation'}
+
+
+def save_sparse_csr(filename, array):
+    # note that .npz extension is added automatically
+    np.savez(filename, data=array.data, indices=array.indices,
+             indptr=array.indptr, shape=array.shape)
+
+
+def load_sparse_csr(filename):
+    # here we need to add .npz extension manually
+    loader = np.load(filename + '.npz')
+    return csr_matrix((loader['data'], loader['indices'], loader['indptr']),
+                      shape=loader['shape'])
+
 
 def get_dataset_path():
     if 'casper' in socket.gethostname():
@@ -747,13 +762,13 @@ class PickleReader(Dataset):
                 if im["vertical_flip"]:
                     mask = np.flip(mask, axis=1)
                         
-                image = torch.FloatTensor(image)
+                image = torch.tensor(image, dtype=torch.float)
+                #image = torch.FloatTensor(image)
                 #label = torch.LongTensor([label])
-                mask = torch.FloatTensor(mask.copy())
-                
+                #mask = torch.FloatTensor(mask.copy())
+                mask = torch.tensor(mask.copy(), dtype=torch.int)
                 
                 #######
-                
                 
                 data = (image, mask)
 
@@ -849,8 +864,8 @@ class UpsamplingReader(Dataset):
         
         if self.transform == None:
             
-            image = torch.FloatTensor(image)
-            mask = torch.FloatTensor(mask)
+            image = torch.tensor(image, dtype=torch.float)
+            mask = torch.tensor(mask, dtype=torch.int)
             
             return image, mask
         
@@ -868,9 +883,9 @@ class UpsamplingReader(Dataset):
             mask = np.flip(mask, axis=0)
         if im["vertical_flip"]:
             mask = np.flip(mask, axis=1)
-
-        image = torch.FloatTensor(im["image"])
-        mask = torch.FloatTensor(mask.copy())
+            
+        image = torch.tensor(image, dtype=torch.float)
+        mask = torch.tensor(mask.copy(), dtype=torch.int)
         
         return image, mask
     

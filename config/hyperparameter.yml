@@ -1,64 +1,50 @@
 log:
-  save_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo/log.txt"
+  save_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo_models_losses/log.txt"
 
 pbs:
-  jobs: 1
+  jobs: 10
   kernel: "ncar_pylib /glade/work/$USER/py37" # ncar_20200417
   bash: ["source ~/.bashrc"]
   batch:
     N: "holo-echo"
-    l: ["select=1:ncpus=18:ngpus=1:mem=192GB", "walltime=24:00:00", "gpu_type=v100"]
+    l: ["select=1:ncpus=8:ngpus=1:mem=128GB", "walltime=24:00:00", "gpu_type=v100"]
     A: "NAML0001"
     q: "casper"
-    o: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo/out"
-    e: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo/out"
+    o: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo_models_losses/out"
+    e: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo_models_losses/out"
     
 optuna:
   study_name: "holodecml"
-  storage: "sqlite:////glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo/holodec.db"
+  storage: "sqlite:////glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo_models_losses/holodec.db"
   reload: 0
   objective: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/applications/objective.py"
   direction: "minimize"
   metric: "val_loss"
   n_trials: 999
   gpu: True
-  save_path: '/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo/'
+  save_path: '/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo_models_losses/'
   sampler:
     type: "TPESampler"
     n_startup_trials: 100
   parameters:
-    data:total_negative:
-      type: "int"
-      settings:
-        name: "total_negative"
-        low: 2
-        high: 10
-    transforms:training:GaussianBlur:sigma:
-      type: "float"
-      settings:
-        name: "sigma"
-        low: 0.0
-        high: 5.0
-    transforms:training:GaussianNoise:noise:
-      type: "float"
-      settings:
-        name: "noise"
-        low: 0.0
-        high: 0.5
-    transforms:training:AdjustBrightness:brightness_factor:
-      type: "float"
-      settings:
-        name: "brightness"
-        low: 0.0
-        high: 5.0
     optimizer:learning_rate:
       type: "loguniform"
       settings:
         name: "learning_rate"
-        low: 1.0e-06
+        low: 5.0e-05
         high: 1.0e-02
     trainer:training_loss:
       type: "categorical"
       settings:
         name: "training_loss"
         choices: ["dice", "dice-bce", "iou", "focal", "tyversky", "focal-tyversky", "lovasz-hinge", "combo"]
+    model:name:
+      type: "categorical"
+      settings:
+        name: "model_name"
+        choices: ["unet", "unet++", "manet", "linknet", "fpn", "pspnet", "pan", "deeplabv3", "deeplabv3+"]
+    model:encoder_name:
+      type: "categorical"
+      settings:
+        name: "encoder_name"
+        choices: ["resnet18", "resnet152", "densenet121", "xception", "efficientnet-b0", "mobilenet_v2", "dpn68", "vgg11"]

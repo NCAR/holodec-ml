@@ -1,5 +1,5 @@
 seed: 1000
-save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/echo"
+save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/optimized_noisy"
 
 data:
     n_bins: 1000
@@ -8,12 +8,12 @@ data:
     tile_size: 512
     step_size: 128
     marker_size: 10
-    total_positive: 2
-    total_negative: 2
+    total_positive: 5
+    total_negative: 5
     total_training: 50000
     output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
     device: "cpu"
-    cores: 18
+    cores: 0
 
 transforms:
     training:
@@ -26,13 +26,13 @@ transforms:
         GaussianBlur:
             rate: 1.0
             kernel_size: 1
-            sigma: 3
+            sigma: 1.7902436563642792
         GaussianNoise:
             rate: 1.0
-            noise: 0.1
+            noise: 0.011353967974406949
         AdjustBrightness:
             rate: 1.0
-            brightness_factor: 2.0
+            brightness_factor: 1.7301154565769068
         ToTensor: True
     validation:
         Normalize:
@@ -41,14 +41,23 @@ transforms:
     inference:
         Normalize:
             mode: '255'
-    
+            
+            
 model:
-    name: "R18-U-Net-No-Noise-No-Phase"
-    color_dim: 1
-    mode: "mask"
+    name: "manet"
+    encoder_name: "xception"
+    encoder_weights: "imagenet"
+    in_channels: 1
+    classes: 1
+    activation: "sigmoid"
+    
+# model:
+#     name: "R18-U-Net-No-Noise-No-Phase"
+#     color_dim: 1
+#     mode: "mask"
     
 optimizer:
-    learning_rate: 1.0e-04
+    learning_rate: 0.0006145337230850794
     weight_decay: 0.0
     
 trainer:
@@ -56,11 +65,12 @@ trainer:
     train_batch_size: 16
     valid_batch_size: 16
     batches_per_epoch: 500
-    stopping_patience: 5
-    training_loss: "dice-bce"
+    stopping_patience: 4
+    training_loss: "tyversky"
     validation_loss: "dice"
     
 inference:
+    mode: "mask"
     batch_size: 16
     n_nodes: 4
     gpus_per_node: 1
