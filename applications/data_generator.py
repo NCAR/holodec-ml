@@ -165,7 +165,7 @@ class WavePropagator(WavePropagator):
             step_size = self.step_size
             tile_size = self.tile_size
 
-            for sub_idx,z_idx in enumerate(z_full_idx):
+            for sub_idx, z_idx in enumerate(z_full_idx):
                 part_set_idx = np.where(loc_z_idx == z_idx)[0]
                 empt_set_idx = np.where(empt_z_idx == z_idx)[0]
 
@@ -246,9 +246,9 @@ if __name__ == '__main__':
         sys.exit(1)
         
     with open(config_file) as cf:
-        config = yaml.load(cf, Loader=yaml.FullLoader)
+        conf = yaml.load(cf, Loader=yaml.FullLoader)
         
-    config = config["data"]
+    config = conf["data"]
     ############################################################
     
     root = logging.getLogger()
@@ -272,20 +272,19 @@ if __name__ == '__main__':
 
     ############################################################
     
-    n_bins = config["n_bins"]
+    n_bins = int(config["n_bins"])
     data_path = config["data_path"]
-    output_path = config["output_path"]
-    tile_size = config["tile_size"]  # size of tiled images in pixels
-    step_size = config["step_size"]  # amount that we shift the tile to make a new tile
+    output_path = conf["save_loc"]
+    tile_size = int(config["tile_size"])  # size of tiled images in pixels
+    step_size = int(config["step_size"])  # amount that we shift the tile to make a new tile
     marker_size = config["marker_size"] # UNET gaussian marker width (standard deviation) in um
     # step_size is not allowed be be larger than the tile_size
     assert tile_size >= step_size
     
-    total_positive = config["total_positive"]
-    total_negative = config["total_negative"]
-    total_examples = config["total_training"]
-    
-    cores = config["cores"]
+    total_positive = int(config["total_positive"])
+    total_negative = int(config["total_negative"])
+    total_examples = int(config["total_training"])
+    cores = int(config["cores"])
     
     prop = WavePropagator(
         data_path, 
@@ -293,7 +292,7 @@ if __name__ == '__main__':
         tile_size = tile_size,
         step_size = step_size,
         marker_size = marker_size,
-        #device = device
+        device = device
     )
 
     number_of_holograms = prop.h_ds.dims['hologram_number']
@@ -322,24 +321,26 @@ if __name__ == '__main__':
         empt_per_holo = total_negative
     )
     
+    name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}.pkl"
+    
     # Create the training data first
     with mp.Pool(cores) as p:
         
-        with open(f"{output_path}/training_{tile_size}_{step_size}.pkl", "wb") as fid:
+        with open(f"{output_path}/training_{name_tag}.pkl", "wb") as fid:
             for data in tqdm.tqdm(p.imap(work,
                                          training_hologram_numbers), total = total_training_examples):
                 for image, label, mask in zip(data["stacked_image"], data["label"], data["mask"]):
                     joblib.dump((image, label, mask), fid)
                     
         # Create the validation data
-        with open(f"{output_path}/validation_{tile_size}_{step_size}.pkl", "wb") as fid:
+        with open(f"{output_path}/validation_{name_tag}.pkl", "wb") as fid:
             for data in tqdm.tqdm(p.imap(work, 
                                          validation_hologram_numbers), total = total_validation_examples):
                 for image, label, mask in zip(data["stacked_image"], data["label"], data["mask"]):
                     joblib.dump((image, label, mask), fid)
                     
-        # Create the test data 
-        with open(f"{output_path}/test_{tile_size}_{step_size}.pkl", "wb") as fid:
+        # Create the test data
+        with open(f"{output_path}/test_{name_tag}.pkl", "wb") as fid:
             for data in tqdm.tqdm(p.imap(work, 
                                          test_hologram_numbers), total = total_testing_examples):
                 for image, label, mask in zip(data["stacked_image"], data["label"], data["mask"]):

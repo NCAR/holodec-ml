@@ -1,9 +1,22 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import sys
+import copy
 import logging
 import numpy as np
 import pandas as pd
 from typing import List, Dict
 from scipy.ndimage import gaussian_filter
+
+import torch
+import torch.nn as nn
+import torchvision
+import torchvision.models as models
+
+from holodecml.losses import *
+from holodecml.metrics import *
+import segmentation_models_pytorch as smp
 
 from tensorflow.keras.layers import (Input, Conv2D, Dense, Flatten, MaxPool2D,
                                      AveragePooling2D, Activation,
@@ -12,15 +25,6 @@ import tensorflow as tf
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.losses import mean_absolute_error, binary_crossentropy
-
-from holodecml.losses import *
-from holodecml.metrics import *
-
-
-import torch
-import torch.nn as nn
-import torchvision
-import torchvision.models as models
 
 
 
@@ -31,19 +35,43 @@ logger = logging.getLogger(__name__)
 custom_losses = {
     "sce": SymmetricCrossEntropy(0.5, 0.5),
     "rmse": rmse,
+    "weighted_mse": wmse,
     "r2": R2,
     "noisy": noisy_true_particle_loss,
     "random": random_particle_distance_loss
 }
 
-custom_metrics = {
-    "TP": TruePositives,
-    "FP": FalsePositives,
-    "TN": TrueNegatives,
-    "FN": FalseNegatives
-} 
+# custom_metrics = {
+#     "TP": TruePositives,
+#     "FP": FalsePositives,
+#     "TN": TrueNegatives,
+#     "FN": FalseNegatives
+# } 
+
+supported_models = {
+    "unet": smp.Unet,
+    "unet++": smp.UnetPlusPlus,
+    "manet": smp.MAnet,
+    "linknet": smp.Linknet,
+    "fpn": smp.FPN,
+    "pspnet": smp.PSPNet,
+    "pan": smp.PAN,
+    "deeplabv3": smp.DeepLabV3,
+    "deeplabv3+": smp.DeepLabV3Plus
+}
+
+supported_encoders = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnext50_32x4d', 'resnext101_32x4d', 'resnext101_32x8d', 'resnext101_32x16d', 'resnext101_32x32d', 'resnext101_32x48d', 'dpn68', 'dpn68b', 'dpn92', 'dpn98', 'dpn107', 'dpn131', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn', 'senet154', 'se_resnet50', 'se_resnet101', 'se_resnet152', 'se_resnext50_32x4d', 'se_resnext101_32x4d', 'densenet121', 'densenet169', 'densenet201', 'densenet161', 'inceptionresnetv2', 'inceptionv4', 'efficientnet-b0', 'efficientnet-b1', 'efficientnet-b2', 'efficientnet-b3', 'efficientnet-b4', 'efficientnet-b5', 'efficientnet-b6', 'efficientnet-b7', 'mobilenet_v2', 'xception', 'timm-efficientnet-b0', 'timm-efficientnet-b1', 'timm-efficientnet-b2', 'timm-efficientnet-b3', 'timm-efficientnet-b4', 'timm-efficientnet-b5', 'timm-efficientnet-b6', 'timm-efficientnet-b7', 'timm-efficientnet-b8', 'timm-efficientnet-l2', 'timm-tf_efficientnet_lite0', 'timm-tf_efficientnet_lite1', 'timm-tf_efficientnet_lite2', 'timm-tf_efficientnet_lite3', 'timm-tf_efficientnet_lite4', 'timm-resnest14d', 'timm-resnest26d', 'timm-resnest50d', 'timm-resnest101e', 'timm-resnest200e', 'timm-resnest269e', 'timm-resnest50d_4s2x40d', 'timm-resnest50d_1s4x24d', 'timm-res2net50_26w_4s', 'timm-res2net101_26w_4s', 'timm-res2net50_26w_6s', 'timm-res2net50_26w_8s', 'timm-res2net50_48w_2s', 'timm-res2net50_14w_8s', 'timm-res2next50', 'timm-regnetx_002', 'timm-regnetx_004', 'timm-regnetx_006', 'timm-regnetx_008', 'timm-regnetx_016', 'timm-regnetx_032', 'timm-regnetx_040', 'timm-regnetx_064', 'timm-regnetx_080', 'timm-regnetx_120', 'timm-regnetx_160', 'timm-regnetx_320', 'timm-regnety_002', 'timm-regnety_004', 'timm-regnety_006', 'timm-regnety_008', 'timm-regnety_016', 'timm-regnety_032', 'timm-regnety_040', 'timm-regnety_064', 'timm-regnety_080', 'timm-regnety_120', 'timm-regnety_160', 'timm-regnety_320', 'timm-skresnet18', 'timm-skresnet34', 'timm-skresnext50_32x4d', 'timm-mobilenetv3_large_075', 'timm-mobilenetv3_large_100', 'timm-mobilenetv3_large_minimal_100', 'timm-mobilenetv3_small_075', 'timm-mobilenetv3_small_100', 'timm-mobilenetv3_small_minimal_100', 'timm-gernet_s', 'timm-gernet_m', 'timm-gernet_l']
 
 
+def load_model(model_conf):
+    model_conf = copy.deepcopy(model_conf)
+    name = model_conf.pop("name")
+    if name in supported_models:
+        logger.info(f"Loading model {name} with settings {model_conf}")
+        return supported_models[name](**model_conf)
+    else:
+        raise OSError(f"Model name {name} not recognized. Please choose from {supported_models.keys()}")
+    
 
 class ResNet(nn.Module):
     def __init__(self, fcl_layers = [], dr = 0.0, color_dim = 2, output_size = 1, resnet_model = 18, pretrained = True):
@@ -156,7 +184,6 @@ class ResNetUNet(nn.Module):
         self.conv_last = nn.Conv2d(64, n_class, 1)
 
     def forward(self, input):
-        
         x_original = self.conv_original_size0(input)
         x_original = self.conv_original_size1(x_original)
 
@@ -265,7 +292,6 @@ class Conv2DNeuralNetwork(object):
     """
     A Conv2D Neural Network Model that can support an arbitrary numbers of
     layers.
-
     Attributes:
         filters: List of number of filters in each Conv2D layer
         kernel_sizes: List of kernel sizes in each Conv2D layer
@@ -423,7 +449,7 @@ class Conv2DNeuralNetwork(object):
         output = sub_model.predict(x, batch_size=batch_size)
         return output            
 
-class ParticleEncoder(Layer):
+class ParticleEncoder(Model):
     def __init__(self, hidden_layers=1, hidden_neurons=10, activation="relu", attention_neurons=100, **kwargs):
         super(ParticleEncoder, self).__init__(**kwargs)
         self.hidden_layers = hidden_layers
@@ -450,7 +476,7 @@ class ParticleEncoder(Layer):
         return config
 
 
-class ParticleDecoder(Layer):
+class ParticleDecoder(Model):
     def __init__(self, hidden_layers=1, hidden_neurons=10, activation="relu", output_num=2, **kwargs):
         super(ParticleDecoder, self).__init__(**kwargs)
         self.hidden_layers = hidden_layers
@@ -477,7 +503,7 @@ class ParticleDecoder(Layer):
         return config
 
 
-class HologramEncoder(Layer):
+class HologramEncoder(Model):
     def __init__(self, min_filters=4, filter_width=5, pooling="mean", pooling_width=2, filter_growth_rate=2,
                  min_data_width=16, attention_neurons=100, activation="relu", **kwargs):
         super(HologramEncoder, self).__init__(**kwargs)
@@ -557,7 +583,7 @@ class ParticleAttentionNet(Model):
                                                 filter_growth_rate=filter_growth_rate, pooling_width=pooling_width,
                                                 activation=activation, attention_neurons=attention_neurons,
                                                 name="hologram_encoder")
-        self.particle_attention = Attention(use_scale=True)
+        self.particle_attention = Attention(use_scale=False)
         return
 
     def call(self, inputs, **kwargs):
@@ -570,7 +596,7 @@ class ParticleAttentionNet(Model):
         particle_dec = self.particle_decoder(attention_out)
         # particle_dec.shape = batch_size x proposed_num_particles x num_coordinates (x,y,z,d,p(particle_is_real)<optional)
         return particle_dec
-    
+
 def generate_gaussian_particles(num_images=1000, num_particles=5, image_size_pixels=100,
                                 gaussian_sd=3, random_seed=124):
     np.random.seed(random_seed)
@@ -607,7 +633,547 @@ def run_particleattentionnet():
     plt.savefig("pred_particle.png", dpi=150, bbox_inches="tight")
     return
 
-
-
 if __name__ == "__main__":
     run_particleattentionnet()
+
+def upsample_conv(filters, kernel_size, strides, padding):
+    return Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+
+
+def upsample_simple(filters, kernel_size, strides, padding):
+    return UpSampling2D(strides)
+
+
+def attention_gate(inp_1, inp_2, n_intermediate_filters):
+    """Attention gate. Compresses both inputs to n_intermediate_filters filters before processing.
+       Implemented as proposed by Oktay et al. in their Attention U-net, see: https://arxiv.org/abs/1804.03999.
+    """
+    inp_1_conv = Conv2D(
+        n_intermediate_filters,
+        kernel_size=1,
+        strides=1,
+        padding="same",
+        kernel_initializer="he_normal",
+    )(inp_1)
+    inp_2_conv = Conv2D(
+        n_intermediate_filters,
+        kernel_size=1,
+        strides=1,
+        padding="same",
+        kernel_initializer="he_normal",
+    )(inp_2)
+
+    f = Activation("relu")(add([inp_1_conv, inp_2_conv]))
+    g = Conv2D(
+        filters=1,
+        kernel_size=1,
+        strides=1,
+        padding="same",
+        kernel_initializer="he_normal",
+    )(f)
+    h = Activation("sigmoid")(g)
+    return multiply([inp_1, h])
+
+def attention_concat(conv_below, skip_connection):
+    """Performs concatenation of upsampled conv_below with attention gated version of skip-connection
+    """
+    below_filters = conv_below.get_shape().as_list()[-1]
+    attention_across = attention_gate(skip_connection, conv_below, below_filters)
+    return concatenate([conv_below, attention_across])
+
+def conv2d_block(
+    inputs,
+    use_batch_norm=True,
+    dropout=0.3,
+    dropout_type="spatial",
+    filters=16,
+    kernel_size=(3, 3),
+    activation="relu",
+    kernel_initializer="he_normal",
+    padding="same",
+):
+
+    if dropout_type == "spatial":
+        DO = SpatialDropout2D
+    elif dropout_type == "standard":
+        DO = Dropout
+    else:
+        raise ValueError(
+            f"dropout_type must be one of ['spatial', 'standard'], got {dropout_type}"
+        )
+
+    c = Conv2D(
+        filters,
+        kernel_size,
+        activation=activation,
+        kernel_initializer=kernel_initializer,
+        padding=padding,
+        use_bias=not use_batch_norm,
+    )(inputs)
+    if use_batch_norm:
+        c = BatchNormalization()(c)
+    if dropout > 0.0:
+        c = DO(dropout)(c)
+    c = Conv2D(
+        filters,
+        kernel_size,
+        activation=activation,
+        kernel_initializer=kernel_initializer,
+        padding=padding,
+        use_bias=not use_batch_norm,
+    )(c)
+    if use_batch_norm:
+        c = BatchNormalization()(c)
+    return c
+
+def custom_unet(
+    input_shape,
+    num_classes=1,
+    activation="relu",
+    use_batch_norm=True,
+    upsample_mode="deconv",  # 'deconv' or 'simple'
+    dropout=0.3,
+    dropout_change_per_layer=0.0,
+    dropout_type="spatial",
+    use_dropout_on_upsampling=False,
+    use_attention=False,
+    filters=16,
+    num_layers=3,
+    output_activation="sigmoid",
+):  # 'sigmoid' or 'softmax'
+
+    """
+    Customisable UNet architecture (Ronneberger et al. 2015 [1]).
+    Arguments:
+    input_shape: 3D Tensor of shape (x, y, num_channels)
+    num_classes (int): Unique classes in the output mask. Should be set to 1 for binary segmentation
+    activation (str): A keras.activations.Activation to use. ReLu by default.
+    use_batch_norm (bool): Whether to use Batch Normalisation across the channel axis between convolutional layers
+    upsample_mode (one of "deconv" or "simple"): Whether to use transposed convolutions or simple upsampling in the decoder part
+    dropout (float between 0. and 1.): Amount of dropout after the initial convolutional block. Set to 0. to turn Dropout off
+    dropout_change_per_layer (float between 0. and 1.): Factor to add to the Dropout after each convolutional block
+    dropout_type (one of "spatial" or "standard"): Type of Dropout to apply. Spatial is recommended for CNNs [2]
+    use_dropout_on_upsampling (bool): Whether to use dropout in the decoder part of the network
+    use_attention (bool): Whether to use an attention dynamic when concatenating with the skip-connection, implemented as proposed by Oktay et al. [3]
+    filters (int): Convolutional filters in the initial convolutional block. Will be doubled every block
+    num_layers (int): Number of total layers in the encoder not including the bottleneck layer
+    output_activation (str): A keras.activations.Activation to use. Sigmoid by default for binary segmentation
+    Returns:
+    model (keras.models.Model): The built U-Net
+    Raises:
+    ValueError: If dropout_type is not one of "spatial" or "standard"
+    """
+
+    if upsample_mode == "deconv":
+        upsample = upsample_conv
+    else:
+        upsample = upsample_simple
+
+    # Build U-Net model
+    inputs = Input(input_shape)
+    x = inputs
+
+    down_layers = []
+    for l in range(num_layers):
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+        down_layers.append(x)
+        x = MaxPooling2D((2, 2))(x)
+        dropout += dropout_change_per_layer
+        filters = filters * 2  # double the number of filters with each layer
+
+    x = conv2d_block(
+        inputs=x,
+        filters=filters,
+        use_batch_norm=use_batch_norm,
+        dropout=dropout,
+        dropout_type=dropout_type,
+        activation=activation,
+    )
+
+    if not use_dropout_on_upsampling:
+        dropout = 0.0
+        dropout_change_per_layer = 0.0
+
+    for conv in reversed(down_layers):
+        filters //= 2  # decreasing number of filters with each layer
+        dropout -= dropout_change_per_layer
+        x = upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
+        if use_attention:
+            x = attention_concat(conv_below=x, skip_connection=conv)
+        else:
+            x = concatenate([x, conv])
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+
+    outputs = Conv2D(num_classes, (1, 1), activation=output_activation)(x)
+
+    model = Model(inputs=[inputs], outputs=[outputs])
+    
+    return model
+
+def custom_jnet(
+    input_shape,
+    num_classes=1,
+    activation="relu",
+    use_batch_norm=True,
+    upsample_mode="deconv",  # 'deconv' or 'simple'
+    dropout=0.3,
+    dropout_change_per_layer=0.0,
+    dropout_type="spatial",
+    use_dropout_on_upsampling=False,
+    use_attention=False,
+    filters=16,
+    num_layers=3,
+    pool_down=[2,2,2],
+    pool_up=[2,2,2],
+    skip_pool=10,
+    output_activation="sigmoid",
+):  # 'sigmoid' or 'softmax'
+
+    """
+    Customisable UNet architecture (Ronneberger et al. 2015 [1]).
+    Arguments:
+    input_shape: 3D Tensor of shape (x, y, num_channels)
+    num_classes (int): Unique classes in the output mask. Should be set to 1 for binary segmentation
+    activation (str): A keras.activations.Activation to use. ReLu by default.
+    use_batch_norm (bool): Whether to use Batch Normalisation across the channel axis between convolutional layers
+    upsample_mode (one of "deconv" or "simple"): Whether to use transposed convolutions or simple upsampling in the decoder part
+    dropout (float between 0. and 1.): Amount of dropout after the initial convolutional block. Set to 0. to turn Dropout off
+    dropout_change_per_layer (float between 0. and 1.): Factor to add to the Dropout after each convolutional block
+    dropout_type (one of "spatial" or "standard"): Type of Dropout to apply. Spatial is recommended for CNNs [2]
+    use_dropout_on_upsampling (bool): Whether to use dropout in the decoder part of the network
+    use_attention (bool): Whether to use an attention dynamic when concatenating with the skip-connection, implemented as proposed by Oktay et al. [3]
+    filters (int): Convolutional filters in the initial convolutional block. Will be doubled every block
+    num_layers (int): Number of total layers in the encoder not including the bottleneck layer
+    output_activation (str): A keras.activations.Activation to use. Sigmoid by default for binary segmentation
+    Returns:
+    model (keras.models.Model): The built U-Net
+    Raises:
+    ValueError: If dropout_type is not one of "spatial" or "standard"
+    """
+
+    if upsample_mode == "deconv":
+        upsample = upsample_conv
+    else:
+        upsample = upsample_simple
+    
+    pool_down = [(p,p) for p in pool_down]
+    pool_up = [(p,p) for p in pool_up]
+    
+    # Build U-Net model
+    inputs = Input(input_shape)
+    x = inputs
+
+    down_layers = []
+    for i,l in enumerate(range(len(pool_down))):
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+        down_layers.append(x)
+        x = MaxPooling2D(pool_down[i])(x)
+        dropout += dropout_change_per_layer
+        filters = filters * 2  # double the number of filters with each layer
+
+    x = conv2d_block(
+        inputs=x,
+        filters=filters,
+        use_batch_norm=use_batch_norm,
+        dropout=dropout,
+        dropout_type=dropout_type,
+        activation=activation,
+    )
+
+    for i, down_layer in enumerate(down_layers):
+        print(f"down_layer {i} shape: {down_layer.shape}")
+    if not use_dropout_on_upsampling:
+        dropout = 0.0
+        dropout_change_per_layer = 0.0
+
+    for i, conv in enumerate(reversed(down_layers[:len(pool_up)])):
+        filters //= 2  # decreasing number of filters with each layer
+        dropout -= dropout_change_per_layer
+        print("x.shape before upsample", x.shape)
+        x = upsample(filters, pool_up[i], strides=pool_up[i], padding="same")(x)
+        if use_attention:
+            print("conv.shape before MaxPool", conv.shape)
+            conv = MaxPooling2D((skip_pool, skip_pool))(conv)
+            print("conv.shape after MaxPool", conv.shape)
+            print("x.shape after upsample", x.shape)
+            x = attention_concat(conv_below=x, skip_connection=conv)
+        else:
+            x = concatenate([x, conv])
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+
+    outputs = Conv2D(num_classes, (1, 1), activation=output_activation)(x)
+
+    model = Model(inputs=[inputs], outputs=[outputs])
+    
+    return model
+
+def custom_jnet_full(
+    input_shape,
+    num_classes=1,
+    activation="relu",
+    use_batch_norm=True,
+    upsample_mode="deconv",  # 'deconv' or 'simple'
+    dropout=0.3,
+    dropout_change_per_layer=0.0,
+    dropout_type="spatial",
+    use_dropout_on_upsampling=False,
+    use_attention=False,
+    filters=16,
+    num_layers=3,
+    pool_down=[2,2,2],
+    pool_up=[2,2,2],
+    skip_pool=10,
+    output_activation="sigmoid",
+):  # 'sigmoid' or 'softmax'
+
+    """
+    Customisable UNet architecture (Ronneberger et al. 2015 [1]).
+    Arguments:
+    input_shape: 3D Tensor of shape (x, y, num_channels)
+    num_classes (int): Unique classes in the output mask. Should be set to 1 for binary segmentation
+    activation (str): A keras.activations.Activation to use. ReLu by default.
+    use_batch_norm (bool): Whether to use Batch Normalisation across the channel axis between convolutional layers
+    upsample_mode (one of "deconv" or "simple"): Whether to use transposed convolutions or simple upsampling in the decoder part
+    dropout (float between 0. and 1.): Amount of dropout after the initial convolutional block. Set to 0. to turn Dropout off
+    dropout_change_per_layer (float between 0. and 1.): Factor to add to the Dropout after each convolutional block
+    dropout_type (one of "spatial" or "standard"): Type of Dropout to apply. Spatial is recommended for CNNs [2]
+    use_dropout_on_upsampling (bool): Whether to use dropout in the decoder part of the network
+    use_attention (bool): Whether to use an attention dynamic when concatenating with the skip-connection, implemented as proposed by Oktay et al. [3]
+    filters (int): Convolutional filters in the initial convolutional block. Will be doubled every block
+    num_layers (int): Number of total layers in the encoder not including the bottleneck layer
+    output_activation (str): A keras.activations.Activation to use. Sigmoid by default for binary segmentation
+    Returns:
+    model (keras.models.Model): The built U-Net
+    Raises:
+    ValueError: If dropout_type is not one of "spatial" or "standard"
+    """
+
+    if upsample_mode == "deconv":
+        upsample = upsample_conv
+    else:
+        upsample = upsample_simple
+    
+    pool_down = [(p,p) for p in pool_down]
+    pool_up = [(p,p) for p in pool_up]
+    
+    # Build U-Net model
+    inputs = Input(input_shape)
+    x = inputs
+
+    down_layers = []
+    for i,l in enumerate(range(len(pool_down))):
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+        down_layers.append(x)
+        x = MaxPooling2D(pool_down[i])(x)
+        dropout += dropout_change_per_layer
+        filters = filters * 2  # double the number of filters with each layer
+
+    x = conv2d_block(
+        inputs=x,
+        filters=filters,
+        use_batch_norm=use_batch_norm,
+        dropout=dropout,
+        dropout_type=dropout_type,
+        activation=activation,
+    )
+
+    if not use_dropout_on_upsampling:
+        dropout = 0.0
+        dropout_change_per_layer = 0.0
+
+    for i, conv in enumerate(down_layers):
+        print("conv: ", i, conv.shape)
+
+    down_layers[0] = MaxPooling2D((20, 20))(down_layers[0])
+    down_layers[1] = MaxPooling2D((10, 10))(down_layers[1])
+    down_layers[2] = MaxPooling2D((5, 5))(down_layers[2])
+    down_layers[3] = MaxPooling2D((5, 5))(down_layers[3])
+    down_layers[3] = upsample(down_layers[3].shape[3], (2,2), strides=(2,2), padding="same")(down_layers[3])
+    
+    for i, conv in enumerate(down_layers):
+        print("conv: ", i, conv.shape)
+        
+    for i in range(len(pool_up)):
+        print("I ------", i)
+        filters //= 2  # decreasing number of filters with each layer
+        dropout -= dropout_change_per_layer
+        print("x before upsample", x.shape)
+        print("pool_up[i]: ", pool_up[i])
+        x = upsample(filters, pool_up[i], strides=pool_up[i], padding="same")(x)
+        print("x after upsample", x.shape)
+        if use_attention:
+            for conv in down_layers:
+                if i > 0:
+                    print("conv before upsample", conv.shape)
+                    up = (2*i, 2*i)
+                    print("(2*i,2*i): ", up)
+                    conv = upsample(conv.shape[3], (1,1), strides=(1,1), padding="same")(x)
+                    print("conv after upsample", conv.shape)
+                print(x.shape)
+                x = attention_concat(conv_below=x, skip_connection=conv)
+                print(x.shape)
+        else:
+            for conv in down_layers:
+                x = concatenate([x, conv])
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+
+    outputs = Conv2D(num_classes, (1, 1), activation=output_activation)(x)
+
+    model = Model(inputs=[inputs], outputs=[outputs])
+    
+    return model
+
+
+def jnet_512(
+    input_shape,
+    num_classes=1,
+    activation="relu",
+    use_batch_norm=True,
+    upsample_mode="deconv",  # 'deconv' or 'simple'
+    dropout=0.3,
+    dropout_change_per_layer=0.0,
+    dropout_type="spatial",
+    use_dropout_on_upsampling=False,
+    use_attention=False,
+    filters=16,
+    num_layers=3,
+    pool_down=[2,2,2],
+    pool_up=[2,2,2],
+    skip_pool=10,
+    output_activation="sigmoid",
+):  # 'sigmoid' or 'softmax'
+
+    """
+    Customisable UNet architecture (Ronneberger et al. 2015 [1]).
+    Arguments:
+    input_shape: 3D Tensor of shape (x, y, num_channels)
+    num_classes (int): Unique classes in the output mask. Should be set to 1 for binary segmentation
+    activation (str): A keras.activations.Activation to use. ReLu by default.
+    use_batch_norm (bool): Whether to use Batch Normalisation across the channel axis between convolutional layers
+    upsample_mode (one of "deconv" or "simple"): Whether to use transposed convolutions or simple upsampling in the decoder part
+    dropout (float between 0. and 1.): Amount of dropout after the initial convolutional block. Set to 0. to turn Dropout off
+    dropout_change_per_layer (float between 0. and 1.): Factor to add to the Dropout after each convolutional block
+    dropout_type (one of "spatial" or "standard"): Type of Dropout to apply. Spatial is recommended for CNNs [2]
+    use_dropout_on_upsampling (bool): Whether to use dropout in the decoder part of the network
+    use_attention (bool): Whether to use an attention dynamic when concatenating with the skip-connection, implemented as proposed by Oktay et al. [3]
+    filters (int): Convolutional filters in the initial convolutional block. Will be doubled every block
+    num_layers (int): Number of total layers in the encoder not including the bottleneck layer
+    output_activation (str): A keras.activations.Activation to use. Sigmoid by default for binary segmentation
+    Returns:
+    model (keras.models.Model): The built U-Net
+    Raises:
+    ValueError: If dropout_type is not one of "spatial" or "standard"
+    """
+
+    if upsample_mode == "deconv":
+        upsample = upsample_conv
+    else:
+        upsample = upsample_simple
+    
+    pool_down = [(p,p) for p in pool_down]
+    pool_up = [(p,p) for p in pool_up]
+    
+    # Build U-Net model
+    inputs = Input(input_shape)
+    x = inputs
+
+    down_layers = []
+    for i,l in enumerate(range(len(pool_down))):
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+        down_layers.append(x)
+        x = MaxPooling2D(pool_down[i])(x)
+        dropout += dropout_change_per_layer
+        filters = filters * 2  # double the number of filters with each layer
+
+    x = conv2d_block(
+        inputs=x,
+        filters=filters,
+        use_batch_norm=use_batch_norm,
+        dropout=dropout,
+        dropout_type=dropout_type,
+        activation=activation,
+    )
+
+    if not use_dropout_on_upsampling:
+        dropout = 0.0
+        dropout_change_per_layer = 0.0
+        
+    for i, conv in enumerate(down_layers):
+        print(i, conv.shape)
+
+    for i, conv in enumerate(reversed(down_layers[-len(pool_up):])):
+        filters //= 2  # decreasing number of filters with each layer
+        dropout -= dropout_change_per_layer
+        print("x before upsample shape", x.shape)
+        x = upsample(filters, pool_up[i], strides=pool_up[i], padding="same")(x)
+        print("x after upsample shape", x.shape)
+        if use_attention:
+            print("conv shape before max pool", conv.shape)
+#             conv = MaxPooling2D((skip_pool, skip_pool))(conv)
+            print("conv shape after max pool", conv.shape)
+            x = attention_concat(conv_below=x, skip_connection=conv)
+        else:
+            x = concatenate([x, conv])
+        x = conv2d_block(
+            inputs=x,
+            filters=filters,
+            use_batch_norm=use_batch_norm,
+            dropout=dropout,
+            dropout_type=dropout_type,
+            activation=activation,
+        )
+
+    outputs = Conv2D(num_classes, (1, 1), activation=output_activation)(x)
+
+    model = Model(inputs=[inputs], outputs=[outputs])
+    
+    return model
