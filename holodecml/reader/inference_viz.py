@@ -23,42 +23,44 @@ def load_sparse_csr(filename):
 
 real = 'synthetic' #real
 
-model_loc = f"/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/minmax/"
-model_save = "/glade/scratch/ggantos/holodec/models/minmax_new/"
+model_loc = f"/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/standard/"
+model_save = "/glade/scratch/ggantos/holodec/models/standard_new/"
+
+try:
+    h_idx_indices = list(set(sorted([int(x.split("_")[1]) for x in glob.glob(f"{model_loc}/{real}/propagated/true*")])))
+except:
+    h_idx_indices = list(set(sorted([int(x.split("_")[2]) for x in glob.glob(f"{model_loc}/{real}/propagated/true*")])))
+print(f"h_idx_indices: {h_idx_indices}")
 
 z_file_indices = sorted([int(x.replace(".npz", "").split("_")[-1]) for x in glob.glob(f"{model_loc}/{real}/propagated/true_{h_idx_indices[0]}_*")])
 print(f"z_file_indices range from {min(z_file_indices)} to {max(z_file_indices)}.")
 
+# # Create scipy objects
+# for h_idx in h_idx_indices:
+#     for true in ['true', 'pred']:
+#         start_3d = datetime.now()
+#         array3d = []
+#         for z_file in z_file_indices:
+#             array2d = load_sparse_csr(f"{model_loc}/{real}/propagated/{true}_{h_idx}_{z_file}").toarray()
+#             array3d.append(array2d)
+#         array3d = np.stack(array3d)
+#         print(array3d.shape)
+#         print(f"Loading 3D {true} took {datetime.now() - start_3d} time")
 
-h_idx_indices = list(set(sorted([int(x.split("_")[1]) for x in glob.glob(f"{model_loc}/{real}/propagated/true*")])))
-print(f"h_idx_indices: {h_idx_indices}")
+#         start_label = datetime.now()
+#         labeled_array, num_features = label(array3d, structure=None)
+# #         np.save(f"{model_save}inference/{real}/num_features_{true}_{h_idx}", num_features)
+# #         np.save(f"{model_save}inference/{real}/labeled_array_{true}_{h_idx}", labeled_array)
+#         print(f"Number of features found from {true} masks is {num_features}.")
+#         print(f"Shape of labeled_array_{true} {labeled_array.shape}.")
+#         print(f"Scipy label for {true}_3D took {datetime.now() - start_label} time")
 
-# Create scipy objects
-for h_idx in h_idx_indices:
-    for true in ['true', 'pred']:
-        start_3d = datetime.now()
-        array3d = []
-        for z_file in z_file_indices:
-            array2d = load_sparse_csr(f"{model_loc}/{real}/propagated/{true}_{h_idx}_{z_file}").toarray()
-            array3d.append(array2d)
-        array3d = np.stack(array3d)
-        print(array3d.shape)
-        print(f"Loading 3D {true} took {datetime.now() - start_3d} time")
-
-        start_label = datetime.now()
-        labeled_array, num_features = label(array3d, structure=None)
-#         np.save(f"{model_save}inference/{real}/num_features_{true}_{h_idx}", num_features)
-#         np.save(f"{model_save}inference/{real}/labeled_array_{true}_{h_idx}", labeled_array)
-        print(f"Number of features found from {true} masks is {num_features}.")
-        print(f"Shape of labeled_array_{true} {labeled_array.shape}.")
-        print(f"Scipy label for {true}_3D took {datetime.now() - start_label} time")
-
-        start_fo = datetime.now()
-        objects = find_objects(labeled_array)
-        np.save(f"{model_save}inference/{real}/objects_{true}_{h_idx}", objects)
-        print(f"Scipy find_objects for {true}_3D took {datetime.now() - start_fo} time\n")
-del array2d, array3d, labeled_array, num_features, objects
-gc.collect()
+#         start_fo = datetime.now()
+#         objects = find_objects(labeled_array)
+#         np.save(f"{model_save}inference/{real}/objects_{true}_{h_idx}", objects)
+#         print(f"Scipy find_objects for {true}_3D took {datetime.now() - start_fo} time\n")
+# del array2d, array3d, labeled_array, num_features, objects
+# gc.collect()
         
 # Load original data
 if real == 'real':
@@ -186,7 +188,7 @@ plt.savefig(f"{model_save}inference/{real}/zmass_avg.png")
 
 # Save 3D visualizations
 for h_idx in h_idx_indices:
-    for true in ['pred', 'real', 'orig']:
+    for true in ['pred', 'true', 'orig']:
         data = [go.Scatter3d(x=particles[h_idx][true]['x'],
                      y=particles[h_idx][true]['y'],
                      z=particles[h_idx][true]['z'],
