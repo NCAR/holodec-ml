@@ -66,7 +66,7 @@ print(f"z_file_indices range from {min(z_file_indices)} to {max(z_file_indices)}
 if real == 'real':
     fn_orig = "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
 else:
-    fn_orig = "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
+    fn_orig = "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
 ds = xr.open_dataset(fn_orig)
 dx = ds.attrs['dx']      # horizontal resolution
 dy = ds.attrs['dy']      # vertical resolution
@@ -121,6 +121,11 @@ bins = {'z': np.arange(14000,158000,2000),
         'y': np.arange(-4800,4800,200),
         'd': np.arange(0,139,3)}
 
+widths = {'x': 130,
+          'y': 130,
+          'z': 1300,
+          'd': 2}
+
 hist_avg = {}
 for true in ('true', 'pred'):
     hist_avg[true] = {}
@@ -138,13 +143,12 @@ for coord in ['x', 'y', 'z', 'd']:
     _, binEdges = np.histogram(particles[h_idx]['pred'][coord], bins=bins[coord])
     bincenters = 0.5*(binEdges[1:]+binEdges[:-1])
     plt.title(f"{coord} Coordinate Average Histogram", fontsize=30)
-    plt.bar(bincenters, hist_avg['true'][f'{coord}_mean'], alpha=0.6, width=130, yerr=hist_avg['true'][f'{coord}_std'], label='True',
+    plt.bar(bincenters, hist_avg['true'][f'{coord}_mean'], alpha=0.6, width=widths[coord], yerr=hist_avg['true'][f'{coord}_std'], label='True',
             color='#ff7f0e', ecolor='#ff7f0e')
-    plt.bar(bincenters, hist_avg['pred'][f'{coord}_mean'], alpha=0.8, width=130, yerr=hist_avg['pred'][f'{coord}_std'], label='Predicted',
+    plt.bar(bincenters, hist_avg['pred'][f'{coord}_mean'], alpha=0.8, width=widths[coord], yerr=hist_avg['pred'][f'{coord}_std'], label='Predicted',
             fill=False, linewidth=3, edgecolor='#1f77b4', ecolor='#1f77b4')
     plt.legend()
     plt.savefig(f"{model_save}inference/{real}/hist_{coord}_avg.png")
-    plt.show()
 
 # Plot histograms for individual holograms
 for h_idx in h_idx_indices:
