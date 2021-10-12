@@ -162,7 +162,6 @@ def worker_3d_plot_paired(h_idx, pairs=None, particles=None, model_save=None, re
 if __name__ == '__main__':
 
     real = 'synthetic' #real
-
     model_loc = f"/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/standard/"
     model_save = "/glade/scratch/ggantos/holodec/models/standard_parallel/"
 
