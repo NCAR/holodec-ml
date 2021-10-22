@@ -1,12 +1,13 @@
-numpy<1.19
-tensorflow>2.0.0
+numpy
+tensorflow
 pandas
 scipy
 matplotlib
 xarray
 netcdf4
 Pillow
-torch
 tqdm
-torch
+torch==1.9.0
 torchvision
+segmentation-models-pytorch
+hagelslag

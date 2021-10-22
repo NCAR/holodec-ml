@@ -1,0 +1,86 @@
+seed: 1000
+
+save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/optimized_noisy"
+
+data:
+    n_bins: 1000
+    data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
+    raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_203600-203700.nc"
+    tile_size: 512
+    step_size: 128
+    marker_size: 10
+    total_positive: 5
+    total_negative: 5
+    total_training: 50000
+    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
+    use_cached: True
+    device: "cpu"
+    cores: 0
+
+transforms:
+    training:
+        RandomVerticalFlip:
+            rate: 0.5
+        RandomHorizontalFlip: 
+            rate: 0.5
+        Normalize:
+            mode: '255'
+        GaussianBlur:
+            rate: 1.0
+            kernel_size: 1
+            sigma: 1.7902436563642792
+        GaussianNoise:
+            rate: 1.0
+            noise: 0.011353967974406949
+        AdjustBrightness:
+            rate: 1.0
+            brightness_factor: 1.7301154565769068
+        ToTensor: True
+    validation:
+        Normalize:
+            mode: '255'
+        ToTensor: True
+    inference:
+        Normalize:
+            mode: '255'
+                       
+model:
+    name: "manet"
+    encoder_name: "xception"
+    encoder_weights: "imagenet"
+    in_channels: 1
+    classes: 1
+    activation: "sigmoid"
+    
+optimizer:
+    learning_rate: 0.0006145337230850794
+    weight_decay: 0.0
+    
+trainer:
+    epochs: 100
+    train_batch_size: 16
+    valid_batch_size: 16
+    batches_per_epoch: 500
+    stopping_patience: 4
+    training_loss: "tyversky"
+    validation_loss: "dice"
+    
+inference:
+    mode: "mask"
+    batch_size: 16
+    n_nodes: 4
+    gpus_per_node: 1
+    threads_per_gpu: 2
+    save_arrays: True
+    save_probs: False
+    probability_threshold: 0.5
+    plot: False
+    verbose: False
+    data_set:
+        path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
+        name: "synthetic"
+#         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
+#         name: "real"
+        holograms:
+            min: 0
+            max: 10

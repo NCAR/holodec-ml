@@ -168,6 +168,10 @@ class Normalize(object):
 
         if self.mode == "sym":
             image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
+            
+        if self.mode = "255":
+            image = image / 255.0
+        
         sample["image"] = image
         return sample
 

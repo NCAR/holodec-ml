@@ -1,9 +1,33 @@
+import warnings
+warnings.filterwarnings("ignore")
+
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import socket
 
+import torch
+import random
+import joblib
+import logging
 import numpy as np
 import pandas as pd
 import xarray as xr
+import pandas as pd
+
+from sklearn.preprocessing import MinMaxScaler
+from scipy.fftpack import fft2, ifft2, fftshift
+from scipy.sparse import csr_matrix
+
+from torch.utils.data import Dataset, DataLoader
+
+from .propagation import *
+
+
+
+logger = logging.getLogger(__name__)
+
+
 
 from sklearn.preprocessing import MinMaxScaler
 from scipy.fftpack import fft2, ifft2, fftshift
@@ -30,6 +54,23 @@ split_dict = {
     'train' : 'training',
     'test' : 'test',
     'valid' : 'validation'}
+<<<<<<< HEAD
+=======
+
+
+def save_sparse_csr(filename, array):
+    # note that .npz extension is added automatically
+    np.savez(filename, data=array.data, indices=array.indices,
+             indptr=array.indptr, shape=array.shape)
+
+
+def load_sparse_csr(filename):
+    # here we need to add .npz extension manually
+    loader = np.load(filename + '.npz')
+    return csr_matrix((loader['data'], loader['indices'], loader['indptr']),
+                      shape=loader['shape'])
+
+>>>>>>> d676a376916ca6b137ae8bf51be577566f754e1d
 
 def get_dataset_path():
     if 'casper' in socket.gethostname():
@@ -345,7 +386,10 @@ def load_unet_datasets(path_data, num_particles, output_cols,
 
 def makeGaussian(size, fwhm = 3, center=None):
     """ Make a square gaussian kernel.
+<<<<<<< HEAD
 
+=======
+>>>>>>> d676a376916ca6b137ae8bf51be577566f754e1d
     size is the length of a side of the square
     fwhm is full-width-half-maximum, which
     can be thought of as an effective radius.
@@ -676,3 +720,188 @@ def load_train_patches_1to25(path_data, num_particles, output_cols,
     
     return train_inputs, train_outputs, train_hids, valid_inputs, valid_outputs, valid_hids
 
+<<<<<<< HEAD
+=======
+
+class PickleReader(Dataset):
+    
+    def __init__(self, 
+                 fn, 
+                 max_buffer_size = 5000, 
+                 max_images = 40000, 
+                 color_dim = 2,
+                 shuffle = True, 
+                 transform = False):
+        
+        self.fn = fn
+        self.buffer = []
+        self.max_buffer_size = max_buffer_size
+        self.shuffle = shuffle
+        self.max_images = max_images
+        self.transform = transform
+        self.color_dim = color_dim
+            
+        self.fid = open(self.fn, "rb")
+        self.loaded = 0 
+        self.epoch = 0
+        
+    def __getitem__(self, idx):    
+        
+        self.on_epoch_end()
+        
+        while True:
+        
+            try:
+                data = joblib.load(self.fid)
+                image, label, mask = data
+                image = image[:self.color_dim]
+                
+                im = {
+                    "image": image, 
+                    "horizontal_flip": False, 
+                    "vertical_flip": False
+                }
+                
+                if self.transform:
+                    for image_transform in self.transform:
+                        im = image_transform(im)
+                        
+                image = im["image"]
+                mask = mask.toarray()
+                
+                # Update the mask if we flipped the original image
+                if im["horizontal_flip"]:
+                    mask = np.flip(mask, axis=0)
+                if im["vertical_flip"]:
+                    mask = np.flip(mask, axis=1)
+                        
+                image = torch.tensor(image, dtype=torch.float)
+                #image = torch.FloatTensor(image)
+                #label = torch.LongTensor([label])
+                #mask = torch.FloatTensor(mask.copy())
+                mask = torch.tensor(mask.copy(), dtype=torch.int)
+                
+                #######
+                
+                data = (image, mask)
+
+                self.loaded += 1
+
+                if not self.shuffle:
+                    return data
+                
+                self.buffer.append(data)
+                random.shuffle(self.buffer)
+
+                if len(self.buffer) > self.max_buffer_size:
+                    self.buffer = self.buffer[:self.max_buffer_size]
+
+                if self.epoch > 0:
+                    return self.buffer.pop()
+
+                else: # wait until all data has been seen before sampling from the buffer
+                    return data
+
+
+            except EOFError:
+                self.fid = open(self.fn, "rb")
+                self.loaded = 0
+                continue
+                    
+    def __len__(self):
+        return self.max_images
+    
+    def on_epoch_end(self):
+        if self.loaded == self.__len__():
+            self.fid = open(self.fn, "rb")
+            self.loaded = 0
+            self.epoch += 1
+            
+            
+            
+class UpsamplingReader(Dataset):
+    
+    def __init__(self, conf = None, transform = None, max_size = 10000, device = "cpu"):
+        
+        config = conf["data"]
+        n_bins = config["n_bins"]
+        data_path = config["data_path"]
+        tile_size = config["tile_size"]  # size of tiled images in pixels
+        step_size = config["step_size"]  # amount that we shift the tile to make a new tile
+        marker_size = config["marker_size"] # UNET gaussian marker width (standard deviation) in um
+        
+        self.part_per_holo = config["total_positive"]
+        self.empt_per_holo = config["total_negative"]
+        self.color_dim = conf["model"]["color_dim"]
+        
+        self.prop = UpsamplingPropagator(
+            data_path, 
+            n_bins = n_bins, 
+            tile_size = tile_size,
+            step_size = step_size,
+            marker_size = marker_size,
+            device = device
+        )
+        
+        self.xy = []
+        self.max_size = max_size
+        self.transform = transform
+    
+    def __getitem__(self, h_idx):
+        
+        h_idx = int(self.prop.h_ds["hid"].values[h_idx]) - 1
+        
+        if len(self.xy) > 0:
+            random.shuffle(self.xy)
+            x, y = self.xy.pop()
+            return x, y
+        
+        data = self.prop.get_reconstructed_sub_images(
+            h_idx, self.part_per_holo, self.empt_per_holo
+        )
+        for idx in range(len(data[0])):
+            #result_dict["label"].append(int(data[0][idx]))
+            image = np.expand_dims(np.abs(data[1][idx]), 0)
+            if self.color_dim == 2:
+                phase = np.expand_dims(np.angle(data[1][idx]), 0)
+                image = np.vstack([image, phase])
+            mask = data[4][idx]
+            image, mask = self.apply_transforms(image, mask)
+            self.xy.append((image, mask))
+
+        random.shuffle(self.xy)
+        x, y = self.xy.pop()
+        return x, y
+    
+    def apply_transforms(self, image, mask):
+        
+        if self.transform == None:
+            
+            image = torch.tensor(image, dtype=torch.float)
+            mask = torch.tensor(mask, dtype=torch.int)
+            
+            return image, mask
+        
+        im = {
+            "image": image, 
+            "horizontal_flip": False, 
+            "vertical_flip": False
+        }
+
+        for image_transform in self.transform:
+            im = image_transform(im)
+
+        # Update the mask if we flipped the original image
+        if im["horizontal_flip"]:
+            mask = np.flip(mask, axis=0)
+        if im["vertical_flip"]:
+            mask = np.flip(mask, axis=1)
+            
+        image = torch.tensor(image, dtype=torch.float)
+        mask = torch.tensor(mask.copy(), dtype=torch.int)
+        
+        return image, mask
+    
+    def __len__(self):
+        return len(list(self.prop.h_ds["hid"].values))
+>>>>>>> d676a376916ca6b137ae8bf51be577566f754e1d
