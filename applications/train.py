@@ -16,7 +16,7 @@ import tqdm
 import sys
 import gc
 
-from holodecml.data import PickleReader, UpsamplingReader 
+from holodecml.data import PickleReader, UpsamplingReader
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
 from holodecml.models import load_model

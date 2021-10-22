@@ -20,4 +20,6 @@ dependencies:
     - torchvision
     - segmentation-models-pytorch
     - hagelslag
+    - psutil
+    - git+https://github.com/NCAR/echo-opt
     - .

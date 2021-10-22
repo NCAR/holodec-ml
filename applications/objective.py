@@ -1,5 +1,5 @@
-from aimlutils.echo.src.base_objective import BaseObjective
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from echo.src.base_objective import BaseObjective
 from collections import defaultdict
 import pandas as pd
 import numpy as np
