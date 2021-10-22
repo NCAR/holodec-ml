@@ -1,0 +1,23 @@
+name: holodec
+channels:
+  - conda-forge
+dependencies:
+  - optuna
+  - python=3.8
+  - pip
+  - numpy=1.21.2
+  - scipy=1.7.1
+  - matplotlib
+  - xarray
+  - netcdf4
+  - Pillow
+  - tqdm
+  - pandas
+  - scikit-learn
+  - pip:
+    - tensorflow
+    - torch==1.9.1
+    - torchvision
+    - segmentation-models-pytorch
+    - hagelslag
+    - .

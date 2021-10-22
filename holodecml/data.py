@@ -1,4 +1,4 @@
-from holodecml.propagation import *
+from holodecml.propagation import UpsamplingPropagator
 from torch.utils.data import Dataset
 from scipy.sparse import csr_matrix
 from scipy.fftpack import fft2
@@ -317,7 +317,7 @@ def make_random_outputs(ds):
 
 def outputs_3d(outputs, num_images, max_particles):
     outputs_array = make_template(outputs, num_images, max_particles)
-    for hid in v:
+    for hid in v:  # the variable v here is undefined
         outputs_hid = outputs.loc[outputs['hid'] == hid].to_numpy()
         outputs_hid[:, -1] = 1
         outputs_array[int(hid-1), :outputs_hid.shape[0], :] = outputs_hid

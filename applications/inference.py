@@ -1,8 +1,6 @@
-from hagelslag.evaluation.ProbabilityMetrics import *
-from hagelslag.evaluation.MetricPlotter import *
+from hagelslag.evaluation.MetricPlotter import roc_curve, performance_diagram
 from holodecml.models import load_model
 from functools import partial
-from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
 from argparse import ArgumentParser
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
@@ -27,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 ######
-
 
 def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)

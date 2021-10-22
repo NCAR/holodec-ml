@@ -6,73 +6,29 @@
 * Gabrielle Gantos
 * Gunther Wallach
 
-## Requirments
-The code is designed to run on Python 3.7. It reqires the following external Python libraries:
-* xarray
-* numpy<1.19
-* scipy
-* pandas
-* scikit-learn
-* tensorflow>=2.0.0
-* torch
-* torchvision
-* netcdf4
-* tqdm
-* Pillow
 
 ## Setup from Scratch
 
-* Install Python 3.7 on your machine. I recommend the Miniconda Python installer available
+* Install the Miniconda Python installer available
 [here](https://docs.conda.io/en/latest/miniconda.html).
 
-* Create a conda environment for holodec:  `conda create -n holodec python=3.7`
+
+* Create a conda environment for holodec:  
+`git clone https://github.com/NCAR/holodec-ml.git`
+`cd holodec-ml`
+`conda env create -f environment.yml [--prefix /path/to/holodec]`
+
+* If an environment location was specified by --prefix, the holodec name can be registered with conda by:
+`conda config --append envs_dirs /path/to/`
 
 * Activate the environment on your machine:  
-`source activate holodec`
-
-* Install the Python libraries through conda:
-
-```bash
-conda install -c conda-forge --yes \
-    pip \
-    tqdm \
-    xarray \
-    "numpy<1.19" \
-    pandas \
-    netcdf4 \
-    scikit-learn \
-    torch \
-    torchvision
-
-```
-
-* Ensure that CUDA kernel and CUDA toolkit are installed on your system, and the path and versions 
-
-* Install the tensorflow binary for tensorflow 2. For more detailed installation instructions 
-visit the [tensorflow website](https://www.tensorflow.org/install/gpu).
-```bash
-pip install tensorflow segmentation-models-pytorch
-```
-* Install Pytorch using the instructions on the [PyTorch website](https://pytorch.org/). 
-
-* Clone the holodec library into your directory
-```bash
-cd ~
-git clone https://github.com/NCAR/holodec-ml.git
-cd holodec-ml
-```
-
-* Install the holodec library
-```bash
-pip install .
-```
+`conda activate holodec`
 
 ## Using holodec-ml
 The repository contains python scripts and notebooks that allow users to train segmentation and classification models, and to perform inference with models on synthetic and real holograms.
 
 ### A. Configuration file
 A user-supplied yml file is the basis for setting different parameters pertaining to datasets, resource usage, etc. For example, ```config/unet_propagation.yml``` contains the fields: seed, save_loc, data, transforms, model, optimizer, training, and inference.
-
 
 
 ```yaml

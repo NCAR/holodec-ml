@@ -7,16 +7,17 @@ import torch.fft
 import logging
 import random
 import psutil
+import optuna
 import torch
 import scipy
 import time
 import tqdm
-import sys
 import gc
+from holodecml.data import PickleReader, UpsamplingReader
+from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
 from holodecml.models import load_model
 from holodecml.losses import load_loss
-from holodecml.data import *
 import os
 import warnings
 warnings.filterwarnings("ignore")
