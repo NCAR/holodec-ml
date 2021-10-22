@@ -1,44 +1,26 @@
-import warnings
-warnings.filterwarnings("ignore")
-
-import sys 
-sys.path.append("/glade/work/schreck/repos/HOLO/clean/holodec-ml")
-
-from holodecml.models import *
-
-import os
-import glob
-import tqdm
-import time
-import yaml
-import scipy
-import pickle
-import joblib
-import signal
-import random
-import sklearn
-import logging
-import datetime
-import traceback
-
-import numpy as np
-import pandas as pd
-import xarray as xr
-import matplotlib.pyplot as plt
-from argparse import ArgumentParser
-
-from collections import defaultdict
-from scipy.signal import convolve2d
-from sklearn.model_selection import train_test_split
-from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
-
-from colour import Color
-
-import torch.multiprocessing as mp
-#import multiprocessing as mp
-from functools import partial
 from hagelslag.evaluation.ProbabilityMetrics import *
 from hagelslag.evaluation.MetricPlotter import *
+from holodecml.models import load_model
+from functools import partial
+from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
+from argparse import ArgumentParser
+import torch.multiprocessing as mp
+import matplotlib.pyplot as plt
+import numpy as np
+import subprocess
+import traceback
+import logging
+import signal
+import joblib
+import scipy
+import sys
+import yaml
+import time
+import tqdm
+import glob
+import os
+import warnings
+warnings.filterwarnings("ignore")
 
 
 logger = logging.getLogger(__name__)
@@ -46,52 +28,48 @@ logger = logging.getLogger(__name__)
 
 ######
 
+
 def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
-    
-    # unpack the worker and GPU ids 
+def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
+    # unpack the worker and GPU ids
     this_worker, device = worker_info
     logger.info(f"Initialized worker {this_worker} on device {device}")
-    
+
     # import torch / GPU packages
     import torch
     import torch.fft
     import torch.nn.functional as F
-    
-    import torchvision
     import torchvision.models as models
-    from torch import nn
 
     if torch.cuda.is_available():
         torch.backends.cudnn.enabled = True
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = True
-    
-    from holodecml.models import ResNetUNet
+
     from holodecml.metrics import DistributedROC
     from holodecml.transforms import LoadTransformations
     from holodecml.propagation import InferencePropagator
-    from holodecml.data import save_sparse_csr, load_sparse_csr
-        
+    from holodecml.data import save_sparse_csr
+
     ###################################
-    
+
     n_nodes = conf["inference"]["n_nodes"]
     n_gpus = conf["inference"]["gpus_per_node"]
     threads_per_gpu = conf["inference"]["threads_per_gpu"]
     workers = int(n_nodes * n_gpus * threads_per_gpu)
-    
+
     save_arrays = conf["inference"]["save_arrays"]
     plot = conf["inference"]["plot"]
-    
+
     n_bins = conf["data"]["n_bins"]
     tile_size = conf["data"]["tile_size"]
     step_size = conf["data"]["step_size"]
     marker_size = conf["data"]["marker_size"]
-    synthetic_path = conf["data"]["data_path"]
-    raw_path = conf["data"]["raw_data"]
+    transform_mode = "None" if "transform_mode" not in conf[
+        "data"] else conf["data"]["transform_mode"]
 
     model_loc = conf["save_loc"]
     model_name = conf["model"]["name"]
@@ -101,12 +79,12 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
     save_arrays = conf["inference"]["save_arrays"]
     save_prob = conf["inference"]["save_probs"]
     inference_mode = conf["inference"]["mode"]
-    
-    if "probability_threshold" in conf["inference"]: 
+
+    if "probability_threshold" in conf["inference"]:
         probability_threshold = conf["inference"]["probability_threshold"]
     else:
         probability_threshold = 0.5
-    
+
     plot = conf["inference"]["plot"]
     verbose = conf["inference"]["verbose"]
     data_set = conf["inference"]["data_set"]["path"]
@@ -118,17 +96,19 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
 
     for directory in [prop_data_loc, roc_data_loc, image_data_loc]:
         if not os.path.exists(directory):
-            os.makedirs(directory, exist_ok = True)
+            os.makedirs(directory, exist_ok=True)
 
     # roc threshold
     obs_threshold = 1.0
     if conf["inference"]["data_set"]["name"] == "raw":
         thresholds = np.linspace(0, 1, 100)
     else:
-        thresholds = 1.0 - np.logspace(-5, 0, num=50, endpoint=True, base=10.0, dtype=None, axis=0)
+        thresholds = 1.0 - \
+            np.logspace(-5, 0, num=50, endpoint=True,
+                        base=10.0, dtype=None, axis=0)
         thresholds = thresholds[::-1]
-        
-     ### Configuration settings for which holograms to process
+
+     # Configuration settings for which holograms to process
     h_conf = conf["inference"]["data_set"]["holograms"]
     if isinstance(h_conf, dict):
         h_min = conf["inference"]["data_set"]["holograms"]["min"]
@@ -140,17 +120,19 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
         h_range = [h_conf]
     else:
         raise OSError(f"Unidentified h-range settings {h_conf}")
-        
-    ### Load the model 
-    logger.info(f"Worker {this_worker}: Loading and moving model to device {device}")
+
+    # Load the model
+    logger.info(
+        f"Worker {this_worker}: Loading and moving model to device {device}")
     model = load_model(conf["model"]).to(device)
-    
+
     # take a nap before trying to load the data onto the GPU
     nap_time = delay * (this_worker % threads_per_gpu)
-    logger.info(f"Worker {this_worker}: Napping for {nap_time} s before mounting the model")
+    logger.info(
+        f"Worker {this_worker}: Napping for {nap_time} s before mounting the model")
     time.sleep(nap_time)
 
-    ### Load the weights from the training location
+    # Load the weights from the training location
     checkpoint = torch.load(
         os.path.join(model_loc, "best.pt"),
         map_location=lambda storage, loc: storage
@@ -159,63 +141,75 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
     model.eval()
 
     total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logger.info(f"Worker {this_worker}: There are {total_params} total model parameters")
-    
-    ### Load the image transformations
-    logger.info(f"Worker {this_worker}: Loading image transformations")
-    inference_transforms = LoadTransformations(conf["transforms"]["inference"])
+    trainable_params = sum(p.numel()
+                           for p in model.parameters() if p.requires_grad)
+    logger.info(
+        f"Worker {this_worker}: There are {total_params} total model parameters")
 
-    ### Load the wave prop interence object
-    logger.info(f"Worker {this_worker}: Loading an inference wave-prop generator")
-    
+    # Load the image transformations
+    if "inference" in conf["transforms"]:
+        logger.info(f"Worker {this_worker}: Loading image transformations")
+        if "Normalize" in conf["transforms"]["training"]:
+            conf["transforms"]["inference"]["Normalize"]["mode"] = conf["transforms"]["training"]["Normalize"]["mode"]
+        tile_transforms = LoadTransformations(conf["transforms"]["inference"])
+    else:
+        tile_transforms = None
+
+    # Load the wave prop interence object
+    logger.info(
+        f"Worker {this_worker}: Loading an inference wave-prop generator")
+
     try:
         with torch.no_grad():
 
             prop = InferencePropagator(
-                data_set, 
-                n_bins = n_bins,
-                color_dim = color_dim,
-                tile_size = tile_size,
-                step_size = step_size,
-                marker_size = marker_size,
-                device = device,
-                model = model,
-                mode = inference_mode,
-                probability_threshold = probability_threshold,
-                transforms = inference_transforms
+                data_set,
+                n_bins=n_bins,
+                color_dim=color_dim,
+                tile_size=tile_size,
+                step_size=step_size,
+                marker_size=marker_size,
+                transform_mode=transform_mode,
+                device=device,
+                model=model,
+                mode=inference_mode,
+                probability_threshold=probability_threshold,
+                transforms=tile_transforms
             )
 
-            ### Create a list of z-values to propagate to
+            # Create a list of z-values to propagate to
             z_list = prop.create_z_plane_lst(planes_per_call=1)
             z_list = np.array_split(z_list, workers)[this_worker]
-            logger.info(f"Worker {this_worker}: Performing inference on subset of z planes {this_worker + 1} out of {workers}")
-            
-            ### Main loop to call the generator, predict with the model, and aggregate and save the results
+            logger.info(
+                f"Worker {this_worker}: Performing inference on subset of z planes {this_worker + 1} out of {workers}")
+
+            # Main loop to call the generator, predict with the model, and aggregate and save the results
             for nc, h_idx in enumerate(h_range):
-            
+
                 planes_processed = int(this_worker * (n_bins // workers))
-                logger.info(f"Worker {this_worker} is starting at {planes_processed} for hologram {h_idx} ({nc + 1} / {len(h_range)})")            
-                
+                logger.info(
+                    f"Worker {this_worker} is starting at {planes_processed} for hologram {h_idx} ({nc + 1} / {len(h_range)})")
+
                 inference_generator = prop.get_next_z_planes_labeled(
-                    h_idx, 
-                    z_list, 
-                    batch_size = batch_size, 
-                    thresholds = thresholds,
-                    obs_threshold = obs_threshold, 
-                    start_z_counter = planes_processed
+                    h_idx,
+                    z_list,
+                    batch_size=batch_size,
+                    thresholds=thresholds,
+                    obs_threshold=obs_threshold,
+                    start_z_counter=planes_processed
                 )
 
                 if verbose:
                     jiter = tqdm.tqdm(
-                        enumerate(inference_generator), 
-                        total = len(z_list),
+                        enumerate(inference_generator),
+                        total=len(z_list),
                         leave=True
                     )
                 else:
                     jiter = enumerate(inference_generator)
 
-                roc = DistributedROC(thresholds=thresholds, obs_threshold=obs_threshold)
+                roc = DistributedROC(thresholds=thresholds,
+                                     obs_threshold=obs_threshold)
                 holo_acc = []
 
                 unet_particles = 0
@@ -230,17 +224,21 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
 
                     if save_prob:
                         pred_prob = results_dict["pred_proba"]
-                        pred_prob = np.where(pred_prob < 0.5, 0.0, 1000 * pred_prob)
+                        pred_prob = np.where(
+                            pred_prob < 0.5, 0.0, 1000 * pred_prob)
                         pred_prob = pred_prob.astype(int)
 
                     if save_arrays:
                         # Save the giant matrices as sparse arrays, as most elements are zero
                         if save_prob:
-                            save_sparse_csr(f"{prop_data_loc}/prob_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_prob))
-                        save_sparse_csr(f"{prop_data_loc}/pred_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_label))
-                        save_sparse_csr(f"{prop_data_loc}/true_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(true_label))
-                        
-                    # Merge the ROC result 
+                            save_sparse_csr(
+                                f"{prop_data_loc}/prob_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_prob))
+                        save_sparse_csr(
+                            f"{prop_data_loc}/pred_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_label))
+                        save_sparse_csr(
+                            f"{prop_data_loc}/true_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(true_label))
+
+                    # Merge the ROC result
                     this_roc = results_dict["roc"]
                     roc.merge(this_roc)
 
@@ -274,27 +272,29 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
 
                     # Option to plot each result per plane
                     if plot:
-                        fig, (ax0, ax1, ax2) = plt.subplots(1, 3, figsize = (12, 5))
-                        p1 = ax0.imshow(pred_prob, vmin = 0,  vmax = 1)
+                        fig, (ax0, ax1, ax2) = plt.subplots(
+                            1, 3, figsize=(12, 5))
+                        p1 = ax0.imshow(pred_prob, vmin=0,  vmax=1)
                         ax0.set_title("In-focus confidence")
                         fig.colorbar(p1, ax=ax0)
 
-                        p2 = ax1.imshow(pred_label, vmin = 0,  vmax = 1)
+                        p2 = ax1.imshow(pred_label, vmin=0,  vmax=1)
                         ax1.set_title("Predicted particles")
                         fig.colorbar(p2, ax=ax1)
 
-                        p3 = ax2.imshow(true_label, vmin = 0, vmax = 1)
+                        p3 = ax2.imshow(true_label, vmin=0, vmax=1)
                         ax2.set_title("True particles")
                         fig.colorbar(p3, ax=ax2)
 
                         plt.tight_layout()
-                        plt.show()   
+                        plt.show()
 
-                logger.info(f"Worker {this_worker} finished hologram {h_idx} ({nc+1} / {len(h_range)}) in {time.time() - t0} s")
-                
+                logger.info(
+                    f"Worker {this_worker} finished hologram {h_idx} ({nc+1} / {len(h_range)}) in {time.time() - t0} s")
+
                 # merge rocs that currently exist
-                rocs = sorted(glob.glob(f"{roc_data_loc}/roc_{h_idx}_*.pkl"), 
-                              key = lambda x: int(x.strip(".pkl").split("_")[-1]))
+                rocs = sorted(glob.glob(f"{roc_data_loc}/roc_{h_idx}_*.pkl"),
+                              key=lambda x: int(x.strip(".pkl").split("_")[-1]))
 
                 for k, roc_fn in enumerate(rocs):
                     with open(roc_fn, "rb") as fid:
@@ -306,21 +306,24 @@ def main(worker_info = (0, "cuda:0"), conf = None, delay = 30):
                 with open(f"{roc_data_loc}/roc_{h_idx}.pkl", "wb") as fid:
                     joblib.dump(roc, fid)
 
-                roc_curve([roc], [model_name], ["orange"], ["o"], f"{image_data_loc}/roc_comparison_{h_idx}.png")
-                performance_diagram([roc], [model_name], ["orange"], ["o"], f"{image_data_loc}/performance_comparison_{h_idx}.png")
+                roc_curve([roc], [model_name], ["orange"], ["o"],
+                          f"{image_data_loc}/roc_comparison_{h_idx}.png")
+                performance_diagram([roc], [model_name], ["orange"], [
+                                    "o"], f"{image_data_loc}/performance_comparison_{h_idx}.png")
 
     except:
-        logger.warning(f"Worker {this_worker} failed: {traceback.format_exc()}")
+        logger.warning(
+            f"Worker {this_worker} failed: {traceback.format_exc()}")
         raise
-    
+
     return True
 
 
 if __name__ == '__main__':
-    
+
     description = "Perform model inference on a list of hologram planes using N workers"
     description += " where N = (number of nodes) * (number of GPUs per node) * (threads per GPU)"
-    
+
     parser = ArgumentParser(
         description=description
     )
@@ -359,15 +362,13 @@ if __name__ == '__main__':
         default=-1,
         help="The number of threads (models / GPU) to use to train model(s). Default is to use the values in the yml."
     )
-    
-    import torch
-        
+
     args_dict = vars(parser.parse_args())
     config_file = args_dict.pop("model_config")
-    
+
     with open(config_file) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
-    
+
     n_nodes = int(args_dict.pop("n_nodes"))
     node_id = int(args_dict.pop("node_id"))
     n_gpus = int(args_dict.pop("gpus_per_node"))
@@ -375,15 +376,17 @@ if __name__ == '__main__':
 
     n_nodes = conf["inference"]["n_nodes"] if n_nodes == -1 else n_nodes
     n_gpus = conf["inference"]["gpus_per_node"] if n_gpus == -1 else n_gpus
-    threads_per_gpu = conf["inference"]["threads_per_gpu"] if threads_per_gpu == -1 else threads_per_gpu
+    threads_per_gpu = conf["inference"]["threads_per_gpu"] if threads_per_gpu == - \
+        1 else threads_per_gpu
     workers = int(n_nodes * n_gpus * threads_per_gpu)
     n_bins = conf["data"]["n_bins"]
-    
+
     # Perform a check if we are using > 1 node (here one has to pass the extra argument)
     if node_id >= n_nodes:
-        raise OSError(f"The id of this worker ({node_id}) exceeded the number of nodes + 1 ({n_nodes + 1}).")
-    
-    ### Set up directories to save results
+        raise OSError(
+            f"The id of this worker ({node_id}) exceeded the number of nodes + 1 ({n_nodes + 1}).")
+
+    # Set up directories to save results
     model_loc = conf["save_loc"]
     model_name = conf["model"]["name"]
     data_set = conf["inference"]["data_set"]["path"]
@@ -394,9 +397,9 @@ if __name__ == '__main__':
 
     for directory in [prop_data_loc, roc_data_loc, image_data_loc]:
         if not os.path.exists(directory):
-            os.makedirs(directory, exist_ok = True)
+            os.makedirs(directory, exist_ok=True)
 
-    ### Configuration settings for which holograms to process
+    # Configuration settings for which holograms to process
     h_conf = conf["inference"]["data_set"]["holograms"]
     if isinstance(h_conf, dict):
         h_min = conf["inference"]["data_set"]["holograms"]["min"]
@@ -408,7 +411,7 @@ if __name__ == '__main__':
         h_range = [h_conf]
     else:
         raise OSError(f"Unidentified h-range settings {h_conf}")
-        
+
     ############################################################
     # Initialize logger to stream to stdout
     root = logging.getLogger()
@@ -420,20 +423,29 @@ if __name__ == '__main__':
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     root.addHandler(ch)
-    
+
     # Save the log file
-    logger_name = os.path.join(os.path.join(model_loc, f"{data_set_name}/log.txt"))
+    logger_name = os.path.join(os.path.join(
+        model_loc, f"{data_set_name}/log.txt"))
     fh = logging.FileHandler(logger_name,
                              mode="w",
                              encoding='utf-8')
     fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     root.addHandler(fh)
-    ############################################################    
-        
+    ############################################################
+
+    host = subprocess.Popen(
+        'hostname',
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    ).communicate()[0].decode("utf-8").strip("\n")
+
     # Print details to the logger
-    logger.info(f"Using a total of {workers} models (workers) to perform inference")
-    logger.info(f"... {n_nodes} nodes. The identity of the current node is {node_id}")
+    logger.info(f"Using host {host} to perform inference")
+    logger.info(f"Using a total of {workers} models (workers)")
+    logger.info(
+        f"... {n_nodes} nodes. The identity of the current node is {node_id}")
     logger.info(f"... {n_gpus} GPUs / node")
     logger.info(f"... {threads_per_gpu} models per GPU")
     logger.info(f"Using the data set {data_set_name} located at {data_set}")
@@ -441,19 +453,22 @@ if __name__ == '__main__':
     logger.info(f"Saving any ROC objects to {roc_data_loc}")
     logger.info(f"Saving any images created to {image_data_loc}")
     logger.info(f"Using the following hologram hids: {str(h_range)}")
-    logger.info(f"Performing model inference using {model_name} on {n_bins} reconstructed planes")
-    
+    logger.info(
+        f"Performing model inference using {model_name} on {n_bins} reconstructed planes")
+
     # Construct list of worker IDs and the GPU device to use
     total_workers = list(range(workers))
-    list_of_devices = [x for gpu in range(n_gpus) for x in [f"cuda:{gpu}"] * threads_per_gpu]
-    available_workers = np.array_split(total_workers, int(n_nodes * n_gpus))[node_id]
+    list_of_devices = [x for gpu in range(n_gpus) for x in [
+        f"cuda:{gpu}"] * threads_per_gpu]
+    available_workers = np.array_split(
+        total_workers, int(n_nodes * n_gpus))[node_id]
     gpu_worker_list = list(zip(available_workers, list_of_devices))
-    
+
     # Run models in parallel on the GPU(s)
     t0 = time.time()
-    
-    worker = partial(main, conf = conf)
-    
+
+    worker = partial(main, conf=conf)
+
     try:
         if threads_per_gpu > 1:
             processes = []
@@ -461,7 +476,7 @@ if __name__ == '__main__':
                 p = mp.Process(target=worker, args=(r,))
                 p.start()
                 processes.append(p)
-            
+
             while True:
                 stop = 0
                 for p in processes:
@@ -472,11 +487,11 @@ if __name__ == '__main__':
                 if stop == len(processes):
                     break
                 else:
-                    time.sleep(1)       
+                    time.sleep(1)
         else:
             results = [worker(r) for r in gpu_worker_list]
         logger.info(f"Node {node_id} finished in {time.time()-t0} s")
-        
+
     except KeyboardInterrupt:
         logger.warning('Interrupted')
         try:

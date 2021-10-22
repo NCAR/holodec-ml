@@ -3,8 +3,7 @@ import random
 import logging
 import torchvision
 import numpy as np
-from skimage import data, color
-from skimage.transform import rescale, resize, downscale_local_mean
+from skimage.transform import rescale
 # https://scikit-image.org/docs/dev/auto_examples/transform/plot_rescale.html
 
 
@@ -31,7 +30,7 @@ def LoadTransformations(transform_config: str):
         rate = transform_config["GaussianNoise"]["rate"]
         noise = transform_config["GaussianNoise"]["noise"]
         if rate > 0.0:
-            tforms.append(GaussianNoise(rate,noise))
+            tforms.append(GaussianNoise(rate, noise))
     if "ToTensor" in transform_config:
         tforms.append(ToTensor())
     if "AdjustBrightness" in transform_config:
@@ -149,7 +148,7 @@ class RandomCrop(object):
 
         image = image[top: top + new_h,
                       left: left + new_w]
-        
+
         sample["image"] = image
         return sample
 
@@ -175,6 +174,9 @@ class Normalize(object):
         if mode == "norm":
             logger.info(
                 f"Loaded Normalize transformation that normalizes data in the range 0 to 1")
+        if mode == "stan":
+            logger.info(
+                f"Loaded Normalize transformation that standardizes data into z-scores")
         if mode == "sym":
             logger.info(
                 f"Loaded Normalize transformation that normalizes data in the range -1 to 1")
@@ -184,22 +186,26 @@ class Normalize(object):
         self.mode = mode
 
     def __call__(self, sample):
-        
-        image = sample['image'] #.astype(np.float32)
-        
+
+        image = sample['image']  # .astype(np.float32)
+
         if self.mode == "norm":
             image -= image.min()
             image /= image.max()
 
+        if self.mode == "stan":
+            image -= image.mean()
+            image /= image.std()
+
         if self.mode == "sym":
             image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
-            
+
         if self.mode == "255":
             #image /= 255.0
             image[0] /= 255.0
             if image.shape[0] > 1:
                 image[1] = (1.0 + image[1] / np.pi) / 2.0
-        
+
         sample["image"] = image
         return sample
 
@@ -217,10 +223,10 @@ class ToTensor(object):
             image = image.reshape(1, image.shape[0], image.shape[1])
         sample["image"] = torch.from_numpy(image).float()
         return sample
-    
-    
+
+
 class AdjustBrightness(object):
-    
+
     def __init__(self, rate, brightness):
         logger.info(
             f"Loaded AdjustBrightness transformation")
@@ -242,9 +248,10 @@ class AdjustBrightness(object):
             )
             sample["image"] = image
         return sample
-    
+
+
 class GaussianBlur(object):
-    
+
     def __init__(self, rate, kernel_size, sigma):
         logger.info(
             f"Loaded GaussianBlur transformation")
@@ -257,24 +264,24 @@ class GaussianBlur(object):
             image = sample['image']
             sigma = random.uniform(0.0, self.sigma)
             image = torchvision.transforms.functional.gaussian_blur(
-                image, 
-                kernel_size = self.kernel_size, 
-                sigma = sigma
+                image,
+                kernel_size=self.kernel_size,
+                sigma=sigma
             )
             sample["image"] = image
         elif random.random() < self.rate:
             image = sample['image']
             image = torchvision.transforms.functional.gaussian_blur(
-                image, 
-                kernel_size = self.kernel_size, 
-                sigma = self.sigma
+                image,
+                kernel_size=self.kernel_size,
+                sigma=self.sigma
             )
             sample["image"] = image
         return sample
-    
+
 
 class GaussianNoise(object):
-    
+
     def __init__(self, rate, noise):
         logger.info(
             f"Loaded GaussianNoise transformation")
