@@ -341,7 +341,7 @@ class InferencePropagator(WavePropagator):
                 "pred_output": pred_output,
                 "pred_proba": pred_proba,
                 "true_output": true_output,
-                "z_plane": int(z_sub_set[z_idx]),
+                "z_plane": int(round(z_sub_set[0])),
                 "roc": roc
             }
 
@@ -390,7 +390,6 @@ class InferencePropagator(WavePropagator):
             image_coords - x,y corner coordinates of the sub images
             image_z - z location of the sub image in m
         """
-
         # locate particle information corresponding to this hologram
         particle_idx = np.where(self.h_ds['hid'].values == h_idx+1)
 
