@@ -1,33 +1,24 @@
 from holodecml.propagation import WavePropagator
-from scipy.sparse import csr_matrix
-from functools import partial
-from collections import defaultdict
-from scipy.signal import convolve2d
-from typing import List, Dict, Callable, Union, Any, TypeVar, Tuple
-from torch.optim.lr_scheduler import *
-import matplotlib.pyplot as plt
-import multiprocessing as mp
-import pandas as pd
-import xarray as xr
-import numpy as np
-import torchvision.models as models
-import torch.nn.functional as F
-import torch.fft
-import torch
-import datetime
-import logging
-import random
-import joblib
-import pickle
-import yaml
-import time
-import tqdm
-import glob
-import sys
-import os
 import gc
+import os
+import sys
+import tqdm
+import yaml
+import joblib
+import random
+import logging
+import torch
+import torch.fft
+import torch.nn.functional as F
+import numpy as np
+from scipy.signal import convolve2d
+from collections import defaultdict
+from functools import partial
+from scipy.sparse import csr_matrix
+import multiprocessing as mp
 import warnings
 warnings.filterwarnings("ignore")
+mp.set_start_method('spawn')
 
 
 # Set the default logger
@@ -240,9 +231,6 @@ def worker(h_idx, config=None, part_per_holo=None, empt_per_holo=None):
 
 
 if __name__ == '__main__':
-
-    import multiprocessing as mp
-    mp.set_start_method('spawn')
 
     config_file = str(sys.argv[1])
 
