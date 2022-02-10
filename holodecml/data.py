@@ -917,7 +917,7 @@ class UpsamplingReader(Dataset):
         if im["vertical_flip"]:
             mask = np.flip(mask, axis=1)
 
-        image = torch.tensor(image, dtype=torch.float)
+        image = torch.tensor(im["image"], dtype=torch.float)
         mask = torch.tensor(mask.copy(), dtype=torch.int)
 
         return image, mask
