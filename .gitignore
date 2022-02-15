@@ -4,3 +4,10 @@
 *.out.*
 batch**.sh
 *.o*
+.vscode/settings.json
+scripts/mhayman/job_scripts/countvae.e
+scripts/mhayman/job_scripts/hypvae.e
+scripts/mhayman/job_scripts/hypvae2d.e
+scripts/mhayman/job_scripts/hypvae.e%j
+scripts/mhayman/job_scripts/hypvaeSA.e
+scripts/mhayman/job_scripts/slurm-4480881.out
