@@ -2,6 +2,7 @@ import gc
 import glob
 import psutil
 import pickle
+import traceback
 
 import numpy as np
 import pandas as pd
@@ -162,8 +163,8 @@ def worker_3d_plot_paired(h_idx, pairs=None, particles=None, model_save=None, re
 if __name__ == '__main__':
 
     real = 'synthetic' #real
-    model_loc = f"/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/standard/"
-    model_save = "/glade/scratch/ggantos/holodec/models/standard_parallel/"
+    model_loc = f"/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/manopt/"
+    model_save = "/glade/scratch/ggantos/holodec/models/manopt_parallel/"
 
     try:
         h_idx_indices = list(set(sorted([int(x.split("_")[1]) for x in glob.glob(f"{model_loc}/{real}/propagated/true*")])))
@@ -175,11 +176,15 @@ if __name__ == '__main__':
     print(f"z_file_indices range from {min(z_file_indices)} to {max(z_file_indices)}.")
     
     # Create scipy objects
-    work = partial(worker_objects, z_file_indices=z_file_indices, model_loc=model_loc, real=real)
-    with mp.Pool(processes=4) as p:
-        for result in p.imap(work, h_idx_indices):
-            print(result)
-    raise
+    try:
+        work = partial(worker_objects, z_file_indices=z_file_indices, model_loc=model_loc, real=real)
+        with mp.Pool(processes=4) as p:
+            for result in p.imap(work, h_idx_indices):
+                print(result)
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
+    return        
     
     # Load original data
     if real == 'real':
@@ -383,7 +388,7 @@ if __name__ == '__main__':
     
     # plot 3D distances between pairs particles
     for h_idx in h_idx_indices:
-    work = partial(worker_3d_plot_paired, pairs=pairs, particles=particles, model_save=model_save, real=real)
+        work = partial(worker_3d_plot_paired, pairs=pairs, particles=particles, model_save=model_save, real=real)
     with mp.Pool(processes=4) as p:
         for result in p.imap(work, h_idx_indices):
             print(result)
