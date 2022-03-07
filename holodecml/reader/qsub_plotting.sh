@@ -1,7 +1,7 @@
 #!/bin/bash -l 
 
-#PBS -N holo_inf
-#PBS -l walltime=11:59:00
+#PBS -N 100holo
+#PBS -l walltime=6:59:00
 #PBS -l select=1:ncpus=8:ngpus=1:mem=128GB
 #PBS -l gpu_type=v100
 #PBS -A NAML0001
