@@ -1,6 +1,5 @@
 seed: 1000
-
-save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/optimized_noisy"
+save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results"
 
 data:
     n_bins: 1000
@@ -9,9 +8,10 @@ data:
     tile_size: 512
     step_size: 128
     marker_size: 10
-    total_positive: 5
-    total_negative: 5
-    total_training: 50000
+    total_positive: 6
+    total_negative: 6
+    total_training: 100000
+    transform_mode: 'None'
     output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
     use_cached: True
     device: "cpu"
@@ -24,28 +24,28 @@ transforms:
         RandomHorizontalFlip: 
             rate: 0.5
         Normalize:
-            mode: '255'
+            mode: 'norm'
         GaussianBlur:
             rate: 1.0
             kernel_size: 1
-            sigma: 1.7902436563642792
+            sigma: 2.1252219359742823
         GaussianNoise:
             rate: 1.0
-            noise: 0.011353967974406949
+            noise: 0.3258530643453389
         AdjustBrightness:
             rate: 1.0
-            brightness_factor: 1.7301154565769068
+            brightness_factor: 1.269735791766263
         ToTensor: True
     validation:
         Normalize:
-            mode: '255'
+            mode: 'norm'
         ToTensor: True
     inference:
         Normalize:
-            mode: '255'
-                       
+            mode: 'norm'
+            
 model:
-    name: "manet"
+    name: "linknet"
     encoder_name: "xception"
     encoder_weights: "imagenet"
     in_channels: 1
@@ -53,7 +53,7 @@ model:
     activation: "sigmoid"
     
 optimizer:
-    learning_rate: 0.0006145337230850794
+    learning_rate: 0.00024575732726722595
     weight_decay: 0.0
     
 trainer:
@@ -62,19 +62,19 @@ trainer:
     valid_batch_size: 16
     batches_per_epoch: 500
     stopping_patience: 4
-    training_loss: "tyversky"
+    training_loss: "focal-tyversky"
     validation_loss: "dice"
     
 inference:
     mode: "mask"
-    batch_size: 16
-    n_nodes: 4
+    batch_size: 128
+    n_nodes: 1
     gpus_per_node: 1
-    threads_per_gpu: 2
-    save_arrays: True
+    threads_per_gpu: 1
+    save_metrics: False
+    save_arrays: False
     save_probs: False
     probability_threshold: 0.5
-    plot: False
     verbose: False
     data_set:
         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
