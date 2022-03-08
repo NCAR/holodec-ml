@@ -75,6 +75,7 @@ inference:
     save_arrays: False
     save_probs: False
     probability_threshold: 0.5
+    distance_threshold: 1.0e-03
     verbose: False
     data_set:
         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
