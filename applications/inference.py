@@ -220,11 +220,11 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
                     # Save to text file
                     if len(true_coors):
                         for (x,y,z,d) in true_coors:
-                            with open(f"{prop_data_loc}/true_{h_idx}_{z}.txt", "a+") as fid:
+                            with open(f"{prop_data_loc}/true_{this_worker}.txt", "a+") as fid:
                                 fid.write(f"{h_idx} {x} {y} {z} {d}\n")
                     if len(pred_coors):
                         for (x,y,z,d) in pred_coors:
-                            with open(f"{prop_data_loc}/pred_{h_idx}_{z}.txt", "a+") as fid:
+                            with open(f"{prop_data_loc}/pred_{this_worker}.txt", "a+") as fid:
                                 fid.write(f"{h_idx} {x} {y} {z} {d}\n")
                                 
                     # Get stuff from the results dictionary
