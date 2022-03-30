@@ -7,6 +7,7 @@ import torch.fft
 import torch
 import logging
 import os
+import scipy
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -202,6 +203,8 @@ class InferencePropagator(WavePropagator):
                                infocus_mask,
                                z_part_bin_idx,
                                batch_size=32,
+                               return_arrays=False,
+                               return_metrics=False,
                                thresholds=None,
                                obs_threshold=None):
         """
@@ -322,29 +325,56 @@ class InferencePropagator(WavePropagator):
                             pred_output[row_slice, col_slice] += pred_labels[k]
                             pred_proba[row_slice, col_slice] += pred_probs[k]
 
-            pred_output = pred_output / counter
-            pred_proba = pred_proba / counter
-            true_output = true_output / counter
+            
+            return_dict = {"z": int(round(z_sub_set[0]))}
+                            
+            # Compute the (x,y,d) of predicted masks
+            pred_output = pred_output == counter
+            true_output = true_output == counter
+            
+            true_coordinates = []
+            if true_output.sum() > 0:
+                arr, n = scipy.ndimage.label(true_output.cpu())
+                _centroid = scipy.ndimage.find_objects(arr)
+                for particle in _centroid:
+                    xind = (particle[0].stop + particle[0].start) // 2
+                    yind = (particle[1].stop + particle[1].start) // 2
+                    dind = max([
+                        abs(particle[0].stop - particle[0].start), 
+                        abs(particle[1].stop - particle[1].start)
+                    ])
+                    true_coordinates.append([xind,yind,int(round(z_sub_set[0])),dind])
 
-            pred_output = pred_output == 1.0
-            true_output = true_output == 1.0
-
-            pred_output = pred_output.cpu().numpy()
-            pred_proba = pred_proba.cpu().numpy()
-            true_output = true_output.cpu().numpy()
-
-            roc = DistributedROC(thresholds=thresholds,
-                                 obs_threshold=obs_threshold)
-            roc.update(pred_proba.ravel(), true_output.ravel())
-
-            return_dict = {
-                "pred_output": pred_output,
-                "pred_proba": pred_proba,
-                "true_output": true_output,
-                "z_plane": int(round(z_sub_set[0])),
-                "roc": roc
-            }
-
+            pred_coordinates = []
+            if pred_output.sum() > 0:
+                arr, n = scipy.ndimage.label(pred_output.cpu())
+                _centroid = scipy.ndimage.find_objects(arr)
+                for particle in _centroid:
+                    xind = (particle[0].stop + particle[0].start) // 2
+                    yind = (particle[1].stop + particle[1].start) // 2
+                    dind = max([
+                        abs(particle[0].stop - particle[0].start), 
+                        abs(particle[1].stop - particle[1].start)
+                    ])
+                    pred_coordinates.append([xind,yind,int(round(z_sub_set[0])),dind])
+            
+            return_dict["pred_output"] = pred_coordinates
+            return_dict["true_output"] = true_coordinates
+            
+            if return_arrays:
+                return_dict["pred_array"] = pred_output
+                return_dict["pred_proba"] = pred_proba
+                return_dict["true_array"] = true_output
+                
+            if return_metrics:
+                pred_output = pred_output.cpu().numpy()
+                pred_proba = pred_proba.cpu().numpy()
+                true_output = true_output.cpu().numpy()
+                roc = DistributedROC(thresholds=thresholds,
+                                     obs_threshold=obs_threshold)
+                roc.update(pred_proba.ravel(), true_output.ravel())
+                return_dict["roc"] = roc
+            
         return return_dict
 
     def collate_labels(self, batch, image=None, label=None):
@@ -374,6 +404,8 @@ class InferencePropagator(WavePropagator):
                                   h_idx,
                                   z_planes_lst,
                                   batch_size=32,
+                                  return_arrays=False,
+                                  return_metrics=False,
                                   thresholds=np.arange(0.0, 1.1, 0.1),
                                   obs_threshold=1.0,
                                   start_z_counter=0):
@@ -429,6 +461,8 @@ class InferencePropagator(WavePropagator):
                 x_part, y_part, z_part, d_part, h_part,
                 z_part_bin_idx,
                 batch_size=batch_size,
+                return_arrays=return_arrays,
+                return_metrics=return_metrics,
                 thresholds=thresholds,
                 obs_threshold=obs_threshold
             )

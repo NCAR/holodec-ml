@@ -1,11 +1,16 @@
-## Contributers 
-* David John Gagne
-* Aaron Bansemer
-* Matthew Hayman
-* John Schreck 
-* Gabrielle Gantos
-* Gunther Wallach
+## holodec-ml
+Neural network processing of holographic images
 
+[Paper](https://arxiv.org/pdf/2203.08898.pdf)
+
+[Data](https://doi.org/10.5281/zenodo.6347222)
+
+## Contributers 
+* John Schreck
+* Gabrielle Gantos
+* Matthew Hayman 
+* Aaron Bansemer
+* David John Gagne
 
 ## Setup from Scratch
 
@@ -28,13 +33,13 @@
 The repository contains python scripts and notebooks that allow users to train segmentation and classification models, and to perform inference with models on synthetic and real holograms.
 
 ### A. Configuration file
-A user-supplied yml file is the basis for setting different parameters pertaining to datasets, resource usage, etc. For example, ```config/unet_propagation.yml``` contains the fields: seed, save_loc, data, transforms, model, optimizer, training, and inference.
+A user-supplied yml file is the basis for setting different parameters pertaining to datasets, resource usage, etc. For example, ```config/model_segmentation.yml``` contains the fields: seed, save_loc, data, transforms, model, optimizer, training, and inference.
 
 
 ```yaml
 seed: 1000
 
-save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/optimized_noisy"
+save_loc: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/baseline"
 
 data:
     n_bins: 1000
@@ -105,16 +110,15 @@ inference:
     n_nodes: 4
     gpus_per_node: 1
     threads_per_gpu: 2
-    save_arrays: True
+    save_metrics: False
+    save_arrays: False
     save_probs: False
     probability_threshold: 0.5
-    plot: False
+    distance_threshold: 1.0e-03
     verbose: False
     data_set:
         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
         name: "synthetic"
-#         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
-#         name: "real"
         holograms:
             min: 0
             max: 10
@@ -191,9 +195,11 @@ A learning rate scheduler is also used during the training, which has patience s
 * n_nodes: How many nodes will be used to perform inference. Assumes the user will submit this many launch scripts.
 * gpus_per_node: How many GPUs are available on the current node.
 * threads_per_gpu: How many copies of the model to mount to each available GPU.
+* save_metrics: Save ROC objects from hagelslag.
 * save_arrays: Save truth and predicted segmentation arrays.
 * save_probs: Save the predicted probabilities, where any p<0.5 is saved as zero, and otherwise three significant figures are saved as an integer.
 * probability_threshold: The decision threshold.
+* distance_threshold: The distance threshold used in clustering.
 * plot: Whether to plot the results at each z and save them to disk.
 * verbose: Option allowing more verbose output.
 
@@ -210,7 +216,7 @@ The field "data_set" has the following settings:
 One may generate and save to disk "training", "validation", and "testing" data splits (80/10/10) by running:
 
 ```python
-python applications/data_generator.py config/unet_propagation.yml
+python applications/data_generator.py -c config/model_segmentation.yml
 ```
 
 which will save (tile image, binary label, segmentation mask) tuples to disk, where binary label is zero if the tile does not contain an in-focus particle, and one otherwise. The segmentation mask has the same dimension as the tile image and contains zeros everywhere except when there is a particle in-focus in the tile, where the pixels falling within the particles diameter are labeled 1.
@@ -230,7 +236,7 @@ The DataLoader class allows the user to spawn multiple instances, as controlled 
 One may train a segmentation model by running:
 
 ```python
-python applications/train.py config/unet_propagation.yml
+python applications/train.py -c config/model_segmentation.yml
 ```
 
 which will perform several steps to train a model for a fixed number of epochs, and save the results using save_loc as the end-point. 
@@ -240,32 +246,25 @@ which will perform several steps to train a model for a fixed number of epochs, 
 After a model has been trained it may be used to predict segmentation masks around particles at different values of z. To perform inference on a dataset, run the script:
 
 ```python
-python applications/inference.py config/unet_propagation.yml
+python applications/inference.py -c config/model_segmentation.yml
 ```
 
-which will propagate the holgoram to each z-bin center and feed the derived tiles through the model. The script then performs an average over the tiles to recreate the original hologram image size. 
+which will propagate the holgoram to each z-bin center and feed the derived tiles through the model. The script then performs an average over the tiles to recreate the original hologram image size. Finally, the full-sized mask predictions are indexed via scipy.ndimage.find_objects from which estimates for (x, y, z, d) are obtained for the particles in each plane.
 
-The script will save data as the user instructs for truth masks, predicted masks, and predicted probabilities. The "truth" mask used when real holograms are used is the result predicted by HoloSuite. 
+The script will always save the predicted coordinates for all particles, and save other data as the user instructs including "truth" masks, predicted masks, predicted probabilities, and ROC objects from hagelslag. The "truth" mask used when real holograms are used is the result predicted by the standard method. 
 
 
-### 4. Clustering and Visualizations
+### 4. Clustering and matching paticles
 
-After the inference script has been run on a trained model, we can run clustering and particle pairing algorithms to extract model predictions. The code to run the post-procesing and visualization scrips is contained in *plotting.py*.
-
-In order to run this script, is simply required that the `real`, `model_loc`, and `model_save` variables be defined in lines 164-166 of *plotting.py*. Given this information, the script will go on to:
- * load the 3D masks generated by the inference script in step 3
- * cluster non-zero values in the 3D space via scipy.ndimage.label
- * index the clustered particles in 3D space via scipy.ndimage.find_objects
- * translate indices in the previous step to x, y, z, and d coordinates
- * compare these coordinates to the **true** and **orig** coordinates where:
-     * true coordinates are created via the scipy.ndimage algorithms above using the true masks input as targets into the neural network in Step 2.
-     * orig coordinates are loaded without intervention from the original training or test files
- * calculate the distance matrix between predicted and true particles
- * implement the MunkRes algorithm for pairing predicted with true particles such that the overall distance matrix is minimized without repeating true or orig particles
- * visualize the closest and furthest particles that have been paired by the MunkRes algorithm
- 
-To run `plotting.py`, run the script via:
+After the inference script has been run on a trained model, we can run clustering and particle pairing algorithms to extract model predictions:
 
 ```python
-python holodecml/reader/plotting.py
+python applications/match.py -c config/model_segmentation.yml
 ```
+
+The script will cluster predicted particles resulting from the inference script in the 3D space via the distance matrix and leader clustering. Optionally, true particles can be matched against the predicted particles. The script will save the results in a dictionary, where the keys correspond with the h-index of the hologram in the netCDF file, and the value being the table for that holgram. Additionally, the tables for all holograms processed are saved into a csv-file. The number of predicted particles and the RMSE are printed to screen (if pairing predictions against truth or the standard method).
+
+### 5. Visualizations 
+Finally, histograms of predicted particle coordinates and diameters, and 3D visualizations can be generated by running the Jupyter notebook that can be found here:
+
+applications/figures.ipynb

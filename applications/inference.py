@@ -58,9 +58,6 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
     threads_per_gpu = conf["inference"]["threads_per_gpu"]
     workers = int(n_nodes * n_gpus * threads_per_gpu)
 
-    save_arrays = conf["inference"]["save_arrays"]
-    plot = conf["inference"]["plot"]
-
     n_bins = conf["data"]["n_bins"]
     tile_size = conf["data"]["tile_size"]
     step_size = conf["data"]["step_size"]
@@ -74,6 +71,7 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
 
     batch_size = conf["inference"]["batch_size"]
     save_arrays = conf["inference"]["save_arrays"]
+    save_metrics = conf["inference"]["save_metrics"]
     save_prob = conf["inference"]["save_probs"]
     inference_mode = conf["inference"]["mode"]
 
@@ -82,7 +80,6 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
     else:
         probability_threshold = 0.5
 
-    plot = conf["inference"]["plot"]
     verbose = conf["inference"]["verbose"]
     data_set = conf["inference"]["data_set"]["path"]
     data_set_name = conf["inference"]["data_set"]["name"]
@@ -91,7 +88,11 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
     roc_data_loc = os.path.join(model_loc, f"{data_set_name}/roc")
     image_data_loc = os.path.join(model_loc, f"{data_set_name}/images")
 
-    for directory in [prop_data_loc, roc_data_loc, image_data_loc]:
+    save_dirs = [prop_data_loc]
+    if conf["inference"]["save_metrics"]:
+        save_dirs.append(roc_data_loc)
+        save_dirs.append(image_data_loc)
+    for directory in save_dirs:
         if not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
 
@@ -192,6 +193,8 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
                     z_list,
                     batch_size=batch_size,
                     thresholds=thresholds,
+                    return_arrays=save_arrays,
+                    return_metrics=save_metrics,
                     obs_threshold=obs_threshold,
                     start_z_counter=planes_processed
                 )
@@ -205,58 +208,73 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
                 else:
                     jiter = enumerate(inference_generator)
 
-                roc = DistributedROC(thresholds=thresholds,
+                if save_metrics:
+                    roc = DistributedROC(thresholds=thresholds,
                                      obs_threshold=obs_threshold)
-                holo_acc = []
 
-                unet_particles = 0
-                holo_particles = 0
                 t0 = time.time()
                 for z_idx, results_dict in jiter:
-
+                    
+                    true_coors = results_dict["true_output"]
+                    pred_coors = results_dict["pred_output"]
+                    # Save to text file
+                    if len(true_coors):
+                        for (x,y,z,d) in true_coors:
+                            with open(f"{prop_data_loc}/true_{this_worker}.txt", "a+") as fid:
+                                fid.write(f"{h_idx} {x} {y} {z} {d}\n")
+                    if len(pred_coors):
+                        for (x,y,z,d) in pred_coors:
+                            with open(f"{prop_data_loc}/pred_{this_worker}.txt", "a+") as fid:
+                                fid.write(f"{h_idx} {x} {y} {z} {d}\n")
+                                
                     # Get stuff from the results dictionary
-                    pred_label = results_dict["pred_output"]
-                    true_label = results_dict["true_output"]
-                    z_plane = int(results_dict["z_plane"])
-
-                    if save_prob:
-                        pred_prob = results_dict["pred_proba"]
-                        pred_prob = np.where(
-                            pred_prob < 0.5, 0.0, 1000 * pred_prob)
-                        pred_prob = pred_prob.astype(int)
+                    z_plane = int(results_dict["z"])
 
                     if save_arrays:
                         # Save the giant matrices as sparse arrays, as most elements are zero
-                        if save_prob:
+                        if results_dict["pred_array"].sum() > 0:
+                            if save_prob:
+                                pred_prob = results_dict["pred_proba"]
+                                pred_prob = np.where(
+                                    pred_prob < 0.5, 0.0, 1000 * pred_prob)
+                                pred_prob = pred_prob.astype(int)
+                                save_sparse_csr(
+                                    f"{prop_data_loc}/prob_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_prob))
                             save_sparse_csr(
-                                f"{prop_data_loc}/prob_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_prob))
-                        save_sparse_csr(
-                            f"{prop_data_loc}/pred_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(pred_label))
-                        save_sparse_csr(
-                            f"{prop_data_loc}/true_{h_idx}_{z_plane}.npz", scipy.sparse.csr_matrix(true_label))
+                                f"{prop_data_loc}/pred_{h_idx}_{z_plane}.npz", 
+                                scipy.sparse.csr_matrix(results_dict["pred_array"].cpu().numpy()))
+                        if results_dict["true_array"].sum() > 0:
+                            save_sparse_csr(
+                                f"{prop_data_loc}/true_{h_idx}_{z_plane}.npz", 
+                                scipy.sparse.csr_matrix(results_dict["true_array"].cpu().numpy()))
 
-                    # Merge the ROC result
-                    this_roc = results_dict["roc"]
-                    roc.merge(this_roc)
+                    # Save the ROC results
+                    if save_metrics:
+                        this_roc = results_dict["roc"]
+                        roc.merge(this_roc)
+                        with open(f"{roc_data_loc}/roc_{h_idx}_{z_plane}.pkl", "wb") as fid:
+                            joblib.dump(this_roc, fid)
+                        
+                        # merge rocs that currently exist
+                        rocs = sorted(glob.glob(f"{roc_data_loc}/roc_{h_idx}_*.pkl"),
+                              key=lambda x: int(x.strip(".pkl").split("_")[-1]))
+                        for k, roc_fn in enumerate(rocs):
+                            with open(roc_fn, "rb") as fid:
+                                if k == 0:
+                                    roc = joblib.load(fid)
+                                else:
+                                    roc.merge(joblib.load(fid))
+
+                        with open(f"{roc_data_loc}/roc_{h_idx}.pkl", "wb") as fid:
+                            joblib.dump(roc, fid)
+
+                        roc_curve([roc], [model_name], ["orange"], ["o"],
+                                  f"{image_data_loc}/roc_comparison_{h_idx}.png")
+                        performance_diagram([roc], [model_name], ["orange"], [
+                                            "o"], f"{image_data_loc}/performance_comparison_{h_idx}.png")
 
                     # Print some stuff
-                    #plane = this_roc.binary_metrics()
-                    #hologram = roc.binary_metrics()
-                    plane_acc = (pred_label == true_label).mean()
-                    holo_acc.append(plane_acc)
-
-                    unet_plane_particles = np.sum(pred_label == 1)
-                    holo_plane_particles = np.sum(true_label == 1)
-                    unet_particles += unet_plane_particles
-                    holo_particles += holo_plane_particles
-
                     to_print = f"Worker {this_worker}: Holo: {h_idx} Plane: {z_idx + 1} / {len(z_list)} z: {(z_plane*1e-6):.8f}"
-                    #to_print += f" plane_acc: {plane_acc:.4f}"
-                    #to_print += f" holo_acc: {np.mean(holo_acc):.4f}"
-                    to_print += f" plane_csi: {this_roc.max_csi():.4f}"
-                    to_print += f" holo_csi: {roc.max_csi():.4f}"
-                    to_print += f" plane_(unet/true): {int(unet_plane_particles)} / {int(holo_plane_particles)}"
-                    to_print += f" holo_(unet/true): {int(unet_particles)} / {int(holo_particles)}"
                     secs_per_holo = ((time.time()-t0)/(z_idx+1))
                     to_print += f" secs / plane: {secs_per_holo:.2f}"
                     if verbose:
@@ -264,49 +282,8 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
                         jiter.update()
                     logger.info(to_print)
 
-                    with open(f"{roc_data_loc}/roc_{h_idx}_{z_plane}.pkl", "wb") as fid:
-                        joblib.dump(results_dict["roc"], fid)
-
-                    # Option to plot each result per plane
-                    if plot:
-                        fig, (ax0, ax1, ax2) = plt.subplots(
-                            1, 3, figsize=(12, 5))
-                        p1 = ax0.imshow(pred_prob, vmin=0,  vmax=1)
-                        ax0.set_title("In-focus confidence")
-                        fig.colorbar(p1, ax=ax0)
-
-                        p2 = ax1.imshow(pred_label, vmin=0,  vmax=1)
-                        ax1.set_title("Predicted particles")
-                        fig.colorbar(p2, ax=ax1)
-
-                        p3 = ax2.imshow(true_label, vmin=0, vmax=1)
-                        ax2.set_title("True particles")
-                        fig.colorbar(p3, ax=ax2)
-
-                        plt.tight_layout()
-                        plt.show()
-
                 logger.info(
                     f"Worker {this_worker} finished hologram {h_idx} ({nc+1} / {len(h_range)}) in {time.time() - t0} s")
-
-                # merge rocs that currently exist
-                rocs = sorted(glob.glob(f"{roc_data_loc}/roc_{h_idx}_*.pkl"),
-                              key=lambda x: int(x.strip(".pkl").split("_")[-1]))
-
-                for k, roc_fn in enumerate(rocs):
-                    with open(roc_fn, "rb") as fid:
-                        if k == 0:
-                            roc = joblib.load(fid)
-                        else:
-                            roc.merge(joblib.load(fid))
-
-                with open(f"{roc_data_loc}/roc_{h_idx}.pkl", "wb") as fid:
-                    joblib.dump(roc, fid)
-
-                roc_curve([roc], [model_name], ["orange"], ["o"],
-                          f"{image_data_loc}/roc_comparison_{h_idx}.png")
-                performance_diagram([roc], [model_name], ["orange"], [
-                                    "o"], f"{image_data_loc}/performance_comparison_{h_idx}.png")
 
     except:
         logger.warning(
@@ -390,9 +367,11 @@ if __name__ == '__main__':
     data_set_name = conf["inference"]["data_set"]["name"]
     prop_data_loc = os.path.join(model_loc, f"{data_set_name}/propagated")
     roc_data_loc = os.path.join(model_loc, f"{data_set_name}/roc")
-    image_data_loc = os.path.join(model_loc, f"{data_set_name}/images")
-
-    for directory in [prop_data_loc, roc_data_loc, image_data_loc]:
+    
+    save_dirs = [prop_data_loc]
+    if conf["inference"]["save_metrics"]:
+        save_dirs.append(roc_data_loc)
+    for directory in save_dirs:
         if not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
 
@@ -448,7 +427,6 @@ if __name__ == '__main__':
     logger.info(f"Using the data set {data_set_name} located at {data_set}")
     logger.info(f"Saving any result arrays to {prop_data_loc}")
     logger.info(f"Saving any ROC objects to {roc_data_loc}")
-    logger.info(f"Saving any images created to {image_data_loc}")
     logger.info(f"Using the following hologram hids: {str(h_range)}")
     logger.info(
         f"Performing model inference using {model_name} on {n_bins} reconstructed planes")
