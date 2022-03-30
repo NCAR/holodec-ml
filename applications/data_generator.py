@@ -18,7 +18,8 @@ from scipy.sparse import csr_matrix
 import multiprocessing as mp
 import warnings
 warnings.filterwarnings("ignore")
-mp.set_start_method('spawn')
+
+#mp.set_start_method('spawn')
 
 
 # Set the default logger

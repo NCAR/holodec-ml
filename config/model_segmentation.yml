@@ -4,7 +4,7 @@ save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results"
 data:
     n_bins: 1000
     data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
-    raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_203600-203700.nc"
+    raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
     tile_size: 512
     step_size: 128
     marker_size: 10
