@@ -1,0 +1,78 @@
+seed: 1000
+save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results/gan/"
+
+data:
+    n_bins: 1000
+    data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
+    raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
+    tile_size: 512
+    step_size: 128
+    marker_size: 10
+    total_positive: 6
+    total_negative: 6
+    total_training: 100000
+    transform_mode: 'None'
+    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
+    output_path_raw: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_real/"
+    use_cached: False
+    device: "cpu"
+    cores: 0
+
+transforms:
+    training:
+        RandomVerticalFlip:
+            rate: 0.5
+        RandomHorizontalFlip: 
+            rate: 0.5
+        Normalize:
+            mode: 'sym'
+        ToTensor: True
+    validation:
+        Normalize:
+            mode: 'sym'
+        ToTensor: True
+    inference:
+        Normalize:
+            mode: 'sym'
+            
+            
+model:
+    name: "linknet"
+    encoder_name: "xception"
+    encoder_weights: "imagenet"
+    in_channels: 1
+    classes: 1
+    activation: "sigmoid"
+    
+optimizer:
+    learning_rate: 0.00024575732726722595
+    weight_decay: 0.0
+    
+trainer:
+    epochs: 100
+    train_batch_size: 16
+    valid_batch_size: 16
+    batches_per_epoch: 500
+    stopping_patience: 4
+    training_loss: "focal-tyversky"
+    validation_loss: "dice"
+    
+inference:
+    mode: "mask"
+    batch_size: 16
+    n_nodes: 4
+    gpus_per_node: 1
+    threads_per_gpu: 2
+    save_arrays: True
+    save_probs: False
+    probability_threshold: 0.5
+    plot: False
+    verbose: False
+    data_set:
+#         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
+#         name: "synthetic"
+        path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
+        name: "real"
+        holograms:
+            min: 10
+            max: 20
