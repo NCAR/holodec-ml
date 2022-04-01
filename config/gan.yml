@@ -1,5 +1,5 @@
 seed: 1000
-save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results/gan/"
+save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results/gan_10_noDsynth/"
 
 data:
     n_bins: 1000
@@ -34,45 +34,43 @@ transforms:
     inference:
         Normalize:
             mode: 'sym'
-            
-            
-model:
+                  
+generator:
     name: "linknet"
     encoder_name: "xception"
     encoder_weights: "imagenet"
-    in_channels: 1
+    in_channels: 2
     classes: 1
-    activation: "sigmoid"
+    activation: "tanh"
     
-optimizer:
-    learning_rate: 0.00024575732726722595
-    weight_decay: 0.0
+discriminator:
+    name: "unet"
+    encoder_name: "resnet18"
+    encoder_weights: "imagenet"
+    in_channels: 1
+    aux_params:
+        pooling: 'avg'
+        dropout: 0.2
+        activation: 'sigmoid'
+        classes: 1    
+    
+optimizer_G:
+    learning_rate: 0.0001
+    b0: 0.0 
+    b1: 0.9
+
+optimizer_D:
+    learning_rate: 0.0004
+    b0: 0.0 
+    b1: 0.9
     
 trainer:
-    epochs: 100
+    epochs: 1000
     train_batch_size: 16
     valid_batch_size: 16
-    batches_per_epoch: 500
-    stopping_patience: 4
-    training_loss: "focal-tyversky"
-    validation_loss: "dice"
-    
-inference:
-    mode: "mask"
-    batch_size: 16
-    n_nodes: 4
-    gpus_per_node: 1
-    threads_per_gpu: 2
-    save_arrays: True
-    save_probs: False
-    probability_threshold: 0.5
-    plot: False
-    verbose: False
-    data_set:
-#         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_test.nc"
-#         name: "synthetic"
-        path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
-        name: "real"
-        holograms:
-            min: 10
-            max: 20
+    batches_per_epoch: 250
+    adv_loss: 'wgan-gp'
+    lambda_gp: 10
+    train_gen_every: 1
+    train_disc_every: 10
+    threshold: 0.5
