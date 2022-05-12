@@ -924,3 +924,42 @@ class UpsamplingReader(Dataset):
 
     def __len__(self):
         return len(list(self.prop.h_ds["hid"].values))
+
+    
+class XarrayReader(Dataset):
+
+    def __init__(self,
+                 fn,
+                 transform=False):
+
+        self.ds = xr.open_dataset(fn)  
+        self.transform = transform      
+
+    def __getitem__(self, idx):
+
+        image = self.ds.x[idx].values
+        mask = self.ds.y[idx].values
+
+        im = {
+            "image": np.expand_dims(image, 0),
+            "horizontal_flip": False,
+            "vertical_flip": False
+        }
+
+        if self.transform:
+            for image_transform in self.transform:
+                im = image_transform(im)
+        image = im["image"]
+
+        # Update the mask if we flipped the original image
+        if im["horizontal_flip"]:
+            mask = np.flip(mask, axis=0)
+        if im["vertical_flip"]:
+            mask = np.flip(mask, axis=1)
+
+        image = torch.tensor(image, dtype=torch.float)
+        mask = torch.tensor(mask.copy(), dtype=torch.int)
+        return (image, mask)
+
+    def __len__(self):
+        return len(self.ds.k)

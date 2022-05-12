@@ -1,5 +1,5 @@
 seed: 1000
-save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results/gan_10_noDsynth/"
+save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results/manual_check/"
 
 data:
     n_bins: 1000
@@ -35,10 +35,19 @@ transforms:
         Normalize:
             mode: 'sym'
                   
+# generator:
+#     name: "linknet"
+#     encoder_name: "xception"
+#     encoder_weights: "imagenet"
+#     in_channels: 2
+#     classes: 1
+#     activation: "tanh"
+
 generator:
-    name: "linknet"
-    encoder_name: "xception"
+    name: "unet"
+    encoder_name: "resnet18"
     encoder_weights: "imagenet"
+    decoder_attention_type: "scse"
     in_channels: 2
     classes: 1
     activation: "tanh"
@@ -47,30 +56,35 @@ discriminator:
     name: "unet"
     encoder_name: "resnet18"
     encoder_weights: "imagenet"
+    decoder_attention_type: "scse"
     in_channels: 1
+    activation: "sigmoid"
     aux_params:
         pooling: 'avg'
         dropout: 0.2
         activation: 'sigmoid'
-        classes: 1    
+        classes: 1  
     
 optimizer_G:
-    learning_rate: 0.0001
-    b0: 0.0 
-    b1: 0.9
+    learning_rate: 0.0002
+    b0: 0.5
+    b1: 0.999
 
 optimizer_D:
-    learning_rate: 0.0004
-    b0: 0.0 
-    b1: 0.9
+    learning_rate: 0.0002
+    b0: 0.5
+    b1: 0.999
     
 trainer:
-    epochs: 1000
+    epochs: 200
     train_batch_size: 16
     valid_batch_size: 16
     batches_per_epoch: 250
-    adv_loss: 'wgan-gp'
+    adv_loss: 'hinge'
     lambda_gp: 10
     train_gen_every: 1
     train_disc_every: 10
     threshold: 0.5
+    mask_penalty: 0.5
+    regression_penalty: 0.2
+    stopping_patience: 50
