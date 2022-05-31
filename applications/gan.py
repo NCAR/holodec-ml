@@ -30,15 +30,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-from holodecml.data import PickleReader, UpsamplingReader, XarrayReader
+from holodecml.data import PickleReader, UpsamplingReader, XarrayReader, XarrayReaderLabels
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
 from holodecml.models import load_model
 from holodecml.losses import load_loss
+import sklearn, sklearn.metrics
 
 import os
 import warnings
 warnings.filterwarnings("ignore")
+
+"""
+https://stats.stackexchange.com/questions/482653/what-is-the-stop-criteria-of-generative-adversarial-nets
+https://github.com/richzhang/PerceptualSimilarity
+https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/f13aab8148bd5f15b9eb47b690496df8dadbab0c/models/networks.py
+"""
 
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -76,6 +83,50 @@ class Objective(BaseObjective):
     def train(self, trial, conf):
         return trainer(conf, save_images = False, trial = trial)
         
+
+def man_metrics(results):
+    result = {}
+    for metric in ["f1", "auc", 'pod', "far", "csi"]: #"man_prec", "man_recall",
+        if metric == 'f1':
+            score = sklearn.metrics.f1_score(results["true"], results["pred"], average = "weighted")
+        elif metric == 'prec':
+            score = sklearn.metrics.precision_score(results["true"], results["pred"], average = "weighted")
+        elif metric == 'recall':
+            score = sklearn.metrics.recall_score(results["true"], results["pred"], average = "weighted")
+        elif metric == 'auc':
+            try:
+                score = sklearn.metrics.roc_auc_score(results["true"], results["pred"], average = "weighted")
+            except:
+                score = 1.0
+        elif metric ==  "csi":
+            try:
+                TN, FP, FN, TP = sklearn.metrics.confusion_matrix(results["true"], results["pred"]).ravel()
+                score = TP / (TP + FN + FP)
+            except:
+                score = 1
+        elif metric == 'far':
+            try:
+                TN, FP, FN, TP = sklearn.metrics.confusion_matrix(results["true"], results["pred"]).ravel()
+                score = FP / (TP + FP)
+            except:
+                score = 1
+        elif metric == 'pod':
+            try:
+                TN, FP, FN, TP = sklearn.metrics.confusion_matrix(results["true"], results["pred"]).ravel()
+                score = TP / (TP + FN)
+            except: 
+                score = 1
+        result[metric] = score
+        #print(metric, round(score, 3))
+    return result
+
+def apply_transforms(transforms, image):
+    im = {"image": image}
+    for image_transform in transforms:
+        im = image_transform(im)
+    image = im["image"]
+    return image
+
         
 def trainer(conf, save_images = True, trial = False):
     
@@ -103,7 +154,7 @@ def trainer(conf, save_images = True, trial = False):
     name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}_{transform_mode}"
     fn_train = f"{data_path}/training_{name_tag}.nc"
     fn_valid = f"{data_path}/validation_{name_tag}.nc"
-    fn_train_raw = f"{data_path_raw}/training_{name_tag}.nc"
+    fn_train_raw = data_path_raw#f"{data_path_raw}/training_{name_tag}.nc"
     fn_valid_raw = f"{data_path_raw}/validation_{name_tag}.nc"
 
     # Trainer params
@@ -130,9 +181,8 @@ def trainer(conf, save_images = True, trial = False):
     train_transforms = LoadTransformations(conf["transforms"]["training"])
     valid_transforms = LoadTransformations(conf["transforms"]["validation"])
 
-
     train_synthetic_dataset = XarrayReader(fn_train, train_transforms)
-    test_synthetic_dataset = XarrayReader(fn_valid, valid_transforms)
+    #test_synthetic_dataset = XarrayReader(fn_valid, valid_transforms)
 
     train_synthetic_loader = torch.utils.data.DataLoader(
         train_synthetic_dataset,
@@ -141,15 +191,15 @@ def trainer(conf, save_images = True, trial = False):
         pin_memory=True,
         shuffle=True)
 
-    test_synthetic_loader = torch.utils.data.DataLoader(
-        test_synthetic_dataset,
-        batch_size=valid_batch_size,
-        num_workers=0,  # 0 = One worker with the main process
-        pin_memory=True,
-        shuffle=False)
+#     test_synthetic_loader = torch.utils.data.DataLoader(
+#         test_synthetic_dataset,
+#         batch_size=valid_batch_size,
+#         num_workers=0,  # 0 = One worker with the main process
+#         pin_memory=True,
+#         shuffle=False)
 
-    train_holodec_dataset = XarrayReader(fn_train_raw, train_transforms)
-    test_holodec_dataset = XarrayReader(fn_valid_raw, valid_transforms)
+    train_holodec_dataset = XarrayReaderLabels(fn_train_raw, train_transforms)
+    #test_holodec_dataset = XarrayReader(fn_valid_raw, valid_transforms)
 
     train_holodec_loader = torch.utils.data.DataLoader(
         train_holodec_dataset,
@@ -158,17 +208,17 @@ def trainer(conf, save_images = True, trial = False):
         pin_memory=True,
         shuffle=True)
 
-    test_holodec_loader = torch.utils.data.DataLoader(
-        test_holodec_dataset,
-        batch_size=valid_batch_size,
-        num_workers=0,  # 0 = One worker with the main process
-        pin_memory=True,
-        shuffle=False)
+#     test_holodec_loader = torch.utils.data.DataLoader(
+#         test_holodec_dataset,
+#         batch_size=valid_batch_size,
+#         num_workers=0,  # 0 = One worker with the main process
+#         pin_memory=True,
+#         shuffle=False)
 
     # Load the models
     generator = load_model(conf["generator"]).to(device)
     discriminator = load_model(conf["discriminator"]).to(device)
-    model = load_model(conf["discriminator"]).to(device)
+    model = load_model(conf["model"]).to(device)
 
     # Load loss function
     adv_loss = conf["trainer"]["adv_loss"]
@@ -191,15 +241,15 @@ def trainer(conf, save_images = True, trial = False):
         lr = conf["optimizer_D"]["learning_rate"], 
         betas = (conf["optimizer_D"]["b0"], conf["optimizer_D"]["b1"]))
     
-    model_D = torch.optim.Adam(
+    optimizer_M = torch.optim.Adam(
         filter(lambda p: p.requires_grad, model.parameters()), 
-        lr = 0.0004,
-        betas = (conf["optimizer_D"]["b0"], conf["optimizer_D"]["b1"]))
+        lr = conf["optimizer_M"]["learning_rate"], 
+        betas = (conf["optimizer_M"]["b0"], conf["optimizer_M"]["b1"]))
     
     # Anneal the learning rate
-    lr_G_decay = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=30, gamma=0.2)
-    lr_D_decay = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=30, gamma=0.2)
-    lr_M_decay = torch.optim.lr_scheduler.StepLR(model_D, step_size=30, gamma=0.2)
+    lr_G_decay = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=20, gamma=0.2)
+    lr_D_decay = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=20, gamma=0.2)
+    lr_M_decay = torch.optim.lr_scheduler.StepLR(optimizer_M, step_size=20, gamma=0.2)
 
     results = defaultdict(list)
     for epoch in range(epochs):
@@ -240,13 +290,13 @@ def trainer(conf, save_images = True, trial = False):
             #  Train mask model
             # -----------------
 
-            model_D.zero_grad()
+            optimizer_M.zero_grad()
             requires_grad(model, True)
-            pred_masks, _ = model(gen_imgs.detach())
+            pred_masks = model(gen_imgs.detach())
             mask_loss = Mask_Loss(pred_masks, synth_label.to(device))
             train_results["mask_loss"].append(mask_loss.item())
             mask_loss.backward()
-            model_D.step()
+            optimizer_M.step()
             requires_grad(model, False)
 
             # -----------------
@@ -397,7 +447,40 @@ def trainer(conf, save_images = True, trial = False):
         metric = "custom"
         metric_value = results["mask_loss"][-1] + results["perception_holo"][-1]
         results[metric].append(metric_value)
+                
+        # Validate 
+        requires_grad(model, False)
+        inputs = torch.from_numpy(np.load(os.path.join(
+            data_path, f'manual_images_{transform_mode}_test.npy'))).float()
+        labels = torch.from_numpy(np.load(os.path.join(
+            data_path, f'manual_labels_{transform_mode}_test.npy'))).float()
+        inputs = torch.from_numpy(np.expand_dims(
+            np.vstack([apply_transforms(valid_transforms, x) for x in inputs.numpy()]), 1))
 
+        results_dict_set1 = defaultdict(list)
+        my_iter = enumerate(zip(inputs, labels))
+        for k, (x, y) in my_iter:
+            pred_label = model(x.unsqueeze(0).to(device))
+            arr, n = scipy.ndimage.label(pred_label.cpu() > 0.5)
+            centroid = scipy.ndimage.find_objects(arr)
+            pred_label = len(centroid)
+            if pred_label > 0:
+                pred_label = 1
+            else:
+                pred_label = 0
+            results_dict_set1["pred"].append(pred_label)
+            results_dict_set1["true"].append(y[0].item())
+            #mets = man_metrics(results_dict_set1)
+            #f1, pod, far, csi = mets["f1"], mets["pod"], mets["far"], mets["csi"]
+            #my_iter.set_description(f"Epoch {epoch} F1: {f1:.3f} POD: {pod:.3f} FAR: {far:.3f} CSI: {csi:3f}")
+            #my_iter.refresh()
+        mets = man_metrics(results_dict_set1)
+        f1, pod, far, csi = mets["f1"], mets["pod"], mets["far"], mets["csi"]
+        results["man_f1"].append(f1)
+        results["man_pod"].append(pod)
+        results["man_far"].append(far)
+        results["man_csi"].append(csi)
+        
         if save_images:
             try:
                 df = pd.DataFrame.from_dict(results).reset_index()
@@ -407,16 +490,17 @@ def trainer(conf, save_images = True, trial = False):
                 raise
 
             # Save the model
-            state_dict = {
-                'epoch': epoch,
-                'discriminator_state_dict': discriminator.state_dict(),
-                'optimizer_D_state_dict': optimizer_D.state_dict(),
-                'generator_state_dict': generator.state_dict(),
-                'optimizer_G_state_dict': optimizer_G.state_dict(),
-                'model_state_dict': model.state_dict(),
-                'model_optimizer_state_dict': model_D.state_dict(),
-            }
-            torch.save(state_dict, f'{conf["save_loc"]}/best.pt')
+            if metric_value == min(results[metric]):
+                state_dict = {
+                    'epoch': epoch,
+                    'discriminator_state_dict': discriminator.state_dict(),
+                    'optimizer_D_state_dict': optimizer_D.state_dict(),
+                    'generator_state_dict': generator.state_dict(),
+                    'optimizer_G_state_dict': optimizer_G.state_dict(),
+                    'model_state_dict': model.state_dict(),
+                    'model_optimizer_state_dict': optimizer_M.state_dict(),
+                }
+                torch.save(state_dict, f'{conf["save_loc"]}/best.pt')
             
         # Update optuna trial if using ECHO
         if trial:
@@ -454,16 +538,19 @@ def trainer(conf, save_images = True, trial = False):
             
     result_dict = {
         "epoch": best_epoch,
-        "combined_perception": results["combined_perception"][best_epoch],
+        #"combined_perception": results["combined_perception"][best_epoch],
         "holodec_perception": results["perception_holo"][best_epoch],
         "synthetic_perception": results["perception_syn"][best_epoch],
         "mask_loss": results["mask_loss"][best_epoch],
         #"fake_mask_loss": results["fake_mask_loss"][best_epoch],
+        "man_f1": results["man_f1"][best_epoch],
+        "man_pod": results["man_pod"][best_epoch],
+        "man_far": results["man_far"][best_epoch], 
+        "man_csi": results["man_csi"][best_epoch],
         metric: results[metric][best_epoch]
     }
         
     return result_dict
-
 
         
 if __name__ == '__main__':
@@ -491,6 +578,6 @@ if __name__ == '__main__':
     save_loc = conf["save_loc"]
     os.makedirs(save_loc, exist_ok = True)
     os.makedirs(os.path.join(save_loc, "images"), exist_ok = True)
-    shutil.copyfile(config, os.path.join(save_loc, "model.yml"))
-        
+    if not os.path.isfile(os.path.join(save_loc, "model.yml")):
+        shutil.copyfile(config, os.path.join(save_loc, "model.yml"), exist_ok = True) 
     result = trainer(conf, save_images = True)
