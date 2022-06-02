@@ -963,3 +963,39 @@ class XarrayReader(Dataset):
 
     def __len__(self):
         return len(self.ds.k)
+    
+    
+class XarrayReaderLabels(Dataset):
+
+    def __init__(self,
+                 fn,
+                 transform=False):
+
+        self.ds = xr.open_dataset(fn)  
+        self.transform = transform      
+
+    def __getitem__(self, idx):
+
+        try:
+            image = self.ds.var_x[idx].values
+            mask = self.ds.var_y[idx].values
+        except:
+            image = self.ds.x[idx].values
+            mask = self.ds.y[idx].values
+
+        im = {
+            "image": np.expand_dims(image, 0),
+            "horizontal_flip": False,
+            "vertical_flip": False
+        }
+
+        if self.transform:
+            for image_transform in self.transform:
+                im = image_transform(im)
+        image = im["image"]
+        image = torch.tensor(image, dtype=torch.float)
+        mask = torch.tensor(mask.copy(), dtype=torch.int)
+        return (image, mask)
+
+    def __len__(self):
+        return len(self.ds.n)

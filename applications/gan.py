@@ -1,16 +1,24 @@
+import random, os, torch, numpy as np
+
+def seed_everything(seed=42):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    
+
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from echo.src.base_objective import BaseObjective
 from collections import defaultdict
 import pandas as pd
-import numpy as np
 import torch.fft
 import subprocess
 import logging
-import random
 import shutil
 import psutil
 import scipy
-import torch
 import lpips
 import copy
 import yaml
@@ -28,7 +36,6 @@ from torch.autograd import Variable
 
 import torch.nn as nn
 import torch.nn.functional as F
-import torch
 
 from holodecml.data import PickleReader, UpsamplingReader, XarrayReader, XarrayReaderLabels
 from holodecml.propagation import InferencePropagator
@@ -37,7 +44,6 @@ from holodecml.models import load_model
 from holodecml.losses import load_loss
 import sklearn, sklearn.metrics
 
-import os
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -57,16 +63,16 @@ is_cuda = torch.cuda.is_available()
 device = torch.device("cpu") if not is_cuda else torch.device("cuda:0")
 
 
-# ### Set seeds for reproducibility
-def seed_everything(seed=1234):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.deterministic = True
+# # ### Set seeds for reproducibility
+# def seed_everything(seed=1234):
+#     random.seed(seed)
+#     os.environ['PYTHONHASHSEED'] = str(seed)
+#     np.random.seed(seed)
+#     torch.manual_seed(seed)
+#     if torch.cuda.is_available():
+#         torch.cuda.manual_seed(seed)
+#         torch.backends.cudnn.benchmark = True
+#         torch.backends.cudnn.deterministic = True
 
 def requires_grad(model, flag=True):
     for p in model.parameters():
@@ -84,7 +90,7 @@ class Objective(BaseObjective):
         return trainer(conf, save_images = False, trial = trial)
         
 
-def man_metrics(results):
+def man_metrics(results, tol = 1e-8):
     result = {}
     for metric in ["f1", "auc", 'pod', "far", "csi"]: #"man_prec", "man_recall",
         if metric == 'f1':
@@ -107,13 +113,13 @@ def man_metrics(results):
         elif metric == 'far':
             try:
                 TN, FP, FN, TP = sklearn.metrics.confusion_matrix(results["true"], results["pred"]).ravel()
-                score = FP / (TP + FP)
+                score = (FP + tol) / (TP + FP + tol)
             except:
                 score = 1
         elif metric == 'pod':
             try:
                 TN, FP, FN, TP = sklearn.metrics.confusion_matrix(results["true"], results["pred"]).ravel()
-                score = TP / (TP + FN)
+                score = (TP + tol) / (TP + FN + tol)
             except: 
                 score = 1
         result[metric] = score
@@ -247,9 +253,9 @@ def trainer(conf, save_images = True, trial = False):
         betas = (conf["optimizer_M"]["b0"], conf["optimizer_M"]["b1"]))
     
     # Anneal the learning rate
-    lr_G_decay = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=20, gamma=0.2)
-    lr_D_decay = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=20, gamma=0.2)
-    lr_M_decay = torch.optim.lr_scheduler.StepLR(optimizer_M, step_size=20, gamma=0.2)
+    lr_G_decay = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=10, gamma=0.2)
+    lr_D_decay = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=10, gamma=0.2)
+    lr_M_decay = torch.optim.lr_scheduler.StepLR(optimizer_M, step_size=10, gamma=0.2)
 
     results = defaultdict(list)
     for epoch in range(epochs):
@@ -464,7 +470,7 @@ def trainer(conf, save_images = True, trial = False):
             arr, n = scipy.ndimage.label(pred_label.cpu() > 0.5)
             centroid = scipy.ndimage.find_objects(arr)
             pred_label = len(centroid)
-            if pred_label > 0:
+            if pred_label > 0 and pred_label < 10000:
                 pred_label = 1
             else:
                 pred_label = 0
@@ -574,6 +580,10 @@ if __name__ == '__main__':
     config = sys.argv[1]
     with open(config) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
+        
+    # Set seeds for reproducibility
+    #seed = 1000 if "seed" not in conf else conf["seed"]
+    #seed_everything()
         
     save_loc = conf["save_loc"]
     os.makedirs(save_loc, exist_ok = True)
