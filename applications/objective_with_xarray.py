@@ -13,7 +13,7 @@ import scipy
 import time
 import tqdm
 import gc
-from holodecml.data import PickleReader, UpsamplingReader, XarrayReaderLabels
+from holodecml.data import PickleReader, UpsamplingReader, XarrayReader
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
 from holodecml.models import load_model
@@ -130,8 +130,8 @@ class Objective(BaseObjective):
             valid_transforms = LoadTransformations(conf["transforms"]["validation"])
 
             # Load the data class for reading and preparing the data as needed to train the u-net
-            train_dataset = XarrayReaderLabels(fn_train, train_transforms, mode = "mask")
-            test_dataset = XarrayReaderLabels(fn_valid, valid_transforms, mode = "mask")
+            train_dataset = XarrayReader(fn_train, train_transforms, mode = "mask")
+            test_dataset = XarrayReader(fn_valid, valid_transforms, mode = "mask")
 
             # Load the iterators for batching the data
             train_loader = torch.utils.data.DataLoader(
