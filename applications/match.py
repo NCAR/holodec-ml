@@ -107,8 +107,10 @@ def create_table(distance_threshold=0.001,
     mapping_table["rmse"] = {}
     df_table = defaultdict(list)
 
-    holo_indices = list(true_coordinates.keys()) if match else list(
-        pred_coordinates.keys())
+#     holo_indices = list(true_coordinates.keys()) if match else list(
+#         pred_coordinates.keys())
+    holo_indices = pred_coordinates.keys()
+    
     for h_idx in tqdm.tqdm(sorted(holo_indices)):
 
         logger.info(
@@ -116,19 +118,20 @@ def create_table(distance_threshold=0.001,
 
         if match:
             if h_idx not in pred_coordinates:
-                for p in true_coordinates[h_idx]:
-                    mapping_table[h_idx].append([" ".join(map(str, p)), None])
-                    x, y, z, d = list(map(float, p))
-                    df_table["h"].append(h_idx)
-                    df_table["x_t"].append(x)
-                    df_table["y_t"].append(y)
-                    df_table["z_t"].append(z)
-                    df_table["d_t"].append(d)
-                    df_table["x_p"].append(np.nan)
-                    df_table["y_p"].append(np.nan)
-                    df_table["z_p"].append(np.nan)
-                    df_table["d_p"].append(np.nan)
-                    df_table["rmse"].append(np.nan)
+                if len(true_coordinates[h_idx]) != 0:
+                    for p in true_coordinates[h_idx]:
+                        mapping_table[h_idx].append([" ".join(map(str, p)), None])
+                        x, y, z, d = list(map(float, p))
+                        df_table["h"].append(h_idx)
+                        df_table["x_t"].append(x)
+                        df_table["y_t"].append(y)
+                        df_table["z_t"].append(z)
+                        df_table["d_t"].append(d)
+                        df_table["x_p"].append(np.nan)
+                        df_table["y_p"].append(np.nan)
+                        df_table["z_p"].append(np.nan)
+                        df_table["d_p"].append(np.nan)
+                        df_table["rmse"].append(np.nan)
                 continue
 
             if len(pred_coordinates[h_idx]) == 0:
@@ -184,101 +187,121 @@ def create_table(distance_threshold=0.001,
         """
             Match the clustered particles against the true particles (if they exist)
         """
+        if len(true_coordinates[h_idx]) == 0:
+            for p in pred_coordinates[h_idx]:
+                mapping_table[h_idx].append([None, " ".join(map(str, p))])
+                x, y, z, d = p
+                df_table["h"].append(h_idx)
+                df_table["x_p"].append(x)
+                df_table["y_p"].append(y)
+                df_table["z_p"].append(z)
+                df_table["d_p"].append(d)
+                df_table["x_t"].append(np.nan)
+                df_table["y_t"].append(np.nan)
+                df_table["z_t"].append(np.nan)
+                df_table["d_t"].append(np.nan)
+                df_table["rmse"].append(np.nan)
+                
+            logger.info(
+                f"... matched 0 particles")
+                
+            continue
+                
+        else:        
+            true_r = np.array(true_coordinates[h_idx]).astype(float)
 
-        true_r = np.array(true_coordinates[h_idx]).astype(float)
+            """Compute the distance matrix b/t the two datasets --> pandas df"""
+            start_time = time.time()
+            result_dict = defaultdict(list)
+            for k1, x in enumerate(pred_r):
+                for k2, y in enumerate(true_r):
+                    error = distance(x, y)
+                    result_dict["pred_id"].append(k1)
+                    result_dict["true_id"].append(k2)
+                    result_dict["pred_coor"].append(
+                        " ".join([str(xx) for xx in list(x)]))
+                    result_dict["true_coor"].append(
+                        " ".join([str(yy) for yy in list(y)]))
+                    result_dict["error"].append(np.mean(np.abs(error)))
+            df = pd.DataFrame(result_dict)
 
-        """Compute the distance matrix b/t the two datasets --> pandas df"""
-        start_time = time.time()
-        result_dict = defaultdict(list)
-        for k1, x in enumerate(pred_r):
-            for k2, y in enumerate(true_r):
-                error = distance(x, y)
-                result_dict["pred_id"].append(k1)
-                result_dict["true_id"].append(k2)
-                result_dict["pred_coor"].append(
-                    " ".join([str(xx) for xx in list(x)]))
-                result_dict["true_coor"].append(
-                    " ".join([str(yy) for yy in list(y)]))
-                result_dict["error"].append(np.mean(np.abs(error)))
-        df = pd.DataFrame(result_dict)
+            """Add to the mapping table"""
+            pred_seen = []
+            true_seen = []
+            error = []
+            while True:
+                c1 = df["true_id"].isin(true_seen)
+                c2 = df["pred_id"].isin(pred_seen)
+                c = c1 | c2
+                if c.sum() == df.shape[0]:
+                    break
+                smallest_error = df[~c]["error"] == min(df[~c]["error"])
+                error.append(list(df[~c][smallest_error]["error"])[0])
+                true_id = list(df[~c][smallest_error]["true_id"])[0]
+                pred_id = list(df[~c][smallest_error]["pred_id"])[0]
+                pred_seen.append(pred_id)
+                true_seen.append(true_id)
 
-        """Add to the mapping table"""
-        pred_seen = []
-        true_seen = []
-        error = []
-        while True:
-            c1 = df["true_id"].isin(true_seen)
-            c2 = df["pred_id"].isin(pred_seen)
-            c = c1 | c2
-            if c.sum() == df.shape[0]:
-                break
-            smallest_error = df[~c]["error"] == min(df[~c]["error"])
-            error.append(list(df[~c][smallest_error]["error"])[0])
-            true_id = list(df[~c][smallest_error]["true_id"])[0]
-            pred_id = list(df[~c][smallest_error]["pred_id"])[0]
-            pred_seen.append(pred_id)
-            true_seen.append(true_id)
+                pred_n = list(df[~c][smallest_error]["pred_coor"])[0]
+                true_n = list(df[~c][smallest_error]["true_coor"])[0]
+                mapping_table[h_idx].append([true_n, pred_n])
 
-            pred_n = list(df[~c][smallest_error]["pred_coor"])[0]
-            true_n = list(df[~c][smallest_error]["true_coor"])[0]
-            mapping_table[h_idx].append([true_n, pred_n])
+            """Add matched to the table/dataframe"""
+            for idx, (true, pred) in enumerate(mapping_table[h_idx]):
+                df_table["h"].append(h_idx)
+                x, y, z, d = list(map(float, true.split(" ")))
+                df_table["x_t"].append(x)
+                df_table["y_t"].append(y)
+                df_table["z_t"].append(z)
+                df_table["d_t"].append(d)
+                x, y, z, d = list(map(float, pred.split(" ")))
+                df_table["x_p"].append(x)
+                df_table["y_p"].append(y)
+                df_table["z_p"].append(z)
+                df_table["d_p"].append(d)
+                df_table["rmse"].append(error[idx])
+            n_match = len(mapping_table[h_idx])
 
-        """Add matched to the table/dataframe"""
-        for idx, (true, pred) in enumerate(mapping_table[h_idx]):
-            df_table["h"].append(h_idx)
-            x, y, z, d = list(map(float, true.split(" ")))
-            df_table["x_t"].append(x)
-            df_table["y_t"].append(y)
-            df_table["z_t"].append(z)
-            df_table["d_t"].append(d)
-            x, y, z, d = list(map(float, pred.split(" ")))
-            df_table["x_p"].append(x)
-            df_table["y_p"].append(y)
-            df_table["z_p"].append(z)
-            df_table["d_p"].append(d)
-            df_table["rmse"].append(error[idx])
-        n_match = len(mapping_table[h_idx])
+            """Add non-matched to the table/dataframe"""
 
-        """Add non-matched to the table/dataframe"""
+            true_unmatched = list(
+                set(df["true_coor"].unique()) - set([x[0] for x in mapping_table[h_idx]]))
+            pred_unmatched = list(
+                set(df["pred_coor"].unique()) - set([x[1] for x in mapping_table[h_idx]]))
 
-        true_unmatched = list(
-            set(df["true_coor"].unique()) - set([x[0] for x in mapping_table[h_idx]]))
-        pred_unmatched = list(
-            set(df["pred_coor"].unique()) - set([x[1] for x in mapping_table[h_idx]]))
+            for p in true_unmatched:
+                mapping_table[h_idx].append([p, None])
+                x, y, z, d = list(map(float, p.split(" ")))
+                df_table["h"].append(h_idx)
+                df_table["x_t"].append(x)
+                df_table["y_t"].append(y)
+                df_table["z_t"].append(z)
+                df_table["d_t"].append(d)
+                df_table["x_p"].append(np.nan)
+                df_table["y_p"].append(np.nan)
+                df_table["z_p"].append(np.nan)
+                df_table["d_p"].append(np.nan)
+                df_table["rmse"].append(np.nan)
 
-        for p in true_unmatched:
-            mapping_table[h_idx].append([p, None])
-            x, y, z, d = list(map(float, p.split(" ")))
-            df_table["h"].append(h_idx)
-            df_table["x_t"].append(x)
-            df_table["y_t"].append(y)
-            df_table["z_t"].append(z)
-            df_table["d_t"].append(d)
-            df_table["x_p"].append(np.nan)
-            df_table["y_p"].append(np.nan)
-            df_table["z_p"].append(np.nan)
-            df_table["d_p"].append(np.nan)
-            df_table["rmse"].append(np.nan)
+            for p in pred_unmatched:
+                mapping_table[h_idx].append([None, p])
+                x, y, z, d = list(map(float, p.split(" ")))
+                df_table["h"].append(h_idx)
+                df_table["x_p"].append(x)
+                df_table["y_p"].append(y)
+                df_table["z_p"].append(z)
+                df_table["d_p"].append(d)
+                df_table["x_t"].append(np.nan)
+                df_table["y_t"].append(np.nan)
+                df_table["z_t"].append(np.nan)
+                df_table["d_t"].append(np.nan)
+                df_table["rmse"].append(np.nan)
 
-        for p in pred_unmatched:
-            mapping_table[h_idx].append([None, p])
-            x, y, z, d = list(map(float, p.split(" ")))
-            df_table["h"].append(h_idx)
-            df_table["x_p"].append(x)
-            df_table["y_p"].append(y)
-            df_table["z_p"].append(z)
-            df_table["d_p"].append(d)
-            df_table["x_t"].append(np.nan)
-            df_table["y_t"].append(np.nan)
-            df_table["z_t"].append(np.nan)
-            df_table["d_t"].append(np.nan)
-            df_table["rmse"].append(np.nan)
+            mtime = time.time() - start_time
+            logger.info(
+                f"... matched {n_match} particles in {mtime} s. RMSE = {np.mean(error)}")
 
-        mtime = time.time() - start_time
-        logger.info(
-            f"... matched {n_match} particles in {mtime} s. RMSE = {np.mean(error)}")
-
-        mapping_table["rmse"][h_idx] = error
+            mapping_table["rmse"][h_idx] = error
 
     return mapping_table, df_table
 
@@ -305,11 +328,23 @@ if __name__ == "__main__":
         default=True,
         help="Whether to match predictions against truth or standard method values."
     )
+    parser.add_argument(
+        "-t",
+        dest="table",
+        type=str,
+        default=False,
+        help="Pandas table to match predicted particles against."
+    )
 
     args_dict = vars(parser.parse_args())
     config_file = args_dict.pop("model_config")
     match = bool(int(args_dict.pop("match")))
+    table = args_dict.pop("table")
+    table = str(table) if table else False
 
+    if not os.path.isfile(config_file):
+        raise OSError("A mode config file is required. Exiting.")
+        
     with open(config_file) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
 
@@ -365,13 +400,21 @@ if __name__ == "__main__":
                 pred_coordinates[h].append([x, y, z, d])
 
     if match:
-        truth = [x for x in fns if "true" in x.split("/")[-1]]
-        true_coordinates = defaultdict(list)
-        for fn in truth:
-            with open(fn, "r") as fid:
-                for line in fid.readlines():
-                    h, x, y, z, d = list(map(int, line.split(" ")))
-                    true_coordinates[h].append([x, y, z, d])
+        if table:
+            true_coordinates = defaultdict(list)
+            match_table = pd.read_csv(table)
+            for i, row in match_table.iterrows():
+                h = row["h"]
+                x, y, z, d = row["x"], row["y"], row["z"], row["d"]
+                true_coordinates[h].append([x,y,z,d])
+        else:
+            truth = [x for x in fns if "true" in x.split("/")[-1]]
+            true_coordinates = defaultdict(list)
+            for fn in truth:
+                with open(fn, "r") as fid:
+                    for line in fid.readlines():
+                        h, x, y, z, d = list(map(int, line.split(" ")))
+                        true_coordinates[h].append([x, y, z, d])
     else:
         true_coordinates = None
 

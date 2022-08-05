@@ -924,3 +924,150 @@ class UpsamplingReader(Dataset):
 
     def __len__(self):
         return len(list(self.prop.h_ds["hid"].values))
+
+    
+class XarrayReader(Dataset):
+
+    def __init__(self,
+                 fn,
+                 transform=False,
+                 mode="mask", 
+                 color_dim=1):
+
+        self.ds = xr.open_dataset(fn)  
+        self.transform = transform   
+        self.mode = mode
+        self.color_dim = color_dim
+        
+        if "x1" in self.ds.dims:
+            if self.mode == "mask":
+                self.ds = self.ds.rename_dims({"k": "n"})
+                self.ds = self.ds.rename_vars({"x": "var_x", "y": "var_y"})
+            else:
+                self.ds = self.ds.rename_dims({"k": "n"})
+                self.ds = self.ds.rename_vars({"x": "var_x", "y": "var_z"})
+
+    def __getitem__(self, idx):
+
+        image = self.ds.var_x[idx].values
+        
+        if len(image.shape) == 2:
+            image = np.expand_dims(image, 0)
+        elif len(image.shape) == 3:
+            image = image[:self.color_dim, :, :]
+        elif len(image.shape) == 4:
+            image = image[:, :self.color_dim, :, :]
+            
+        if self.mode == "mask":
+            label = self.ds.var_y[idx].values
+        else: # binary labels 
+            label = self.ds.var_z[idx].values 
+            
+        im = {
+            "image": image,#, np.expand_dims(image, 0),
+            "horizontal_flip": False,
+            "vertical_flip": False
+        }
+
+        if self.transform:
+            for image_transform in self.transform:
+                im = image_transform(im)
+        image = im["image"]
+        
+        # Update the mask if we flipped the original image
+        if self.mode == "mask":
+            if im["horizontal_flip"]:
+                label = np.flip(label, axis=0)
+            if im["vertical_flip"]:
+                label = np.flip(label, axis=1)
+        
+        image = torch.tensor(image, dtype=torch.float)
+        label = torch.tensor(label.copy(), dtype=torch.int)
+        return (image, label)
+
+    def __len__(self):
+        return len(self.ds.n)
+    
+# class XarrayReader(Dataset):
+
+#     def __init__(self,
+#                  fn,
+#                  transform=False):
+
+#         self.ds = xr.open_dataset(fn)  
+#         self.transform = transform      
+
+#     def __getitem__(self, idx):
+
+#         image = self.ds.x[idx].values
+#         mask = self.ds.y[idx].values
+
+#         im = {
+#             "image": np.expand_dims(image, 0),
+#             "horizontal_flip": False,
+#             "vertical_flip": False
+#         }
+
+#         if self.transform:
+#             for image_transform in self.transform:
+#                 im = image_transform(im)
+#         image = im["image"]
+
+#         # Update the mask if we flipped the original image
+#         if im["horizontal_flip"]:
+#             mask = np.flip(mask, axis=0)
+#         if im["vertical_flip"]:
+#             mask = np.flip(mask, axis=1)
+
+#         image = torch.tensor(image, dtype=torch.float)
+#         mask = torch.tensor(mask.copy(), dtype=torch.int)
+#         return (image, mask)
+
+#     def __len__(self):
+#         return len(self.ds.k)
+    
+    
+# class XarrayReaderLabels(Dataset):
+
+#     def __init__(self,
+#                  fn,
+#                  transform=False,
+#                  mode="label"):
+
+#         self.ds = xr.open_dataset(fn)  
+#         self.transform = transform   
+#         self.mode = mode
+
+#     def __getitem__(self, idx):
+
+#         try:
+#             image = self.ds.var_x[idx].values
+#             mask = self.ds.var_y[idx].values
+#         except:
+#             image = self.ds.x[idx].values
+#             mask = self.ds.y[idx].values
+
+#         im = {
+#             "image": np.expand_dims(image, 0),
+#             "horizontal_flip": False,
+#             "vertical_flip": False
+#         }
+
+#         if self.transform:
+#             for image_transform in self.transform:
+#                 im = image_transform(im)
+#         image = im["image"]
+        
+#         # Update the mask if we flipped the original image
+#         if self.mode == "mask":
+#             if im["horizontal_flip"]:
+#                 mask = np.flip(mask, axis=0)
+#             if im["vertical_flip"]:
+#                 mask = np.flip(mask, axis=1)
+        
+#         image = torch.tensor(image, dtype=torch.float)
+#         mask = torch.tensor(mask.copy(), dtype=torch.int)
+#         return (image, mask)
+
+#     def __len__(self):
+#         return len(self.ds.n)
