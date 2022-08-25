@@ -16,6 +16,17 @@ data:
     use_cached: True
     device: "cpu"
     cores: 0
+    
+style:
+    raw:
+        path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
+        tiles_per_reconstruction: 5
+        reconstruction_per_hologram: 35
+        save_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_real"
+        sampler: "random"
+    synthetic: 
+        save_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/style_transfered"
+        sampler: "random"
 
 transforms:
     training:
