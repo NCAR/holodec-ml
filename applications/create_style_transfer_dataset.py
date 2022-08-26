@@ -1,29 +1,30 @@
-import random
-import os
-import torch
-import numpy as np
 from argparse import ArgumentParser
+import xarray as xr
 import torchvision
+import numpy as np
+import subprocess
+import logging
 import shutil
-import psutil
+import random
+import torch
+import lpips
 import yaml
 import glob
 import tqdm
 import sys
+import os
 
-import torch.optim as optim
-import torch.nn as nn
-import torch.nn.functional as F
-
+from holodecml.seed import seed_everything
 from holodecml.data import XarrayReader, PickleReader
-from holodecml.style import (requires_grad, get_input_optimizer, 
+from holodecml.style import (requires_grad, get_input_optimizer,
                              gram_matrix, ContentLoss, StyleLoss,
                              rename_vgg_layers, get_style_model_and_losses)
 
-import lpips
-import xarray as xr
 import warnings
 warnings.filterwarnings("ignore")
+
+
+logger = logging.getLogger(__name__)
 
 
 # Set up the GPU, grab number of CPUS
@@ -31,33 +32,54 @@ is_cuda = torch.cuda.is_available()
 device = torch.device("cpu") if not is_cuda else torch.device("cuda")
 
 
-def seed_everything(seed=42):
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
+def launch_pbs_jobs(nodes):
+    from pathlib import Path 
+    script_path = Path(__file__).absolute()
+    parent = Path(__file__).parent
+    for worker in range(nodes):
+        script = f"""
+        #!/bin/bash -l
+        #PBS -N style-{worker}
+        #PBS -l select=1:ncpus=8:ngpus=1:mem=128GB
+        #PBS -l walltime=12:00:00
+        #PBS -l gpu_type=v100
+        #PBS -A NAML0001
+        #PBS -q casper
+        #PBS -o out
+        #PBS -e out
+
+        source ~/.bashrc
+        ncar_pylib /glade/work/$USER/py37
+        python {script_path} -c {parent}/../config/model_segmentation.yml -n {nodes} -w {worker}
+        """
+        with open("launcher.sh", "w") as fid:
+            fid.write(script)
+        jobid = subprocess.Popen("qsub launcher.sh", 
+                                 shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
+        jobid = jobid.decode("utf-8").strip("\n")
+        print(jobid)
+    os.remove("launcher.sh")
 
 
 def run_style_transfer(
-    cnn,
-    content_img,
-    style_img,
-    input_img,
-    content_layers,
-    style_layers,
-    num_steps=300,
-    style_weight=1000000,
-    content_weight=1,
-    verbose=0,
-):
+        cnn,
+        content_img,
+        style_img,
+        input_img,
+        content_layers,
+        style_layers,
+        num_steps=300,
+        style_weight=1000000,
+        content_weight=1,
+        verbose=0):
+
     """Run the style transfer."""
+
     model, style_losses, content_losses = get_style_model_and_losses(
         cnn, style_img, content_img, content_layers, style_layers
     )
 
-    # We want to optimize the input and not the model parameters so we
+    # We want to optimize the input and not the model parameters, so we
     # update all the requires_grad fields accordingly
     input_img.requires_grad_(True)
     model.requires_grad_(False)
@@ -111,7 +133,7 @@ def run_style_transfer(
 
 if __name__ == "__main__":
 
-    description = "Run style transfer using two datasets."
+    description = "Create hologram images using content/style from two datasets"
 
     parser = ArgumentParser(description=description)
     parser.add_argument(
@@ -142,12 +164,25 @@ if __name__ == "__main__":
         default=0,
         help="Load and merge all data from workers into a dataset. Set = 1.",
     )
+    parser.add_argument(
+        "-l",
+        dest="launch",
+        type=int,
+        default=0,
+        help="Submit {nodes} workers to PBS. Run -m option once all workers finish."
+    )
 
     args_dict = vars(parser.parse_args())
     config_file = args_dict.pop("model_config")
     nodes = int(args_dict.pop("nodes"))
     worker = int(args_dict.pop("worker"))
     merge = bool(int(args_dict.pop("merge")))
+    launch = bool(int(args_dict.pop("launch")))
+    
+    if launch:
+        logger.info(f"Launching {nodes} workers to PBS")
+        launch_pbs_jobs(nodes)
+        sys.exit()
 
     with open(config_file) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
@@ -173,7 +208,7 @@ if __name__ == "__main__":
     transform_mode = "None"
     train_transforms = None
     valid_transforms = None
-    
+
     name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}_{transform_mode}"
     fn_train = f"{data_path}/training_{name_tag}.nc"
     fn_valid = f"{data_path}/validation_{name_tag}.nc"
@@ -197,11 +232,20 @@ if __name__ == "__main__":
         aug_data_path, f"valid_{sampler}_{name_tag}_{worker}.nc"
     )
     fn_test_aug = os.path.join(aug_data_path, f"test_{sampler}_{name_tag}_{worker}.nc")
-    
+
     # Check if we are merging only
     if merge:
+        logger.info(f"Merging {nodes} dataframes into one common df")
         for split in ["train", "valid", "test"]:
             shorthand = os.path.join(aug_data_path, f"{split}_{sampler}_{name_tag}_*.nc")
+            
+            if len(shorthand) != nodes:
+                logger.warning(
+                    "The number of files to be merged does not equal the number of nodes used. Exiting."
+                )
+                sys.exit(1)
+            
+            logger.info(f"On split {split}, merging {shorthand}")
             df = xr.concat(
                 [
                     xr.open_dataset(x)
@@ -215,6 +259,8 @@ if __name__ == "__main__":
             for worker_fn in glob.glob(shorthand):
                 os.remove(worker_fn)
         sys.exit()
+        
+    logger.info("Beginning style augmentation training")
 
     # Load synthetic and holodec hologram data sets 
     train_synthetic_dataset = XarrayReader(fn_train, train_transforms)
@@ -234,56 +280,59 @@ if __name__ == "__main__":
     style_layers = ["conv_1", "conv_2", "conv_3", "conv_4", "conv_5"]
     perceptual_alex = lpips.LPIPS(net="alex").to(device)
 
-    ### Start translation
+    # Start hologram translation
     filenames = [fn_train_aug, fn_valid_aug, fn_test_aug]
-    synthetic = [
-        train_synthetic_dataset,
-        valid_synthetic_dataset,
-        test_synthetic_dataset,
-    ]
-    holodec = [train_holodec_dataset, valid_holodec_dataset, test_holodec_dataset]
+    synthetic_datasets = [train_synthetic_dataset, valid_synthetic_dataset, test_synthetic_dataset]
+    holodec_datasets = [train_holodec_dataset, valid_holodec_dataset, test_holodec_dataset]
 
-    for fn_name, synth, holo in zip(filenames, synthetic, holodec):
+    
+    try:
+    
+        for fn_name, synth, holo in zip(filenames, synthetic_datasets, holodec_datasets):
 
-        size = synth.__len__()
-        synthetic_idx = list(range(size))
-        holodec_idx = list(range(holo.__len__()))
-        synthetic_idx = np.array_split(synthetic_idx, nodes)[worker]
-        X = np.zeros((len(synthetic_idx), 512, 512), dtype=np.float32)
-        Y = np.zeros((len(synthetic_idx), 512, 512), dtype=np.int)
+            size = synth.__len__()
+            synthetic_idx = list(range(size))
+            holodec_idx = list(range(holo.__len__()))
+            synthetic_idx = np.array_split(synthetic_idx, nodes)[worker]
+            X = np.zeros((len(synthetic_idx), 512, 512), dtype=np.float32)
+            Y = np.zeros((len(synthetic_idx), 512, 512), dtype=np.int)
 
-        for i, k in tqdm.tqdm(enumerate(synthetic_idx), total=len(synthetic_idx)):
-            x_s, y_s = synth.__getitem__(k)
+            last_i = 0
+            for i, k in tqdm.tqdm(enumerate(synthetic_idx), total=len(synthetic_idx)):
+                x_s, y_s = synth.__getitem__(k)
 
-            # randomly select hologram image
-            h_idx = random.sample(holodec_idx, 1)[0]
-            x_h, y_h = holo.__getitem__(h_idx)
-            content_img = x_s.clone().unsqueeze(0).to(device).float() / 255.0
-            style_img = x_h.clone().unsqueeze(0).to(device).float() / 255.0
-            input_img = (
-                torch.randn_like(x_s.clone()).unsqueeze(0).to(device).float() / 255.0
-            )
+                # randomly select hologram image
+                h_idx = random.sample(holodec_idx, 1)[0]
+                x_h, y_h = holo.__getitem__(h_idx)
+                content_img = x_s.clone().unsqueeze(0).to(device).float() / 255.0
+                style_img = x_h.clone().unsqueeze(0).to(device).float() / 255.0
+                input_img = (
+                        torch.randn_like(x_s.clone()).unsqueeze(0).to(device).float() / 255.0
+                )
 
-            output = run_style_transfer(
-                cnn,
-                content_img,
-                style_img,
-                input_img,
-                content_layers,
-                style_layers,
-                style_weight=1e9,
-                content_weight=2,
-                verbose=0,
-                num_steps=100,
-            )
+                output = run_style_transfer(
+                    cnn,
+                    content_img,
+                    style_img,
+                    input_img,
+                    content_layers,
+                    style_layers,
+                    style_weight=1e9,
+                    content_weight=2,
+                    verbose=0,
+                    num_steps=100,
+                )
 
-            X[i] = output.squeeze(0).squeeze(0).detach().cpu().numpy() * 255.0
-            Y[i] = y_s.squeeze(0).squeeze(0).cpu().numpy()
+                X[i] = output.squeeze(0).squeeze(0).detach().cpu().numpy() * 255.0
+                Y[i] = y_s.squeeze(0).squeeze(0).cpu().numpy()
+                last_i = i
 
-        df = xr.Dataset(
-            data_vars=dict(
-                var_x=(["n", "x", "y"], X[:i]), var_y=(["n", "x", "y"], Y[:i])
-            )
-        )
-
-        df.to_netcdf(fn_name)
+            df = xr.Dataset(data_vars=dict(var_x=(["n", "x", "y"], X[:last_i]), var_y=(["n", "x", "y"], Y[:last_i])))
+            df.to_netcdf(fn_name)
+            
+    except KeyboardInterrupt:
+        print('Interrupted')
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)

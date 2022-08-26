@@ -1,5 +1,5 @@
 seed: 1000
-save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results"
+save_loc: "/glade/work/schreck/repos/HOLO/style/holodec-ml/results/holosuite_sampled"
 
 data:
     n_bins: 1000
@@ -12,6 +12,7 @@ data:
     total_negative: 6
     total_training: 100000
     transform_mode: 'None'
+    prefix: "None"
     output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
     use_cached: True
     device: "cpu"
@@ -35,50 +36,51 @@ transforms:
         RandomHorizontalFlip: 
             rate: 0.5
         Normalize:
-            mode: 'norm'
-        GaussianBlur:
-            rate: 1.0
-            kernel_size: 1
-            sigma: 2.1252219359742823
-        GaussianNoise:
-            rate: 1.0
-            noise: 0.3258530643453389
-        AdjustBrightness:
-            rate: 1.0
-            brightness_factor: 1.269735791766263
+            mode: 'sym'
+#         GaussianBlur:
+#             rate: 1.0
+#             kernel_size: 1
+#             sigma: 2.1252219359742823
+#         GaussianNoise:
+#             rate: 1.0
+#             noise: 0.3258530643453389
+#         AdjustBrightness:
+#             rate: 1.0
+#             brightness_factor: 1.269735791766263
         ToTensor: True
     validation:
         Normalize:
-            mode: 'norm'
+            mode: 'sym'
         ToTensor: True
     inference:
         Normalize:
-            mode: 'norm'
+            mode: 'sym'
             
 model:
     name: "linknet"
-    encoder_name: "xception"
+    encoder_name: "vgg11"
     encoder_weights: "imagenet"
     in_channels: 1
     classes: 1
     activation: "sigmoid"
     
 optimizer:
-    learning_rate: 0.00024575732726722595
-    weight_decay: 0.0
+    learning_rate: 0.00014105651059948075
+    weight_decay: 6.043702479460191e-06
     
 trainer:
     epochs: 100
     train_batch_size: 16
     valid_batch_size: 16
-    batches_per_epoch: 500
+    batches_per_epoch: 250
+    valid_batches_per_epoch: 100
     stopping_patience: 4
     training_loss: "focal-tyversky"
     validation_loss: "dice"
     
 inference:
     mode: "mask"
-    batch_size: 128
+    batch_size: 32
     n_nodes: 1
     gpus_per_node: 1
     threads_per_gpu: 1

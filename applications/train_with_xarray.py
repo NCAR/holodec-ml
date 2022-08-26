@@ -8,77 +8,58 @@ import logging
 import random
 import shutil
 import psutil
-import scipy
 import torch
 import yaml
 import time
 import tqdm
 import sys
 import gc
+import os
 
-from holodecml.data import PickleReader, UpsamplingReader, XarrayReader
+from holodecml.seed import seed_everything
+from holodecml.data import XarrayReader
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
 from holodecml.models import load_model
 from holodecml.losses import load_loss
-
-import os
 import warnings
 warnings.filterwarnings("ignore")
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-
 available_ncpus = len(psutil.Process().cpu_affinity())
 
 
-# ### Set seeds for reproducibility
-def seed_everything(seed=1234):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.deterministic = True
-
-
-def dice(true, pred, k=1):
+def dice(true, pred, k=1, eps=1e-12):
     true = np.array(true)
     pred = np.array(pred)
     intersection = np.sum(pred[true == k]) * 2.0
-    dice = intersection / (np.sum(pred) + np.sum(true) + 1e-12)
+    denominator = np.sum(pred) + np.sum(true)
+    denominator = np.maximum(denominator, eps)
+    dice = intersection / denominator
     return dice
 
 
 def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
-
     model.eval()
 
     n_bins = conf["data"]["n_bins"]
     tile_size = conf["data"]["tile_size"]
     step_size = conf["data"]["step_size"]
     marker_size = conf["data"]["marker_size"]
-    data_path = conf["data"]["data_path"]
     raw_path = conf["data"]["raw_data"]
-    output_path = conf["data"]["output_path"]
     transform_mode = "None" if "transform_mode" not in conf[
         "data"] else conf["data"]["transform_mode"]
-
-    model_loc = conf["save_loc"]
-    model_name = conf["model"]["name"]
     color_dim = conf["model"]["in_channels"]
 
     inference_mode = conf["inference"]["mode"]
     probability_threshold = conf["inference"]["probability_threshold"]
     valid_batch_size = conf["trainer"]["valid_batch_size"]
-    #conf["transforms"]["inference"]["Normalize"]["mode"] = conf["transforms"]["training"]["Normalize"]["mode"]
+    # conf["transforms"]["inference"]["Normalize"]["mode"] = conf["transforms"]["training"]["Normalize"]["mode"]
 
     tile_transforms = None if "inference" not in conf["transforms"] else LoadTransformations(
         conf["transforms"]["inference"])
 
-    output_path = output_path.replace("style_transfered", "tiled_synthetic")
+    output_path = "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
     with torch.no_grad():
         inputs = torch.from_numpy(np.load(os.path.join(
             output_path, f'manual_images_{transform_mode}.npy'))).float()
@@ -102,16 +83,16 @@ def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
         # apply transforms
         inputs = torch.from_numpy(np.expand_dims(
             np.vstack([prop.apply_transforms(x) for x in inputs.numpy()]), 1))
-        
+
         performance = defaultdict(list)
         batched = zip(
             np.array_split(inputs, inputs.shape[0] // valid_batch_size),
             np.array_split(labels, inputs.shape[0] // valid_batch_size)
         )
         my_iter = tqdm.tqdm(
-            batched, 
-            total = inputs.shape[0] // valid_batch_size, 
-            leave = True
+            batched,
+            total=inputs.shape[0] // valid_batch_size,
+            leave=True
         )
 
         with torch.no_grad():
@@ -124,10 +105,10 @@ def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
                     performance["true_label"].append(int(true_label[0].item()))
                 man_loss = dice(performance["true_label"],
                                 performance["pred_label"])
-                to_print = "Epoch {} man_loss: {:.6f}".format(epoch, man_loss)
+                to_print = "Epoch {} man_loss: {:.6f}".format(epoch, 1.0 - man_loss)
                 my_iter.set_description(to_print)
                 my_iter.update()
-                
+
         man_loss = dice(performance["true_label"], performance["pred_label"])
 
         # Shutdown the progbar
@@ -154,7 +135,7 @@ if __name__ == '__main__':
     root.addHandler(ch)
 
     # Set up torch multiprocessing env
-    #torch.multiprocessing.set_start_method('spawn', force=True)
+    # torch.multiprocessing.set_start_method('spawn', force=True)
 
     # ### Load the configuration and get the relevant variables
     config = sys.argv[1]
@@ -179,10 +160,10 @@ if __name__ == '__main__':
     # Set up number of CPU cores available
     if config_ncpus > available_ncpus:
         ncpus = available_ncpus
-        #ncpus = int(2 * available_ncpus)
+        # ncpus = int(2 * available_ncpus)
     else:
         ncpus = config_ncpus
-        #ncpus = int(2 * config_ncpus)
+        # ncpus = int(2 * config_ncpus)
 
     host = subprocess.Popen(
         'hostname',
@@ -195,18 +176,24 @@ if __name__ == '__main__':
     logging.info(
         f"Using {available_ncpus} CPU cores to run {ncpus} data workers")
 
+    # Set up training and validation file names. Use the prefix to use style-augmented data sets
     name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}_{transform_mode}"
-    fn_train = f"{data_path}/training_{name_tag}.nc"
-    fn_valid = f"{data_path}/validation_{name_tag}.nc"
-    #fn_train = f"{data_path}/training_{tile_size}_{step_size}.pkl"
-    #fn_valid = f"{data_path}/validation_{tile_size}_{step_size}.pkl"
+    if "prefix" in conf["data"]:
+        if conf["data"]["prefix"] is not "None":
+            data_prefix = conf["data"]["prefix"]
+            name_tag = f"{data_prefix}_{name_tag}"
+    fn_train = f"{data_path}/train_{name_tag}.nc"
+    fn_valid = f"{data_path}/valid_{name_tag}.nc"
 
     epochs = conf["trainer"]["epochs"]
     start_epoch = 0 if "start_epoch" not in conf["trainer"] else conf["trainer"]["start_epoch"]
     train_batch_size = conf["trainer"]["train_batch_size"]
     valid_batch_size = conf["trainer"]["valid_batch_size"]
     batches_per_epoch = conf["trainer"]["batches_per_epoch"]
-    valid_batches_per_epoch = 100
+    if "valid_batches_per_epoch" in conf["trainer"]:
+        valid_batches_per_epoch = conf["trainer"]["valid_batches_per_epoch"]
+    else:
+        valid_batches_per_epoch = 10000
     stopping_patience = conf["trainer"]["stopping_patience"]
     grad_clip = 1.0
 
@@ -254,8 +241,8 @@ if __name__ == '__main__':
     valid_transforms = LoadTransformations(conf["transforms"]["validation"])
 
     # Load the data class for reading and preparing the data as needed to train the u-net
-    train_dataset = XarrayReader(fn_train, train_transforms, mode = "mask")
-    test_dataset = XarrayReader(fn_valid, valid_transforms, mode = "mask")
+    train_dataset = XarrayReader(fn_train, train_transforms, mode="mask")
+    test_dataset = XarrayReader(fn_valid, valid_transforms, mode="mask")
 
     # Load the iterators for batching the data
     train_loader = torch.utils.data.DataLoader(
@@ -333,150 +320,159 @@ if __name__ == '__main__':
         # update the learning rate scheduler
         for valid_loss in epoch_test_losses:
             lr_scheduler.step(valid_loss)
-
-    # Train a U-net model
-    manual_loss = []
-    for epoch in range(start_epoch, epochs):
-
-        # Train the model
-        unet.train()
-
-        batch_loss = []
-
-        # set up a custom tqdm
-        batch_group_generator = tqdm.tqdm(
-            enumerate(train_loader),
-            total=batches_per_epoch,
-            leave=True
-        )
-
-        t0 = time.time()
-
-        for k, (inputs, y) in batch_group_generator:
-            # Move data to the GPU, if not there already
-            inputs = inputs.to(device)
-            y = y.to(device)
             
+    try:
 
-            # Clear gradient
-            optimizer.zero_grad()
+        # Train a U-net model
+        manual_loss = []
+        for epoch in range(start_epoch, epochs):
 
-            # get output from the model, given the inputs
-            pred_mask = unet(inputs)
-
-            # get loss for the predicted output
-            loss = train_criterion(pred_mask, y.float())
-
-            # get gradients w.r.t to parameters
-            loss.backward()
-            batch_loss.append(loss.item())
-            
-            # gradient clip
-            torch.nn.utils.clip_grad_norm_(unet.parameters(), grad_clip)
-
-            # update parameters
-            optimizer.step()
-
-            # update tqdm
-            to_print = "Epoch {} train_loss: {:.6f}".format(
-                epoch, np.mean(batch_loss))
-            to_print += " lr: {:.12f}".format(optimizer.param_groups[0]['lr'])
-            batch_group_generator.set_description(to_print)
-            batch_group_generator.update()
-
-            # stop the training epoch when train_batches_per_epoch have been used to update
-            # the weights to the model
-            if k >= batches_per_epoch and k > 0:
-                break
-
-            #lr_scheduler.step(epoch + k / batches_per_epoch)
-
-        # Shutdown the progbar
-        batch_group_generator.close()
-
-        # Compuate final performance metrics before doing validation
-        train_loss = np.mean(batch_loss)
-
-        # clear the cached memory from the gpu
-        torch.cuda.empty_cache()
-        gc.collect()
-
-        # Test the model
-        unet.eval()
-        with torch.no_grad():
+            # Train the model
+            unet.train()
 
             batch_loss = []
 
             # set up a custom tqdm
             batch_group_generator = tqdm.tqdm(
-                enumerate(test_loader),
+                enumerate(train_loader),
+                total=batches_per_epoch,
                 leave=True
             )
+
+            t0 = time.time()
 
             for k, (inputs, y) in batch_group_generator:
                 # Move data to the GPU, if not there already
                 inputs = inputs.to(device)
                 y = y.to(device)
+
+                # Clear gradient
+                optimizer.zero_grad()
+
                 # get output from the model, given the inputs
                 pred_mask = unet(inputs)
+
                 # get loss for the predicted output
-                loss = test_criterion(pred_mask, y.float())
+                loss = train_criterion(pred_mask, y.float())
+
+                # get gradients w.r.t to parameters
+                loss.backward()
                 batch_loss.append(loss.item())
+
+                # gradient clip
+                torch.nn.utils.clip_grad_norm_(unet.parameters(), grad_clip)
+
+                # update parameters
+                optimizer.step()
+
                 # update tqdm
-                to_print = "Epoch {} test_loss: {:.6f}".format(
+                to_print = "Epoch {} train_loss: {:.6f}".format(
                     epoch, np.mean(batch_loss))
+                to_print += " lr: {:.12f}".format(optimizer.param_groups[0]['lr'])
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
-                
-                if k >= valid_batches_per_epoch and k > 0:
+
+                # stop the training epoch when train_batches_per_epoch have been used to update
+                # the weights to the model
+                if k >= batches_per_epoch and k > 0:
                     break
+
+                # lr_scheduler.step(epoch + k / batches_per_epoch)
 
             # Shutdown the progbar
             batch_group_generator.close()
-            
-        # Load the manually labeled data
-        man_loss = predict_on_manual(
-            epoch, conf, unet, device) #+ np.mean(batch_loss)
-        manual_loss.append(float(man_loss))
 
-        # Use the supplied metric in the config file as the performance metric to toggle learning rate and early stopping
-        test_loss = np.mean(batch_loss)
-        epoch_test_losses.append(test_loss)
+            # Compuate final performance metrics before doing validation
+            train_loss = np.mean(batch_loss)
 
-        # clear the cached memory from the gpu
-        torch.cuda.empty_cache()
-        gc.collect()
+            # clear the cached memory from the gpu
+            torch.cuda.empty_cache()
+            gc.collect()
 
-        # Lower the learning rate if we are not improving
-        lr_scheduler.step(test_loss)
+            # Test the model
+            unet.eval()
+            with torch.no_grad():
 
-        # Save the model if its the best so far.
-        if test_loss == min(epoch_test_losses):
-            state_dict = {
-                'epoch': epoch,
-                'model_state_dict': unet.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': test_loss
-            }
-            torch.save(state_dict, f"{model_loc}/best.pt")
+                batch_loss = []
 
-        # Get the last learning rate
-        learning_rate = optimizer.param_groups[0]['lr']
+                # set up a custom tqdm
+                batch_group_generator = tqdm.tqdm(
+                    enumerate(test_loader),
+                    leave=True
+                )
 
-        # Put things into a results dictionary -> dataframe
-        results_dict['epoch'].append(epoch)
-        results_dict['train_loss'].append(train_loss)
-        results_dict['valid_loss'].append(test_loss)
-        results_dict['manual_loss'].append(man_loss)
-        results_dict["learning_rate"].append(learning_rate)
-        df = pd.DataFrame.from_dict(results_dict).reset_index()
+                for k, (inputs, y) in batch_group_generator:
+                    # Move data to the GPU, if not there already
+                    inputs = inputs.to(device)
+                    y = y.to(device)
+                    # get output from the model, given the inputs
+                    pred_mask = unet(inputs)
+                    # get loss for the predicted output
+                    loss = test_criterion(pred_mask, y.float())
+                    batch_loss.append(loss.item())
+                    # update tqdm
+                    to_print = "Epoch {} valid_loss: {:.6f}".format(
+                        epoch, np.mean(batch_loss))
+                    batch_group_generator.set_description(to_print)
+                    batch_group_generator.update()
 
-        # Save the dataframe to disk
-        df.to_csv(f"{model_loc}/training_log.csv", index=False)
+                    if k >= valid_batches_per_epoch and k > 0:
+                        break
 
-        # Stop training if we have not improved after X epochs (stopping patience)
-        best_epoch = [i for i, j in enumerate(
-            epoch_test_losses) if j == min(epoch_test_losses)][0]
-        offset = epoch - best_epoch
-        if offset >= stopping_patience:
-            break
+                # Shutdown the progbar
+                batch_group_generator.close()
+
+            # Load the manually labeled data
+            man_loss = predict_on_manual(
+                epoch, conf, unet, device)  # + np.mean(batch_loss)
+            manual_loss.append(float(man_loss))
+
+            # Use the supplied metric in the config file as the performance metric
+            # to toggle learning rate and early stopping
+            test_loss = np.mean(batch_loss)
+            epoch_test_losses.append(test_loss)
+
+            # clear the cached memory from the gpu
+            torch.cuda.empty_cache()
+            gc.collect()
+
+            # Lower the learning rate if we are not improving
+            lr_scheduler.step(test_loss)
+
+            # Save the model if its the best so far.
+            if test_loss == min(epoch_test_losses):
+                state_dict = {
+                    'epoch': epoch,
+                    'model_state_dict': unet.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': test_loss
+                }
+                torch.save(state_dict, f"{model_loc}/best.pt")
+
+            # Get the last learning rate
+            learning_rate = optimizer.param_groups[0]['lr']
+
+            # Put things into a results dictionary -> dataframe
+            results_dict['epoch'].append(epoch)
+            results_dict['train_loss'].append(train_loss)
+            results_dict['valid_loss'].append(test_loss)
+            results_dict['manual_loss'].append(man_loss)
+            results_dict["learning_rate"].append(learning_rate)
+            df = pd.DataFrame.from_dict(results_dict).reset_index()
+
+            # Save the dataframe to disk
+            df.to_csv(f"{model_loc}/training_log.csv", index=False)
+
+            # Stop training if we have not improved after X epochs (stopping patience)
+            best_epoch = [i for i, j in enumerate(
+                epoch_test_losses) if j == min(epoch_test_losses)][0]
+            offset = epoch - best_epoch
+            if offset >= stopping_patience:
+                break
+                
+    except KeyboardInterrupt:
+        print('Interrupted')
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)
