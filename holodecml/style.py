@@ -7,16 +7,21 @@ warnings.filterwarnings("ignore")
 
 
 
-def get_input_optimizer(input_img):
+def get_input_optimizer(input_img, lr = 1):
     # this line to show that input is a parameter that requires a gradient
-    optimizer = optim.LBFGS([input_img], lr=1)
-    # optimizer = optim.Adam([input_img], lr = 0.01)
+    optimizer = optim.LBFGS([input_img], lr=lr)
+    #optimizer = optim.Adam([input_img], lr = lr)
     return optimizer
 
 
 def requires_grad(model, flag=True):
     for p in model.parameters():
         p.requires_grad = flag
+        
+        
+def tv_loss(Y_hat):
+    return 0.5 * (torch.abs(Y_hat[:, :, 1:, :] - Y_hat[:, :, :-1, :]).mean() +
+                  torch.abs(Y_hat[:, :, :, 1:] - Y_hat[:, :, :, :-1]).mean())
 
 
 class ContentLoss(nn.Module):
