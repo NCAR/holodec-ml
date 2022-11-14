@@ -16,7 +16,8 @@ import sys
 import gc
 import os
 
-from holodecml.seed import seed_everything
+#from holodecml.seed import seed_everything
+from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 from holodecml.data import XarrayReader
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
@@ -27,6 +28,17 @@ warnings.filterwarnings("ignore")
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 available_ncpus = len(psutil.Process().cpu_affinity())
+
+
+def seed_everything(seed=1234):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = True
 
 
 def dice(true, pred, k=1, eps=1e-12):
@@ -54,7 +66,10 @@ def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
     inference_mode = conf["inference"]["mode"]
     probability_threshold = conf["inference"]["probability_threshold"]
     valid_batch_size = conf["trainer"]["valid_batch_size"]
-    # conf["transforms"]["inference"]["Normalize"]["mode"] = conf["transforms"]["training"]["Normalize"]["mode"]
+    
+    if "Normalize" in conf["transforms"]["training"]:
+        conf["transforms"]["validation"]["Normalize"]["mode"] = conf["transforms"]["training"]["Normalize"]["mode"]
+        conf["transforms"]["inference"]["Normalize"]["mode"] = conf["transforms"]["training"]["Normalize"]["mode"]
 
     tile_transforms = None if "inference" not in conf["transforms"] else LoadTransformations(
         conf["transforms"]["inference"])
@@ -298,11 +313,20 @@ if __name__ == '__main__':
     test_criterion = load_loss(valid_loss, split="validation")
 
     # Load a learning rate scheduler
-    lr_scheduler = ReduceLROnPlateau(
-        optimizer,
-        patience=1,
-        min_lr=1.0e-13,
-        verbose=True
+#     lr_scheduler = ReduceLROnPlateau(
+#         optimizer,
+#         patience=1,
+#         min_lr=1.0e-13,
+#         verbose=True
+#     )
+    lr_scheduler = CosineAnnealingWarmupRestarts(
+        optimizer, 
+        first_cycle_steps=batches_per_epoch,
+        cycle_mult=1.0, 
+        max_lr=learning_rate, 
+        min_lr=1e-3 * learning_rate,
+        warmup_steps=50, 
+        gamma=0.8
     )
 
     # Reload the results saved in the training csv if continuing to train
@@ -377,7 +401,7 @@ if __name__ == '__main__':
                 if k >= batches_per_epoch and k > 0:
                     break
 
-                # lr_scheduler.step(epoch + k / batches_per_epoch)
+                lr_scheduler.step()
 
             # Shutdown the progbar
             batch_group_generator.close()
@@ -437,7 +461,7 @@ if __name__ == '__main__':
             gc.collect()
 
             # Lower the learning rate if we are not improving
-            lr_scheduler.step(test_loss)
+            #lr_scheduler.step(test_loss)
 
             # Save the model if its the best so far.
             if test_loss == min(epoch_test_losses):

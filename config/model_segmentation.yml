@@ -1,5 +1,5 @@
 seed: 1000
-save_loc: "/glade/work/schreck/repos/HOLO/style/holodec-ml/results/holosuite_sampled"
+save_loc: "/glade/work/schreck/repos/HOLO/style/holodec-ml/results/weights/0"
 
 data:
     n_bins: 1000
@@ -12,13 +12,17 @@ data:
     total_negative: 6
     total_training: 100000
     transform_mode: 'None'
-    prefix: "None"
-    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
+    prefix: "random"
+    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/style_transfered/0"
     use_cached: True
     device: "cpu"
     cores: 0
     
 style:
+    weights:
+        alpha: 1.0
+        beta: 1.0e09
+        selection: 0
     raw:
         path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
         tiles_per_reconstruction: 5
@@ -26,8 +30,10 @@ style:
         save_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_real"
         sampler: "random"
     synthetic: 
-        save_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/style_transfered"
+        save_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic"
         sampler: "random"
+    generated:
+        save_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/style_transfered/0"
 
 transforms:
     training:

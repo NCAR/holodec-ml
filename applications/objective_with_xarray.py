@@ -13,9 +13,11 @@ import scipy
 import time
 import tqdm
 import gc
+from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 from holodecml.data import PickleReader, UpsamplingReader, XarrayReader
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
+#from holodecml.seed import seed_everything
 from holodecml.models import load_model
 from holodecml.losses import load_loss
 import os
@@ -71,9 +73,18 @@ class Objective(BaseObjective):
                 ncpus = config_ncpus
                 #ncpus = int(2 * config_ncpus)
 
+            # Set up training and validation file names. Use the prefix to use style-augmented data sets
             name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}_{transform_mode}"
-            fn_train = f"{data_path}/training_{name_tag}.nc"
-            fn_valid = f"{data_path}/validation_{name_tag}.nc"
+            if "prefix" in conf["data"]:
+                if conf["data"]["prefix"] is not "None":
+                    data_prefix = conf["data"]["prefix"]
+                    name_tag = f"{data_prefix}_{name_tag}"
+            fn_train = f"{data_path}/train_{name_tag}.nc"
+            fn_valid = f"{data_path}/valid_{name_tag}.nc"
+    
+            #name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}_{transform_mode}"
+            #fn_train = f"{data_path}/training_{name_tag}.nc"
+            #fn_valid = f"{data_path}/validation_{name_tag}.nc"
             #fn_train = f"{data_path}/training_{tile_size}_{step_size}.pkl"
             #fn_valid = f"{data_path}/validation_{tile_size}_{step_size}.pkl"
 
@@ -187,11 +198,20 @@ class Objective(BaseObjective):
             test_criterion = load_loss(valid_loss, split="validation")
 
             # Load a learning rate scheduler
-            lr_scheduler = ReduceLROnPlateau(
-                optimizer,
-                patience=1,
-                min_lr=1.0e-13,
-                verbose=True
+#             lr_scheduler = ReduceLROnPlateau(
+#                 optimizer,
+#                 patience=1,
+#                 min_lr=1.0e-13,
+#                 verbose=True
+#             )
+            lr_scheduler = CosineAnnealingWarmupRestarts(
+                optimizer, 
+                first_cycle_steps=batches_per_epoch,
+                cycle_mult=1.0, 
+                max_lr=learning_rate, 
+                min_lr=1e-3 * learning_rate,
+                warmup_steps=50, 
+                gamma=0.8
             )
 
             # Reload the results saved in the training csv if continuing to train
@@ -268,7 +288,7 @@ class Objective(BaseObjective):
                     if k >= batches_per_epoch and k > 0:
                         break
 
-                    #lr_scheduler.step(epoch + k / batches_per_epoch)
+                    lr_scheduler.step() # epoch + k / batches_per_epoch
 
                 # Shutdown the progbar
                 batch_group_generator.close()
@@ -345,7 +365,7 @@ class Objective(BaseObjective):
                 df.to_csv(f"{model_loc}/trial_results/training_log_{trial.number}.csv", index=False)
 
                 # Lower the learning rate if we are not improving
-                lr_scheduler.step(test_loss)
+                #lr_scheduler.step(test_loss)
 
                 # Report result to the trial
                 attempt = 0
@@ -394,11 +414,13 @@ class Objective(BaseObjective):
                 raise E
 
 
-def dice(true, pred, k=1):
+def dice(true, pred, k=1, eps=1e-12):
     true = np.array(true)
     pred = np.array(pred)
     intersection = np.sum(pred[true == k]) * 2.0
-    dice = intersection / (np.sum(pred) + np.sum(true) + 1e-12)
+    denominator = np.sum(pred) + np.sum(true)
+    denominator = np.maximum(denominator, eps)
+    dice = intersection / denominator
     return dice
 
 
@@ -431,7 +453,7 @@ def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
     tile_transforms = None if "inference" not in conf["transforms"] else LoadTransformations(
         conf["transforms"]["inference"])
 
-    output_path = output_path.replace("style_transfered", "tiled_synthetic")
+    output_path = "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
     with torch.no_grad():
         inputs = torch.from_numpy(np.load(os.path.join(
             output_path, f'manual_images_{transform_mode}.npy'))).float()
@@ -477,7 +499,7 @@ def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
                     performance["true_label"].append(int(true_label[0].item()))
                 man_loss = dice(performance["true_label"],
                                 performance["pred_label"])
-                to_print = "Epoch {} man_loss: {:.6f}".format(epoch, man_loss)
+                to_print = "Epoch {} man_loss: {:.6f}".format(epoch, 1.0 - man_loss)
                 my_iter.set_description(to_print)
                 my_iter.update()
                 
