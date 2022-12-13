@@ -48,7 +48,7 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
 
     from holodecml.metrics import DistributedROC
     from holodecml.transforms import LoadTransformations
-    from holodecml.propagation import InferencePropagator
+    from holodecml.propagation import InferencePropagator, InferencePropagationNoLabels
     from holodecml.data import save_sparse_csr
 
     ###################################
@@ -160,20 +160,39 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
     try:
         with torch.no_grad():
 
-            prop = InferencePropagator(
-                data_set,
-                n_bins=n_bins,
-                color_dim=color_dim,
-                tile_size=tile_size,
-                step_size=step_size,
-                marker_size=marker_size,
-                transform_mode=transform_mode,
-                device=device,
-                model=model,
-                mode=inference_mode,
-                probability_threshold=probability_threshold,
-                transforms=tile_transforms
-            )
+            try:
+                prop = InferencePropagator(
+                    data_set,
+                    n_bins=n_bins,
+                    color_dim=color_dim,
+                    tile_size=tile_size,
+                    step_size=step_size,
+                    marker_size=marker_size,
+                    transform_mode=transform_mode,
+                    device=device,
+                    model=model,
+                    mode=inference_mode,
+                    probability_threshold=probability_threshold,
+                    transforms=tile_transforms
+                )
+                prop.h_ds["x"]
+                logger.info("... true coordinates detected in the source file")
+            except KeyError: 
+                logger.info("... no true coordinates detected in the source file")
+                prop = InferencePropagationNoLabels(
+                    data_set,
+                    n_bins=n_bins,
+                    color_dim=color_dim,
+                    tile_size=tile_size,
+                    step_size=step_size,
+                    marker_size=marker_size,
+                    transform_mode=transform_mode,
+                    device=device,
+                    model=model,
+                    mode=inference_mode,
+                    probability_threshold=probability_threshold,
+                    transforms=tile_transforms
+                )
 
             # Create a list of z-values to propagate to
             z_list = prop.create_z_plane_lst(planes_per_call=1)
@@ -215,13 +234,14 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
                 t0 = time.time()
                 for z_idx, results_dict in jiter:
                     
-                    true_coors = results_dict["true_output"]
                     pred_coors = results_dict["pred_output"]
                     # Save to text file
-                    if len(true_coors):
-                        for (x,y,z,d) in true_coors:
-                            with open(f"{prop_data_loc}/true_{this_worker}.txt", "a+") as fid:
-                                fid.write(f"{h_idx} {x} {y} {z} {d}\n")
+                    if "true_output" in results_dict:
+                        true_coors = results_dict["true_output"]
+                        if len(true_coors):
+                            for (x,y,z,d) in true_coors:
+                                with open(f"{prop_data_loc}/true_{this_worker}.txt", "a+") as fid:
+                                    fid.write(f"{h_idx} {x} {y} {z} {d}\n")
                     if len(pred_coors):
                         for (x,y,z,d) in pred_coors:
                             with open(f"{prop_data_loc}/pred_{this_worker}.txt", "a+") as fid:
@@ -243,35 +263,38 @@ def main(worker_info=(0, "cuda:0"), conf=None, delay=30):
                             save_sparse_csr(
                                 f"{prop_data_loc}/pred_{h_idx}_{z_plane}.npz", 
                                 scipy.sparse.csr_matrix(results_dict["pred_array"].cpu().numpy()))
-                        if results_dict["true_array"].sum() > 0:
-                            save_sparse_csr(
-                                f"{prop_data_loc}/true_{h_idx}_{z_plane}.npz", 
-                                scipy.sparse.csr_matrix(results_dict["true_array"].cpu().numpy()))
+                        
+                        if "true_array" in results_dict:
+                            if results_dict["true_array"].sum() > 0:
+                                save_sparse_csr(
+                                    f"{prop_data_loc}/true_{h_idx}_{z_plane}.npz", 
+                                    scipy.sparse.csr_matrix(results_dict["true_array"].cpu().numpy()))
 
                     # Save the ROC results
                     if save_metrics:
-                        this_roc = results_dict["roc"]
-                        roc.merge(this_roc)
-                        with open(f"{roc_data_loc}/roc_{h_idx}_{z_plane}.pkl", "wb") as fid:
-                            joblib.dump(this_roc, fid)
-                        
-                        # merge rocs that currently exist
-                        rocs = sorted(glob.glob(f"{roc_data_loc}/roc_{h_idx}_*.pkl"),
-                              key=lambda x: int(x.strip(".pkl").split("_")[-1]))
-                        for k, roc_fn in enumerate(rocs):
-                            with open(roc_fn, "rb") as fid:
-                                if k == 0:
-                                    roc = joblib.load(fid)
-                                else:
-                                    roc.merge(joblib.load(fid))
+                        if "roc" in results_dict:
+                            this_roc = results_dict["roc"]
+                            roc.merge(this_roc)
+                            with open(f"{roc_data_loc}/roc_{h_idx}_{z_plane}.pkl", "wb") as fid:
+                                joblib.dump(this_roc, fid)
 
-                        with open(f"{roc_data_loc}/roc_{h_idx}.pkl", "wb") as fid:
-                            joblib.dump(roc, fid)
+                            # merge rocs that currently exist
+                            rocs = sorted(glob.glob(f"{roc_data_loc}/roc_{h_idx}_*.pkl"),
+                                  key=lambda x: int(x.strip(".pkl").split("_")[-1]))
+                            for k, roc_fn in enumerate(rocs):
+                                with open(roc_fn, "rb") as fid:
+                                    if k == 0:
+                                        roc = joblib.load(fid)
+                                    else:
+                                        roc.merge(joblib.load(fid))
 
-                        roc_curve([roc], [model_name], ["orange"], ["o"],
-                                  f"{image_data_loc}/roc_comparison_{h_idx}.png")
-                        performance_diagram([roc], [model_name], ["orange"], [
-                                            "o"], f"{image_data_loc}/performance_comparison_{h_idx}.png")
+                            with open(f"{roc_data_loc}/roc_{h_idx}.pkl", "wb") as fid:
+                                joblib.dump(roc, fid)
+
+                            roc_curve([roc], [model_name], ["orange"], ["o"],
+                                      f"{image_data_loc}/roc_comparison_{h_idx}.png")
+                            performance_diagram([roc], [model_name], ["orange"], [
+                                                "o"], f"{image_data_loc}/performance_comparison_{h_idx}.png")
 
                     # Print some stuff
                     to_print = f"Worker {this_worker}: Holo: {h_idx} Plane: {z_idx + 1} / {len(z_list)} z: {(z_plane*1e-6):.8f}"

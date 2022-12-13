@@ -107,9 +107,10 @@ def create_table(distance_threshold=0.001,
     mapping_table["rmse"] = {}
     df_table = defaultdict(list)
 
-#     holo_indices = list(true_coordinates.keys()) if match else list(
-#         pred_coordinates.keys())
-    holo_indices = pred_coordinates.keys()
+    if match:
+        holo_indices = list(set(list(true_coordinates.keys()) + list(pred_coordinates.keys())))
+    else:
+        holo_indices = pred_coordinates.keys()
     
     for h_idx in tqdm.tqdm(sorted(holo_indices)):
 
