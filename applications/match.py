@@ -8,6 +8,7 @@ import tqdm
 from collections import defaultdict
 import pandas as pd
 import joblib
+import scipy.ndimage
 import glob
 import yaml
 import os
@@ -17,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 scale_x = 2.96e-06
-scale_y = 2.96e-06
+scale_y = 2.96e-06 
 scale_z = 1.00e-06
-scale_d = 2.96e-06
+scale_d = 2.96e-06 * 0.0
 
 
 scales = [scale_x, scale_y, scale_z, scale_d]
@@ -41,7 +42,7 @@ class Threshold:
         vol[:, 3] *= scale_d
 
         self.vol = vol
-        self.dist_matrix = distance_matrix(vol, vol)
+        self.dist_matrix = distance_matrix(vol, vol, p = 1)
         self.n = self.dist_matrix.shape[0]
 
     def search(self, threshold):
@@ -86,11 +87,64 @@ class Threshold:
         return sorted(clusters, key=lambda x: -len(x[1])), list(not_clustered)
 
 
+def cluster_after_leader(clust):
+    clust_max_x = clust[:, 0] + clust[:, 3]
+    clust_min_x = clust[:, 0] - clust[:, 3]
+    clust_max_y = clust[:, 1] + clust[:, 3]
+    clust_min_y = clust[:, 1] - clust[:, 3]
+    dx = max(clust_max_x) - min(clust_min_x)
+    dy = max(clust_max_y) - min(clust_min_y)
+    size = max(dx, dy)
+    l = np.zeros((size, size))
+    array = np.zeros((size, size))
+    for circle in clust:
+        x, y, z, d = circle
+        x -= min(clust_min_x)
+        y -= min(clust_min_y)
+        b, a = np.ogrid[-x:size-x, -y:size-y]
+        mask = a*a + b*b <= (d/2)**2
+        array[mask] = 1
+    arr, n = scipy.ndimage.label(array)
+    _centroid = scipy.ndimage.find_objects(arr)
+    particles = []
+    for k, particle in enumerate(_centroid):
+        xind = (particle[0].stop + particle[0].start) / 2.
+        yind = (particle[1].stop + particle[1].start) / 2.
+#         dind = max([
+#             abs(particle[0].stop - particle[0].start), 
+#             abs(particle[1].stop - particle[1].start)
+#         ])
+        dind = 2 * ((arr == (k+1)).sum() / np.pi)**(1/2)
+        xind += min(clust_min_x)
+        yind += min(clust_min_y)
+        particles.append([xind, yind, dind])
+    # To get z, loop through the particles and pick which ever its closer
+    particle_z = defaultdict(list)
+    for circle in clust:
+        d = [
+            distance(circle[:2], particle[:2]) for k, particle in enumerate(particles)
+        ]
+        matched = np.argwhere(np.array(d) == min(d))[0][0]
+        particle_z[matched].append(circle[2])
+    coordinates = []
+    for k, particle in enumerate(particles):
+        x, y, d = particle
+        coordinates.append([
+            x, y, np.mean(particle_z[k]), d
+        ])
+    return coordinates
+    
 def diameter_average(coors, centroid, clusters):
     centroid = [coors[centroid]]
     centroid += [coors[x] for x in clusters]
+    # try to cluster a second time 
+    centroid = cluster_after_leader(np.array(centroid))
+    return centroid
+
     centroid = np.array(centroid).astype(float)
+    max_d = max(centroid[:, 3])
     centroid = np.average(centroid, axis=0)
+    centroid[3] = max_d
     return centroid
 
 
@@ -158,8 +212,15 @@ def create_table(distance_threshold=0.001,
         clusters, unassigned = t.Cluster(distance_threshold)
 
         """Create numpy arrays from the centroids/unassigned"""
-        pred_r_centroids = np.array([diameter_average(
-            pred_coordinates[h_idx], centroid, members) for centroid, members in clusters]).astype(float)
+        pred_r_centroids = []
+        for centroid, members in clusters:
+            results = diameter_average(pred_coordinates[h_idx], centroid, members)
+            pred_r_centroids += [np.array(x).astype(float) for x in results]
+        pred_r_centroids = np.array(pred_r_centroids)
+        
+        #pred_r_centroids = np.array([diameter_average(
+        #    pred_coordinates[h_idx], centroid, members) for centroid, members in clusters]).astype(float)
+        
         pred_r_not_matched = np.array(
             [pred_coordinates[h_idx][idx] for idx in unassigned]).astype(float)
         if pred_r_centroids.shape[0] > 0:
@@ -172,17 +233,25 @@ def create_table(distance_threshold=0.001,
         ctime = time.time() - start_time
 
         logger.info(
-            f"... clustering completed in {ctime} s, {len(clusters)} clusters, {len(unassigned)} unassigned, {pred_r.shape[0]} total")
+            f"... clustering completed in {ctime} s, {pred_r_centroids.shape[0]} clusters, {len(unassigned)} unassigned, {pred_r.shape[0]} total")
 
-        if not match:
+#         with open("cluster_results.txt", "a+") as fid:
+#             fid.write(f"{distance_threshold} {h_idx} {len(clusters)} {len(unassigned)} {pred_r.shape[0]}\n")
+        
+        if not match or not true_coordinates:
             mapping_table[h_idx] = [list(x) for x in pred_r]
             for coors in pred_r:
                 x, y, z, d = list(coors)
-                df_table["x"].append(x)
-                df_table["y"].append(y)
-                df_table["z"].append(z)
-                df_table["d"].append(d)
                 df_table["h"].append(h_idx)
+                df_table["x_p"].append(x)
+                df_table["y_p"].append(y)
+                df_table["z_p"].append(z)
+                df_table["d_p"].append(d)
+                df_table["x_t"].append(np.nan)
+                df_table["y_t"].append(np.nan)
+                df_table["z_t"].append(np.nan)
+                df_table["d_t"].append(np.nan)
+                df_table["rmse"].append(np.nan)
             continue
 
         """
@@ -326,7 +395,7 @@ if __name__ == "__main__":
         "-m",
         dest="match",
         type=str,
-        default=True,
+        default=False,
         help="Whether to match predictions against truth or standard method values."
     )
     parser.add_argument(
@@ -419,6 +488,28 @@ if __name__ == "__main__":
     else:
         true_coordinates = None
 
+#     # Round 1 
+#     coors_table, df_table = create_table(
+#         distance_threshold=10.0*scale_x,
+#         true_coordinates=true_coordinates,
+#         pred_coordinates=pred_coordinates,
+#         match=match
+#     )
+#     df_table = pd.DataFrame.from_dict(df_table)
+    
+#     # Round 2
+#     dff = {}
+#     for h in df_table["h"].unique():
+#         c = (df_table["h"] == h)
+#         dff[h] = df_table[c][["x_p", "y_p", "z_p", "d_p"]].values
+        
+#     coors_table, df_table = create_table(
+#         distance_threshold=distance_threshold,
+#         true_coordinates=true_coordinates,
+#         pred_coordinates=dff,
+#         match=match
+#     )
+    
     coors_table, df_table = create_table(
         distance_threshold=distance_threshold,
         true_coordinates=true_coordinates,

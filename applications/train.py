@@ -1,8 +1,21 @@
+from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
+
 # from torch.optim.lr_scheduler import ReduceLROnPlateau
+from holodecml.propagation import InferencePropagator
+from holodecml.transforms import LoadTransformations
 from echo.src.base_objective import BaseObjective
+
+# from holodecml.seed import seed_everything
+from holodecml.data import XarrayReader
+from holodecml.models import load_model
+from holodecml.losses import load_loss
 from collections import defaultdict
+from argparse import ArgumentParser
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
+import subprocess
 import torch.fft
 import logging
 import shutil
@@ -13,17 +26,9 @@ import torch
 import time
 import tqdm
 import gc
+import os
 import sys
 import yaml
-from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
-from holodecml.data import XarrayReader
-from holodecml.propagation import InferencePropagator
-from holodecml.transforms import LoadTransformations
-
-# from holodecml.seed import seed_everything
-from holodecml.models import load_model
-from holodecml.losses import load_loss
-import os
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -44,6 +49,36 @@ def seed_everything(seed=1234):
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = True
+
+
+def launch_pbs_jobs(config, save_path="./"):
+    script_path = Path(__file__).absolute()
+    script = f"""
+    #!/bin/bash -l
+    #PBS -N holo-trainer
+    #PBS -l select=1:ncpus=8:ngpus=1:mem=128GB
+    #PBS -l walltime=24:00:00
+    #PBS -l gpu_type=v100
+    #PBS -A NAML0001
+    #PBS -q casper
+    #PBS -o {os.path.join(save_path, "out")}
+    #PBS -e {os.path.join(save_path, "out")}
+
+    source ~/.bashrc
+    ncar_pylib /glade/work/$USER/py37
+    python {script_path} -c {config}
+    """
+    with open("launcher.sh", "w") as fid:
+        fid.write(script)
+    jobid = subprocess.Popen(
+        "qsub launcher.sh",
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).communicate()[0]
+    jobid = jobid.decode("utf-8").strip("\n")
+    print(jobid)
+    os.remove("launcher.sh")
 
 
 def trainer(conf, trial=False):
@@ -75,7 +110,7 @@ def trainer(conf, trial=False):
     # Set up training and validation file names. Use the prefix to use style-augmented data sets
     name_tag = f"{tile_size}_{step_size}_{total_positive}_{total_negative}_{total_examples}_{transform_mode}"
     if "prefix" in conf["data"]:
-        if conf["data"]["prefix"] is not "None":
+        if conf["data"]["prefix"] != "None":
             data_prefix = conf["data"]["prefix"]
             name_tag = f"{data_prefix}_{name_tag}"
     fn_train = f"{data_path}/train_{name_tag}.nc"
@@ -412,7 +447,7 @@ def trainer(conf, trial=False):
                 break
 
             if len(epoch_test_losses) == 0:
-                trial.should_prune()
+                raise optuna.TrialPruned()
 
     best_epoch = [
         i for i, j in enumerate(epoch_test_losses) if j == min(epoch_test_losses)
@@ -556,11 +591,27 @@ def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 2:
-        print("Usage: python train.py config.yml")
-        sys.exit()
+    description = "Train a segmengation model on a hologram data set"
+    parser = ArgumentParser(description=description)
+    parser.add_argument(
+        "-c",
+        dest="model_config",
+        type=str,
+        default=False,
+        help="Path to the model configuration (yml) containing your inputs.",
+    )
+    parser.add_argument(
+        "-l",
+        dest="launch",
+        type=int,
+        default=0,
+        help="Submit {n_nodes} workers to PBS.",
+    )
+    args_dict = vars(parser.parse_args())
+    config = args_dict.pop("model_config")
+    launch = bool(int(args_dict.pop("launch")))
 
-    # ### Set up logger to print stuff
+    # Set up logger to print stuff
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
@@ -571,9 +622,14 @@ if __name__ == "__main__":
     ch.setFormatter(formatter)
     root.addHandler(ch)
 
-    # ### Load the configuration and get the relevant variables
-    config = sys.argv[1]
+    # Load the configuration and get the relevant variables
     with open(config) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
+
+    # Launch PBS jobs
+    if launch:
+        logging.info("Launching to PBS")
+        launch_pbs_jobs(config, conf["save_loc"])
+        sys.exit()
 
     result = trainer(conf)

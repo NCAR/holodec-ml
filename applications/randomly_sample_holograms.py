@@ -1,19 +1,24 @@
-from functools import partial
+import xarray as xr
 import numpy as np
+import logging
 import random
+import torch
 import time
 import tqdm
-import xarray as xr
-import torch
 import yaml
-import sys
-import os
-from holodecml.seed import seed_everything
-from holodecml.models import load_model
+
+
+from holodecml.propagation import InferencePropagationNoLabels
 from holodecml.propagation import InferencePropagator
 from sklearn.model_selection import train_test_split
-import logging
+from holodecml.seed import seed_everything
+from holodecml.models import load_model
+from argparse import ArgumentParser
+from functools import partial
+
+
 import warnings
+
 warnings.filterwarnings("ignore")
 
 
@@ -27,71 +32,148 @@ if is_cuda:
 device = torch.device("cpu") if not is_cuda else torch.device("cuda")
 
 
-class CustomPropagator(InferencePropagator):
+class CustomPropagatorNoLabels(InferencePropagationNoLabels):
     """
     Custom prop class for taking random tile samples from holograms.
     A model still needs to be defined and passed for initialization,
     however it is not used, so model details are irrelevant.
-    
+
     """
-    def get_sub_images_labeled(self,
-                               image_tnsr,
-                               z_sub_set,
-                               z_counter,
-                               xp, yp, zp, dp,
-                               infocus_mask,
-                               z_part_bin_idx,
-                               batch_size=32,
-                               return_arrays=False,
-                               return_metrics=False,
-                               thresholds=None,
-                               obs_threshold=None):
+
+    def get_sub_images_labeled(
+        self,
+        image_tnsr,
+        z_sub_set,
+        z_counter,
+        batch_size=32,
+        return_arrays=False,
+        return_metrics=False,
+        thresholds=None,
+        obs_threshold=None,
+    ):
 
         with torch.no_grad():
 
             # build the torch tensor for reconstruction
-            z_plane = torch.tensor(
-                z_sub_set * 1e-6, device=self.device).unsqueeze(-1).unsqueeze(-1)
+            z_plane = (
+                torch.tensor(z_sub_set * 1e-6, device=self.device)
+                .unsqueeze(-1)
+                .unsqueeze(-1)
+            )
 
             # reconstruct the selected planes
             E_out = self.torch_holo_set(image_tnsr, z_plane)
 
             if self.color_dim == 2:
-                stacked_image = torch.cat([
-                    torch.abs(E_out).unsqueeze(1), torch.angle(E_out).unsqueeze(1)], 1)
+                stacked_image = torch.cat(
+                    [torch.abs(E_out).unsqueeze(1), torch.angle(E_out).unsqueeze(1)], 1
+                )
             elif self.color_dim == 1:
                 stacked_image = torch.abs(E_out).unsqueeze(1)
             else:
                 raise OSError(f"Unrecognized color dimension {self.color_dim}")
-            stacked_image = self.apply_transforms(
-                stacked_image.squeeze(0)).unsqueeze(0)
+            stacked_image = self.apply_transforms(stacked_image.squeeze(0)).unsqueeze(0)
 
             chunked = np.array_split(
                 list(self.idx2slice.items()),
-                int(np.ceil(len(self.idx2slice) / batch_size))
+                int(np.ceil(len(self.idx2slice) / batch_size)),
             )
 
-            inputs, masks, preds = [], [], []
+            inputs, masks = [], []
+            for z_idx in range(E_out.shape[0]):
+                worker = partial(
+                    self.collate_masks, image=stacked_image[z_idx, :].float()
+                )
+
+                for chunk in chunked:
+                    slices, x = worker(chunk)
+                    for k in range(len(slices)):
+                        inputs.append(x[k].cpu().numpy())
+                        masks.append([0.0])
+
+            return_dict = {"inputs": np.vstack(inputs), "masks": np.array(masks)}
+
+        return return_dict
+
+
+class CustomPropagatorLabels(InferencePropagator):
+    """
+    Custom prop class for taking random tile samples from holograms.
+    A model still needs to be defined and passed for initialization,
+    however it is not used, so model details are irrelevant.
+
+    """
+
+    def get_sub_images_labeled(
+        self,
+        image_tnsr,
+        z_sub_set,
+        z_counter,
+        xp,
+        yp,
+        zp,
+        dp,
+        infocus_mask,
+        z_part_bin_idx,
+        batch_size=32,
+        return_arrays=False,
+        return_metrics=False,
+        thresholds=None,
+        obs_threshold=None,
+    ):
+
+        with torch.no_grad():
+
+            # build the torch tensor for reconstruction
+            z_plane = (
+                torch.tensor(z_sub_set * 1e-6, device=self.device)
+                .unsqueeze(-1)
+                .unsqueeze(-1)
+            )
+
+            # reconstruct the selected planes
+            E_out = self.torch_holo_set(image_tnsr, z_plane)
+
+            if self.color_dim == 2:
+                stacked_image = torch.cat(
+                    [torch.abs(E_out).unsqueeze(1), torch.angle(E_out).unsqueeze(1)], 1
+                )
+            elif self.color_dim == 1:
+                stacked_image = torch.abs(E_out).unsqueeze(1)
+            else:
+                raise OSError(f"Unrecognized color dimension {self.color_dim}")
+            stacked_image = self.apply_transforms(stacked_image.squeeze(0)).unsqueeze(0)
+
+            chunked = np.array_split(
+                list(self.idx2slice.items()),
+                int(np.ceil(len(self.idx2slice) / batch_size)),
+            )
+
+            inputs, masks = [], []
             for z_idx in range(E_out.shape[0]):
 
                 unet_mask = torch.zeros(E_out.shape[1:]).to(
-                    self.device)  # initialize the UNET mask
+                    self.device
+                )  # initialize the UNET mask
                 # locate all particles in this plane
-                part_in_plane_idx = np.where(
-                    z_part_bin_idx == z_idx + z_counter)[0]
+                part_in_plane_idx = np.where(z_part_bin_idx == z_idx + z_counter)[0]
 
                 # build the UNET mask for this z plane
                 for part_idx in part_in_plane_idx:
-                    unet_mask += torch.from_numpy(
-                        (self.y_arr[None, :] * 1e6 - yp[part_idx]) ** 2 +
-                        (self.x_arr[:, None] * 1e6 - xp[part_idx]
-                         ) ** 2 < (dp[part_idx] / 2) ** 2
-                    ).float().to(self.device)
+                    unet_mask += (
+                        torch.from_numpy(
+                            (self.y_arr[None, :] * 1e6 - yp[part_idx]) ** 2
+                            + (self.x_arr[:, None] * 1e6 - xp[part_idx]) ** 2
+                            < (dp[part_idx] / 2) ** 2
+                        )
+                        .float()
+                        .to(self.device)
+                    )
 
                 worker = partial(
                     self.collate_masks,
                     image=stacked_image[z_idx, :].float(),
-                    mask=unet_mask
+                    mask=unet_mask,
                 )
 
                 for chunk in chunked:
@@ -105,14 +187,23 @@ class CustomPropagator(InferencePropagator):
         return return_dict
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    config_file = str(sys.argv[1])
+    description = (
+        "Create style training examples by sample tiles from planes in HOLODEC images"
+    )
 
-    if not os.path.isfile(config_file):
-        logger.warning(
-            f"The model config does not exist at {config_file}. Failing with error.")
-        sys.exit(1)
+    parser = ArgumentParser(description=description)
+    parser.add_argument(
+        "-c",
+        dest="model_config",
+        type=str,
+        default=False,
+        help="Path to the model configuration (yml) containing your inputs.",
+    )
+
+    args_dict = vars(parser.parse_args())
+    config_file = args_dict.pop("model_config")
 
     with open(config_file) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
@@ -146,20 +237,38 @@ if __name__ == '__main__':
     name_tag = f"{sampler}_{name_tag}"
 
     logger.info(f"Using data set {data_set}")
-    prop = CustomPropagator(
-        data_set,
-        n_bins=n_bins,
-        color_dim=color_dim,
-        tile_size=tile_size,
-        step_size=step_size,
-        marker_size=marker_size,
-        transform_mode=transform_mode,
-        device=device,
-        model=model,
-        mode=inference_mode,
-        probability_threshold=0.5,
-        transforms=tile_transforms
-    )
+
+    try:
+        prop = CustomPropagatorLabels(
+            data_set,
+            n_bins=n_bins,
+            color_dim=color_dim,
+            tile_size=tile_size,
+            step_size=step_size,
+            marker_size=marker_size,
+            transform_mode=transform_mode,
+            device=device,
+            model=model,
+            mode=inference_mode,
+            probability_threshold=0.5,
+            transforms=tile_transforms,
+        )
+        prop.h_ds["x"]
+    except KeyError:
+        prop = CustomPropagatorNoLabels(
+            data_set,
+            n_bins=n_bins,
+            color_dim=color_dim,
+            tile_size=tile_size,
+            step_size=step_size,
+            marker_size=marker_size,
+            transform_mode=transform_mode,
+            device=device,
+            model=model,
+            mode=inference_mode,
+            probability_threshold=0.5,
+            transforms=tile_transforms,
+        )
 
     # Obtain hologram numbers
     h_range = prop.h_ds.hologram_number.values
@@ -176,7 +285,9 @@ if __name__ == '__main__':
         h_train, rest_data = train_test_split(h_range, train_size=0.8)
         h_valid, h_test = train_test_split(rest_data, test_size=0.5)
 
-    logger.info(f"Total number of train/valid/test holograms: {len(h_train)} {len(h_valid)} {len(h_test)}")
+    logger.info(
+        f"Total number of train/valid/test holograms: {len(h_train)} {len(h_valid)} {len(h_test)}"
+    )
 
     h_splits = [h_train, h_valid, h_test]
     split_names = ["train", "valid", "test"]
@@ -206,7 +317,7 @@ if __name__ == '__main__':
                 return_arrays=False,
                 return_metrics=False,
                 obs_threshold=0.5,
-                start_z_counter=planes_processed
+                start_z_counter=planes_processed,
             )
 
             t0 = time.time()
@@ -217,9 +328,13 @@ if __name__ == '__main__':
                     idx = np.where(mins == min(mins))[0]
                     print(z_idx, idx, results_dict["masks"].shape)
 
-                idx = random.sample(range(results_dict["inputs"].shape[0]), k=tiles_per_reconstruction)
-                X[c:c + tiles_per_reconstruction] = results_dict["inputs"][idx]
-                Y[c:c + tiles_per_reconstruction] = results_dict["masks"][idx].reshape((tiles_per_reconstruction, 1))
+                idx = random.sample(
+                    range(results_dict["inputs"].shape[0]), k=tiles_per_reconstruction
+                )
+                X[c : c + tiles_per_reconstruction] = results_dict["inputs"][idx]
+                Y[c : c + tiles_per_reconstruction] = results_dict["masks"][
+                    idx
+                ].reshape((tiles_per_reconstruction, 1))
                 c += tiles_per_reconstruction
 
                 if c >= X.shape[0]:
@@ -233,8 +348,13 @@ if __name__ == '__main__':
 
         logger.info(f"Completed split {split} with shape {X.shape}")
 
-        df = xr.Dataset(data_vars=dict(var_x=(['n', 'd', 'x', 'y'], X[:c]),
-                                       var_y=(['n', 'z'], Y[:c])))
+        df = xr.Dataset(
+            data_vars=dict(
+                var_x=(["n", "d", "x", "y"], X[:c]), var_y=(["n", "z"], Y[:c])
+            )
+        )
 
-        logger.info(f"Saving the results to netcdf file at {save_path}/{split}_{name_tag}.nc")
+        logger.info(
+            f"Saving the results to netcdf file at {save_path}/{split}_{name_tag}.nc"
+        )
         df.to_netcdf(f"{save_path}/{split}_{name_tag}.nc")

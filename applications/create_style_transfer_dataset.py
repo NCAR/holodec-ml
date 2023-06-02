@@ -1,4 +1,6 @@
 from argparse import ArgumentParser
+from pathlib import Path
+from piqa import SSIM
 import xarray as xr
 import torchvision
 import numpy as np
@@ -13,23 +15,18 @@ import glob
 import tqdm
 import sys
 import os
-
-#from skimage.measure import compare_ssim as ssim
-from piqa import SSIM
-#from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-
-from holodecml.seed import seed_everything
-from holodecml.data import XarrayReader, PickleReader
-from holodecml.style import (requires_grad, get_input_optimizer,
-                             gram_matrix, ContentLoss, StyleLoss, tv_loss,
-                             rename_vgg_layers, get_style_model_and_losses)
-
-import warnings
-warnings.filterwarnings("ignore")
 import matplotlib.pyplot as plt
 
+from holodecml.data import XarrayReader
+from holodecml.style import (
+    get_input_optimizer,
+    tv_loss,
+    rename_vgg_layers,
+    get_style_model_and_losses,
+)
 
-#logger = logging.getLogger(__name__)
+import warnings
+warnings.filterwarnings("always")
 
 
 # Set up the GPU, grab number of CPUS
@@ -45,10 +42,9 @@ class SSIMLoss(SSIM):
             return -10
 
 
-def launch_pbs_jobs(nodes, save_path = "./", selection = 0):
-    from pathlib import Path 
+def launch_pbs_jobs(nodes, save_path="./", selection=0):
     script_path = Path(__file__).absolute()
-    parent = Path(__file__).parent
+    # parent = Path(__file__).parent
     for worker in range(nodes):
         script = f"""
         #!/bin/bash -l
@@ -67,26 +63,31 @@ def launch_pbs_jobs(nodes, save_path = "./", selection = 0):
         """
         with open("launcher.sh", "w") as fid:
             fid.write(script)
-        jobid = subprocess.Popen("qsub launcher.sh", 
-                                 shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0]
+        jobid = subprocess.Popen(
+            "qsub launcher.sh",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).communicate()[0]
         jobid = jobid.decode("utf-8").strip("\n")
         print(jobid)
     os.remove("launcher.sh")
 
 
 def run_style_transfer(
-        cnn,
-        content_img,
-        style_img,
-        input_img,
-        content_layers,
-        style_layers,
-        num_steps=300,
-        style_weight=1000000,
-        content_weight=1,
-        tv_weight=1,
-        lr_decay_epoch=50,
-        verbose=0):
+    cnn,
+    content_img,
+    style_img,
+    input_img,
+    content_layers,
+    style_layers,
+    num_steps=300,
+    style_weight=1000000,
+    content_weight=1,
+    tv_weight=1,
+    lr_decay_epoch=50,
+    verbose=0,
+):
 
     """Run the style transfer."""
 
@@ -135,9 +136,9 @@ def run_style_transfer(
                     )
                 )
                 print()
-                
+
             total_loss = style_score + content_score
-            
+
             if tv_weight > 0.0:
                 total_loss += tv_weight * tv_loss(input_img)
 
@@ -191,7 +192,7 @@ if __name__ == "__main__":
         dest="launch",
         type=int,
         default=0,
-        help="Submit {nodes} workers to PBS. Run -m option once all workers finish."
+        help="Submit {nodes} workers to PBS. Run -m option once all workers finish.",
     )
 
     args_dict = vars(parser.parse_args())
@@ -200,24 +201,24 @@ if __name__ == "__main__":
     worker = int(args_dict.pop("worker"))
     merge = bool(int(args_dict.pop("merge")))
     launch = bool(int(args_dict.pop("launch")))
-    
+
     with open(config_file) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
-    
+
     save_loc = conf["save_loc"]
     os.makedirs(save_loc, exist_ok=True)
     if not os.path.isfile(os.path.join(save_loc, "model.yml")):
         shutil.copyfile(config_file, os.path.join(save_loc, "model.yml"))
-    
+
     if launch:
         logging.info(f"Launching {nodes} workers to PBS")
         launch_pbs_jobs(nodes, conf["save_loc"], conf["style"]["weights"]["selection"])
         sys.exit()
 
     # Set seeds for reproducibility
-    #seed = 1000 if "seed" not in conf else conf["seed"]
-    #seed_everything(seed)
-    
+    # seed = 1000 if "seed" not in conf else conf["seed"]
+    # seed_everything(seed)
+
     tile_size = int(conf["data"]["tile_size"])
     step_size = int(conf["data"]["step_size"])
     data_path = conf["style"]["synthetic"]["save_path"]
@@ -247,15 +248,15 @@ if __name__ == "__main__":
     aug_data_path = conf["style"]["generated"]["save_path"]
     os.makedirs(aug_data_path, exist_ok=True)
     sampler = conf["style"]["synthetic"]["sampler"]
-    
-    num_weights = 20
-    weights = np.logspace(-5, 15, num=num_weights, endpoint=True)
-    weight_selection = conf["style"]["weights"]["selection"]
-    if weight_selection == "None":
-        style_weight = 0.0
-    else:
-        style_weight = weights[weight_selection]
-    
+
+    # num_weights = 20
+    # weights = np.logspace(-5, 15, num=num_weights, endpoint=True)
+    # weight_selection = conf["style"]["weights"]["selection"]
+    # if weight_selection == "None":
+    #    style_weight = 0.0
+    # else:
+    #    style_weight = weights[weight_selection]
+
     fn_train_aug = os.path.join(
         aug_data_path, f"train_{sampler}_{name_tag}_{worker}.nc"
     )
@@ -268,14 +269,18 @@ if __name__ == "__main__":
     if merge:
         logging.info(f"Merging {nodes} dataframes into one common df")
         for split in ["train", "valid", "test"]:
-            shorthand = glob.glob(os.path.join(aug_data_path, f"{split}_{sampler}_{name_tag}_*.nc"))
-            shorthand = sorted(shorthand, key = lambda x: int(x.split("_")[-1].strip(".nc")))
+            shorthand = glob.glob(
+                os.path.join(aug_data_path, f"{split}_{sampler}_{name_tag}_*.nc")
+            )
+            shorthand = sorted(
+                shorthand, key=lambda x: int(x.split("_")[-1].strip(".nc"))
+            )
             if len(shorthand) != nodes:
                 logging.warning(
                     "The number of files to be merged does not equal the number of nodes used. Exiting."
                 )
                 sys.exit(1)
-            
+
             logging.info(f"On split {split}, merging {shorthand}")
             df = [xr.open_dataset(x) for x in tqdm.tqdm(shorthand)]
             df = [f.where(np.isfinite(f.holo_alex), drop=True).squeeze() for f in df]
@@ -285,14 +290,14 @@ if __name__ == "__main__":
             df.to_netcdf(
                 os.path.join(aug_data_path, f"{split}_{sampler}_{name_tag}.nc")
             )
-#             for worker_fn in shorthand:
-#                 logging.info(f"Deleting worker file {worker_fn}")
-#                 os.remove(worker_fn)
+        #             for worker_fn in shorthand:
+        #                 logging.info(f"Deleting worker file {worker_fn}")
+        #                 os.remove(worker_fn)
         sys.exit()
-        
+
     logging.info("Beginning style augmentation training")
 
-    # Load synthetic and holodec hologram data sets 
+    # Load synthetic and holodec hologram data sets
     train_synthetic_dataset = XarrayReader(fn_train, train_transforms)
     valid_synthetic_dataset = XarrayReader(fn_valid, valid_transforms)
     test_synthetic_dataset = XarrayReader(fn_test, valid_transforms)
@@ -301,25 +306,31 @@ if __name__ == "__main__":
     valid_holodec_dataset = XarrayReader(fn_valid_raw, valid_transforms)
     test_holodec_dataset = XarrayReader(fn_test_raw, valid_transforms)
 
-#     # Load VGG19 and rename the layers
-#     cnn = torchvision.models.vgg19(pretrained=True).features
-#     cnn = rename_vgg_layers(cnn).to(device).eval()
-
     # Select content/style layers
     content_layers = ["conv_4"]
     style_layers = ["conv_1", "conv_2", "conv_3", "conv_4", "conv_5"]
-    perceptual_alex = lpips.LPIPS(net="alex").to(device)    
+    perceptual_alex = lpips.LPIPS(net="alex").to(device)
     ssim = SSIMLoss(n_channels=1).to(device).eval()
 
     # Start hologram translation
-    totals = [20000, 2000, 2000] #[50000, 5000, 5000]
+    totals = [200000, 20000, 20000]  # [20000, 2000, 2000] #[50000, 5000, 5000]
     filenames = [fn_train_aug, fn_valid_aug, fn_test_aug]
-    synthetic_datasets = [train_synthetic_dataset, valid_synthetic_dataset, test_synthetic_dataset]
-    holodec_datasets = [train_holodec_dataset, valid_holodec_dataset, test_holodec_dataset]
+    synthetic_datasets = [
+        train_synthetic_dataset,
+        valid_synthetic_dataset,
+        test_synthetic_dataset,
+    ]
+    holodec_datasets = [
+        train_holodec_dataset,
+        valid_holodec_dataset,
+        test_holodec_dataset,
+    ]
 
     try:
-        for total, fn_name, synth, holo in zip(totals, filenames, synthetic_datasets, holodec_datasets):
-            
+        for total, fn_name, synth, holo in zip(
+            totals, filenames, synthetic_datasets, holodec_datasets
+        ):
+
             if os.path.isfile(fn_name):
                 logging.info(f"The file {fn_name} already exists.")
                 continue
@@ -331,7 +342,7 @@ if __name__ == "__main__":
 
             X = np.zeros((len(synthetic_idx), 512, 512), dtype=np.float32)
             Y = np.zeros((len(synthetic_idx), 512, 512), dtype=np.int)
-            
+
             metrics = {
                 "holo_alex": np.zeros((len(synthetic_idx), 1), dtype=np.float32),
                 "syn_alex": np.zeros((len(synthetic_idx), 1), dtype=np.float32),
@@ -342,25 +353,27 @@ if __name__ == "__main__":
             }
 
             last_i = 0
-            my_iter = tqdm.tqdm(enumerate(synthetic_idx), total=len(synthetic_idx), leave=True)
+            my_iter = tqdm.tqdm(
+                enumerate(synthetic_idx), total=len(synthetic_idx), leave=True
+            )
             for i, k in my_iter:
                 x_s, y_s = synth.__getitem__(k)
 
                 attempts = 0
                 # randomly select hologram image
                 while attempts < 10:
-                
+
                     h_idx = random.sample(holodec_idx, 1)[0]
                     x_h, y_h = holo.__getitem__(h_idx)
                     content_img = x_s.clone().unsqueeze(0).to(device).float() / 255.0
                     style_img = x_h.clone().unsqueeze(0).to(device).float() / 255.0
 
                     input_img = (
-                            torch.randn_like(x_s.clone()).unsqueeze(0).to(device).float() 
+                        torch.randn_like(x_s.clone()).unsqueeze(0).to(device).float()
                     )
 
-                    #gauss_noise = np.random.normal(loc=0.5, scale=0.2, size=content_img.shape).astype(np.float32)
-                    #input_img = torch.from_numpy(gauss_noise).float().to(device)
+                    # gauss_noise = np.random.normal(loc=0.5, scale=0.2, size=content_img.shape).astype(np.float32)
+                    # input_img = torch.from_numpy(gauss_noise).float().to(device)
 
                     # Load VGG19 and rename the layers
                     cnn = torchvision.models.vgg19(pretrained=True).features
@@ -373,44 +386,66 @@ if __name__ == "__main__":
                         input_img,
                         content_layers,
                         style_layers,
-                        style_weight=style_weight,#1e9,
-                        content_weight=1.0,#2,
+                        style_weight=conf["style"]["weights"]["beta"],  # 1e9,
+                        content_weight=conf["style"]["weights"]["alpha"],  # 2,
                         tv_weight=1.0,
                         verbose=0,
                         num_steps=500,
                     )
 
-                    holo_alex = 1. - perceptual_alex(style_img, output).mean().item()
-                    syn_alex = 1. - perceptual_alex(content_img, output).mean().item()
+                    holo_alex = 1.0 - perceptual_alex(style_img, output).mean().item()
+                    syn_alex = 1.0 - perceptual_alex(content_img, output).mean().item()
 
                     if np.isfinite(holo_alex):
                         if holo_alex > 0.0 and syn_alex > 0.0:
 
-                            X[i] = output.squeeze(0).squeeze(0).detach().cpu().numpy() * 255.0
+                            X[i] = (
+                                output.squeeze(0).squeeze(0).detach().cpu().numpy()
+                                * 255.0
+                            )
                             Y[i] = y_s.squeeze(0).squeeze(0).cpu().numpy()
                             last_i = i
 
-                            metrics["holo_alex"][i] = 1. - perceptual_alex(style_img, output).mean().item()
-                            metrics["syn_alex"][i] = 1. - perceptual_alex(content_img, output).mean().item()
-                            metrics["mixed_alex"][i] = 1. - perceptual_alex(content_img, style_img).mean().item()
-                            metrics["holo_ssim"][i] = ssim(output, style_img) #.item()
-                            metrics["syn_ssim"][i] = ssim(output, content_img) #.item()
-                            metrics["mixed_ssim"][i] = ssim(content_img, style_img) #.item()
+                            metrics["holo_alex"][i] = (
+                                1.0 - perceptual_alex(style_img, output).mean().item()
+                            )
+                            metrics["syn_alex"][i] = (
+                                1.0 - perceptual_alex(content_img, output).mean().item()
+                            )
+                            metrics["mixed_alex"][i] = (
+                                1.0
+                                - perceptual_alex(content_img, style_img).mean().item()
+                            )
+                            metrics["holo_ssim"][i] = ssim(output, style_img)  # .item()
+                            metrics["syn_ssim"][i] = ssim(
+                                output, content_img
+                            )  # .item()
+                            metrics["mixed_ssim"][i] = ssim(
+                                content_img, style_img
+                            )  # .item()
 
-                            to_print = "h_alex: {:.6f}".format(np.mean(metrics["holo_alex"][:i]))
-                            to_print += " s_alex: {:.6f}".format(np.mean(metrics["syn_alex"][:i]))
-                            to_print += " h_ssim: {:.6f}".format(np.mean(metrics["holo_ssim"][:i]))
-                            to_print += " s_ssim: {:.6f}".format(np.mean(metrics["syn_ssim"][:i]))
+                            to_print = "h_alex: {:.6f}".format(
+                                np.mean(metrics["holo_alex"][:i])
+                            )
+                            to_print += " s_alex: {:.6f}".format(
+                                np.mean(metrics["syn_alex"][:i])
+                            )
+                            to_print += " h_ssim: {:.6f}".format(
+                                np.mean(metrics["holo_ssim"][:i])
+                            )
+                            to_print += " s_ssim: {:.6f}".format(
+                                np.mean(metrics["syn_ssim"][:i])
+                            )
                             my_iter.set_description(to_print)
                             my_iter.update()
 
                             if i % 100 == 0:
                                 plt.imshow(X[i])
                                 plt.savefig(os.path.join(save_loc, f"images/{k}.png"))
-                            
+
                             attempts = 10
                             break
-                            
+
                     else:
                         attempts += 1
 
@@ -422,15 +457,15 @@ if __name__ == "__main__":
                 "mixed_alex": (["n", "z"], metrics["mixed_alex"][:last_i]),
                 "holo_ssim": (["n", "z"], metrics["holo_ssim"][:last_i]),
                 "syn_ssim": (["n", "z"], metrics["syn_ssim"][:last_i]),
-                "mixed_ssim": (["n", "z"], metrics["mixed_ssim"][:last_i])
+                "mixed_ssim": (["n", "z"], metrics["mixed_ssim"][:last_i]),
             }
             df = xr.Dataset(data_vars)
-            #print(fn_name)
-            #df.to_netcdf("/glade/work/schreck/repos/HOLO/style/holodec-ml/results/weights/0_unet/test.nc")
+            # print(fn_name)
+            # df.to_netcdf("/glade/work/schreck/repos/HOLO/style/holodec-ml/results/weights/0_unet/test.nc")
             df.to_netcdf(fn_name)
-            
+
     except KeyboardInterrupt:
-        print('Interrupted')
+        print("Interrupted")
         try:
             sys.exit(0)
         except SystemExit:
