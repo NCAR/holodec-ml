@@ -334,39 +334,7 @@ if __name__ == '__main__':
 
     # Create the training data first
     with mp.Pool(cores) as p:
-
-#         with open(f"{output_path}/training_{name_tag}.pkl", "wb") as fid:
-#             for data in tqdm.tqdm(p.imap(work,
-#                                          training_hologram_numbers), total=total_training_examples):
-#                 for image, label, mask in zip(data["stacked_image"], data["label"], data["mask"]):
-#                     joblib.dump((image, label, mask), fid)
-
-#         # clear the cached memory from the gpu
-#         torch.cuda.empty_cache()
-#         gc.collect()
-
-#         # Create the validation data
-#         with open(f"{output_path}/validation_{name_tag}.pkl", "wb") as fid:
-#             for data in tqdm.tqdm(p.imap(work,
-#                                          validation_hologram_numbers), total=total_validation_examples):
-#                 for image, label, mask in zip(data["stacked_image"], data["label"], data["mask"]):
-#                     joblib.dump((image, label, mask), fid)
-
-#         # clear the cached memory from the gpu
-#         torch.cuda.empty_cache()
-#         gc.collect()
-
-#         # Create the test data
-#         with open(f"{output_path}/test_{name_tag}.pkl", "wb") as fid:
-#             for data in tqdm.tqdm(p.imap(work,
-#                                          test_hologram_numbers), total=total_testing_examples):
-#                 for image, label, mask in zip(data["stacked_image"], data["label"], data["mask"]):
-#                     joblib.dump((image, label, mask), fid)
-                    
-        # Training split
-        total_training_examples = 10
-        
-        
+        # Training split        
         X = np.zeros((total_training_examples, 2, tile_size, tile_size), dtype = np.float32)
         Y1 = np.zeros((total_training_examples, tile_size, tile_size), dtype = np.int)
         Y2 = np.zeros((total_training_examples, 1), dtype = np.int)
@@ -387,11 +355,8 @@ if __name__ == '__main__':
         df = xr.Dataset(data_vars=dict(var_x=(['n', 'd', 'x', 'y'], X[:c]),
                                        var_y=(['n', 'x', 'y'], Y1[:c]),
                                        var_z=(['n', 'z'], Y2[:c])))
-        
-        df.to_netcdf("/glade/work/schreck/repos/HOLO/033022/holodec-ml/results/TEST/test.nc")
-        #df.to_netcdf(f"{output_path}/training_{name_tag}.nc")
-        raise
-        
+        df.to_netcdf(f"{output_path}/training_{name_tag}.nc")
+
         
         # Validation split
         X = np.zeros((total_validation_examples, 2, tile_size, tile_size), dtype = np.float32)
@@ -414,8 +379,7 @@ if __name__ == '__main__':
         df = xr.Dataset(data_vars=dict(var_x=(['n', 'd', 'x', 'y'], X[:c]),
                                        var_y=(['n', 'x', 'y'], Y1[:c]),
                                        var_z=(['n', 'z'], Y2[:c])))
-        
-        df.to_netcdf(f"{output_path}/validation_{name_tag}.nc")
+        df.to_netcdf(f"{output_path}/valid_{name_tag}.nc")
         
         # Test split
         X = np.zeros((total_testing_examples, 2, tile_size, tile_size), dtype = np.float32)
@@ -438,5 +402,4 @@ if __name__ == '__main__':
         df = xr.Dataset(data_vars=dict(var_x=(['n', 'd', 'x', 'y'], X[:c]),
                                        var_y=(['n', 'x', 'y'], Y1[:c]),
                                        var_z=(['n', 'z'], Y2[:c])))
-        
         df.to_netcdf(f"{output_path}/test_{name_tag}.nc")

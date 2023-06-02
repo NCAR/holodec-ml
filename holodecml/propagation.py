@@ -644,3 +644,243 @@ class UpsamplingPropagator(WavePropagator):
                         unet_mask[x_idx*step_size:(x_idx*step_size+tile_size), y_idx*step_size:(y_idx*step_size+tile_size)])
 
         return particle_in_focus_lst, image_lst, image_index_lst, image_corner_coords, particle_unet_labels_lst
+
+    
+    
+class InferencePropagationNoLabels(WavePropagator):
+
+    def __init__(self,
+                 data_path,
+                 n_bins=1000,
+                 color_dim=2,
+                 tile_size=512,
+                 step_size=128,
+                 marker_size=10,
+                 transform_mode=None,
+                 device="cuda",
+                 model=None,
+                 transforms=None,
+                 mode=None,
+                 probability_threshold=0.5):
+
+        super(InferencePropagationNoLabels, self).__init__(
+            data_path,
+            n_bins=n_bins,
+            tile_size=tile_size,
+            step_size=step_size,
+            marker_size=marker_size,
+            transform_mode=transform_mode,
+            device=device
+        )
+
+        self.model = model
+        self.model.eval()
+        self.color_dim = color_dim
+        self.transforms = transforms
+        self.mode = mode
+        self.probability_threshold = probability_threshold
+        self.create_mapping()
+
+    def create_mapping(self):
+
+        self.idx2slice = {}
+        for row_idx in range(self.Nx//self.step_size):
+
+            if row_idx*self.step_size+self.tile_size > self.Nx:
+                image_pixel_x = self.Nx-self.tile_size
+                row_slice = slice(-self.tile_size, None)
+                row_break = True
+            else:
+                image_pixel_x = row_idx*self.step_size
+                row_slice = slice(row_idx*self.step_size,
+                                  row_idx*self.step_size+self.tile_size)
+                row_break = False
+
+            for col_idx in range(self.Ny//self.step_size):
+
+                if col_idx*self.step_size+self.tile_size > self.Ny:
+                    image_pixel_y = self.Ny-self.tile_size
+                    col_slice = slice(-self.tile_size, None)
+                    col_break = True
+                else:
+                    image_pixel_y = col_idx*self.step_size
+                    col_slice = slice(col_idx*self.step_size,
+                                      col_idx*self.step_size+self.tile_size)
+                    col_break = False
+
+                self.idx2slice[row_idx, col_idx] = (row_slice, col_slice)
+
+                if col_break:
+                    break
+
+            if row_break:
+                break
+
+    def get_sub_images_labeled(self,
+                               image_tnsr,
+                               z_sub_set,
+                               z_counter,
+                               batch_size=32,
+                               return_arrays=False,
+                               return_metrics=False,
+                               thresholds=None,
+                               obs_threshold=None):
+        """
+        Reconstruct z_sub_set planes from
+        the original hologram image and
+        split it into tiles of size
+        tile_size
+
+        image - 3D tensor on device to reconstruct
+        z_sub_set - array of z planes to reconstruct in one batch
+        z_counter - counter of how many z images have been reconstructed
+
+        Returns 
+            Esub - a list of complex tiled images 
+            image_index_lst - tile index of the sub image (x,y,z)
+            image_corner_coords - x,y coordinates of the tile corner (starting values)
+            z_pos - the z position of the plane in m
+        """
+
+        with torch.no_grad():
+
+            # build the torch tensor for reconstruction
+            z_plane = torch.tensor(
+                z_sub_set*1e-6, device=self.device).unsqueeze(-1).unsqueeze(-1)
+
+            # reconstruct the selected planes
+            E_out = self.torch_holo_set(image_tnsr, z_plane)
+
+            if self.color_dim == 2:
+                stacked_image = torch.cat([
+                    torch.abs(E_out).unsqueeze(1), torch.angle(E_out).unsqueeze(1)], 1)
+            elif self.color_dim == 1:
+                stacked_image = torch.abs(E_out).unsqueeze(1)
+            else:
+                raise OSError(f"Unrecognized color dimension {self.color_dim}")
+            stacked_image = self.apply_transforms(
+                stacked_image.squeeze(0)).unsqueeze(0)
+
+            size = (E_out.shape[1], E_out.shape[2])
+            pred_output = torch.zeros(size).to(self.device)
+            pred_proba = torch.zeros(size).to(self.device)
+            counter = torch.zeros(size).to(self.device)
+
+            chunked = np.array_split(
+                list(self.idx2slice.items()),
+                int(np.ceil(len(self.idx2slice) / batch_size))
+            )
+
+            for z_idx in range(E_out.shape[0]):
+
+                worker = partial(
+                    self.collate_masks,
+                    image=stacked_image[z_idx, :].float()
+                )
+
+                for chunk in chunked:
+                    slices, x = worker(chunk)
+                    pred_proba_tile = self.model(x).squeeze(1)
+                    pred_mask_tile = pred_proba_tile > self.probability_threshold
+
+                    for k, ((row_idx, col_idx), (row_slice, col_slice)) in enumerate(slices):
+                        counter[row_slice, col_slice] += 1
+                        pred_output[row_slice,
+                                    col_slice] += pred_mask_tile[k]
+                        pred_proba[row_slice,
+                                   col_slice] += pred_proba_tile[k]
+
+            return_dict = {"z": int(round(z_sub_set[0]))}
+                            
+            # Compute the (x,y,d) of predicted masks
+            pred_output = pred_output == counter
+
+            pred_coordinates = []
+            if pred_output.sum() > 0:
+                arr, n = scipy.ndimage.label(pred_output.cpu())
+                _centroid = scipy.ndimage.find_objects(arr)
+                for particle in _centroid:
+                    xind = (particle[0].stop + particle[0].start) // 2
+                    yind = (particle[1].stop + particle[1].start) // 2
+                    dind = max([
+                        abs(particle[0].stop - particle[0].start), 
+                        abs(particle[1].stop - particle[1].start)
+                    ])
+                    pred_coordinates.append([xind,yind,int(round(z_sub_set[0])),dind])
+            
+            return_dict["pred_output"] = pred_coordinates
+            
+            if return_arrays:
+                return_dict["pred_array"] = pred_output
+                return_dict["pred_proba"] = pred_proba
+                
+        return return_dict
+
+    def collate_masks(self, batch, image=None):
+        x = [
+            image[:, row_slice, col_slice] for ((row_idx, col_idx), (row_slice, col_slice)) in batch
+        ]
+        return batch, torch.stack(x)
+
+    def apply_transforms(self, image):
+        if self.transforms:
+            im = {"image": image}
+            for image_transform in self.transforms:
+                im = image_transform(im)
+            image = im["image"]
+        return image
+
+    def get_next_z_planes_labeled(self,
+                                  h_idx,
+                                  z_planes_lst,
+                                  batch_size=32,
+                                  return_arrays=False,
+                                  return_metrics=False,
+                                  thresholds=np.arange(0.0, 1.1, 0.1),
+                                  obs_threshold=1.0,
+                                  start_z_counter=0):
+        """
+        Generator that returns reconstructed z patches
+        input_image - 2D image array of the original captured hologam 
+        z_planes_lst - list containing batchs of arrays of z positions to reconstruct
+            create_z_plane_lst() will provide this for a desired batch size and set
+            planes
+
+        returns:
+            sub_image - list of sub images
+            image_index_lst - list of tile indicies to the sub image
+            image_coords - x,y corner coordinates of the sub images
+            image_z - z location of the sub image in m
+        """
+        # locate hologram image
+        input_image = self.h_ds['image'].isel(hologram_number=h_idx).values
+
+        z_counter = start_z_counter  # the number of planes reconstructed in this generator
+        image_tnsr = torch.tensor(input_image, device=self.device).unsqueeze(0)
+        for z_sub_set in z_planes_lst:
+
+            yield self.get_sub_images_labeled(
+                image_tnsr,
+                z_sub_set,
+                z_counter,
+                batch_size=batch_size,
+                return_arrays=return_arrays,
+                return_metrics=return_metrics,
+                thresholds=thresholds,
+                obs_threshold=obs_threshold
+            )
+            z_counter += z_sub_set.size
+
+            # clear the cached memory from the gpu
+            torch.cuda.empty_cache()
+
+    def create_z_plane_lst(self, planes_per_call=1):
+        """
+        Create a list of z planes according to the requested
+        batch size.  This generates the z_planes_lst argument
+        needed for gen_next_z_plane()
+        """
+        z_lst = []
+        for z_idx in np.arange(0, self.z_centers.size, planes_per_call):
+            z_lst.append(self.z_centers[z_idx:(z_idx+planes_per_call)])
+        return z_lst
