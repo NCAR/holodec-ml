@@ -29,6 +29,8 @@ warnings.filterwarnings("ignore")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
+
+
 available_ncpus = len(psutil.Process().cpu_affinity())
 
 
