@@ -1,0 +1,90 @@
+seed: 1000
+save_loc: "/glade/work/schreck/repos/HOLO/030722/holodec-ml/results/manual_check/"
+
+data:
+    n_bins: 1000
+    data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
+    raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
+    tile_size: 512
+    step_size: 128
+    marker_size: 10
+    total_positive: 6
+    total_negative: 6
+    total_training: 100000
+    transform_mode: 'None'
+    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
+    output_path_raw: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_real/"
+    use_cached: False
+    device: "cpu"
+    cores: 0
+
+transforms:
+    training:
+        RandomVerticalFlip:
+            rate: 0.5
+        RandomHorizontalFlip: 
+            rate: 0.5
+        Normalize:
+            mode: 'sym'
+        ToTensor: True
+    validation:
+        Normalize:
+            mode: 'sym'
+        ToTensor: True
+    inference:
+        Normalize:
+            mode: 'sym'
+                  
+# generator:
+#     name: "linknet"
+#     encoder_name: "xception"
+#     encoder_weights: "imagenet"
+#     in_channels: 2
+#     classes: 1
+#     activation: "tanh"
+
+generator:
+    name: "unet"
+    encoder_name: "resnet18"
+    encoder_weights: "imagenet"
+    decoder_attention_type: "scse"
+    in_channels: 2
+    classes: 1
+    activation: "tanh"
+    
+discriminator:
+    name: "unet"
+    encoder_name: "resnet18"
+    encoder_weights: "imagenet"
+    decoder_attention_type: "scse"
+    in_channels: 1
+    activation: "sigmoid"
+    aux_params:
+        pooling: 'avg'
+        dropout: 0.2
+        activation: 'sigmoid'
+        classes: 1  
+    
+optimizer_G:
+    learning_rate: 0.0002
+    b0: 0.5
+    b1: 0.999
+
+optimizer_D:
+    learning_rate: 0.0002
+    b0: 0.5
+    b1: 0.999
+    
+trainer:
+    epochs: 200
+    train_batch_size: 16
+    valid_batch_size: 16
+    batches_per_epoch: 250
+    adv_loss: 'hinge'
+    lambda_gp: 10
+    train_gen_every: 1
+    train_disc_every: 10
+    threshold: 0.5
+    mask_penalty: 0.5
+    regression_penalty: 0.2
+    stopping_patience: 50
