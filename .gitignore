@@ -7,6 +7,8 @@
 *.o*
 .idea
 holodecml.egg-info/
+build/
 data/
 models/
+holodecml/reader/paper_figures/
 
