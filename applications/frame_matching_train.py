@@ -85,35 +85,6 @@ def launch_pbs_jobs(config, save_path="./"):
     jobid = jobid.decode("utf-8").strip("\n")
     print(jobid)
     os.remove("launcher.sh")
-
-
-# take in 4D tensor (generally of shape [1, 2 * (lookahead+1), 4872, 3248]), number of tiles, and tile
-# overlap. pad image such that dimensions are divisible by tile size, and then tile
- 
-def pad_and_tile(image_in, tile_size, step_size = 0):
-    
-    """
-    Params: Input image, target tile size, overlap (stride) of tiles
-    Outputs image tiled into target tile size given stride, as well as original dimensions and required padding amount
-    Note min tile size is 32 to work in SMP filters
-    """
-    
-    assert tile_size >= 32, "Min tile size is 32"
-    x_pad = tile_size - (image_in.shape[-2] % tile_size)
-    y_pad = tile_size - (image_in.shape[-1] % tile_size)
-    # pad image
-    image = F.pad(image_in, pad = (0, y_pad, 0, x_pad), mode = "constant", value = 0)
-    
-    step_size = tile_size - step_size
-    image = image.permute(1,0,2,3)
-    tiles = torch.stack([
-                    F.unfold(im.unsqueeze(0), (tile_size, tile_size), stride=step_size).permute(1,2,0).reshape(
-                        tile_size, tile_size, image.shape[1], -1) for im in image
-                ], dim = -1).permute(2,3,4,1,0)
-    
-    #print(tiles.shape)
-    tiles = torch.reshape(tiles, (tiles.size(0) * tiles.size(1),) + tiles.size()[2:])
-    return(tiles, (image_in.shape[-2], image_in.shape[-1]), (x_pad, y_pad), image_in.shape[-4])
     
     
     
@@ -331,8 +302,6 @@ class FullSizeHolograms(Dataset):
         if self.shuffle:
             idx = random.choice(range(self.__len__()))
             
-
-            
         #hologram_idx = idx // self.n_bins 
         #plane_idx = idx // len(self.propagator.h_ds.hologram_number)
         hologram_idx, plane_idx = self.indices[(idx) // len(self.idx2slice)]
@@ -348,8 +317,6 @@ class FullSizeHolograms(Dataset):
             "vertical_flip": False
         }
 
-        
-        
         # add transformations here
         if self.transform:
             for image_transform in self.transform:
@@ -405,19 +372,17 @@ class FullSizeHolograms(Dataset):
         z_masks_window = torch.cat(z_masks, dim = 0)
         z_masks_window /= (z_props[1] - z_props[0])
         
-        
+        # cat images and masks in color dim (0 since batch not added yet)
         image_stack = torch.cat([synth_window, phases_window], dim = 0)
         masks_stack = torch.cat([masks_window, z_masks_window], dim = 0)
         
-        #get tile
+        #get tiles, slicing along coords in idx2slice array that maps coord position to slice range
         slice_coords = self.idx2slice[list(self.idx2slice)[idx % len(self.idx2slice)]]
         
         
         image_stack = image_stack[:, slice_coords[0], slice_coords[1]]
         masks_stack = masks_stack[:, slice_coords[0], slice_coords[1]]
-        
-        #print(synth_window.shape, phases_window.shape)
-        #print(f"Hologram # {hologram_idx}, z-plane # {plane_idx}, # particles: {num_particles}")
+        print(image_stack.shape, masks_stack.shape)
         
         return (image_stack, masks_stack)
     
@@ -740,17 +705,18 @@ def trainer(conf, trial=False):
                 loss = test_criterion(mask, y.clone()[:,0:1,:,:].float())
                 mask_test_loss.append(loss.detach().cpu().numpy())
                 mseloss = torch.nn.MSELoss()
-                zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
-                z_test_loss.append(zloss.detach().cpu().numpy())
-                loss += zloss               
+                #zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
+                #z_test_loss.append(zloss.detach().cpu().numpy())
+                #loss += zloss               
 
                 batch_test_loss.append(loss.item())
                 # update tqdm
-                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(
-                    epoch, k, np.mean(batch_test_loss), np.mean(mask_test_loss), np.mean(z_test_loss)
+                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_loss), np.mean(z_test_loss))
+                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(
+                    epoch, k, np.mean(batch_test_loss), np.mean(mask_test_loss)
                 )
-                sub_batch_group_generator.set_description(to_print)
-                sub_batch_group_generator.update()
+                batch_group_generator.set_description(to_print)
+                batch_group_generator.update()
 
 
                 if k >= valid_batches_per_epoch and k > 0:
@@ -768,7 +734,7 @@ def trainer(conf, trial=False):
         # Use the supplied metric in the config file as the performance metric to toggle learning rate and early stopping
         test_loss = np.mean(batch_test_loss)
         mask_test_loss = np.mean(mask_test_loss)
-        z_test_loss = np.mean(z_test_loss)
+        #z_test_loss = np.mean(z_test_loss)
 
         if trial:
             if not np.isfinite(test_loss):
@@ -800,8 +766,8 @@ def trainer(conf, trial=False):
         #results_dict["manual_loss"].append(man_loss)
         results_dict["mask_train_loss"].append(mask_loss)
         results_dict["mask_test_loss"].append(mask_test_loss)
-        results_dict["z_train_loss"].append(z_loss)
-        results_dict["z_test_loss"].append(z_test_loss)
+        #results_dict["z_train_loss"].append(z_loss)
+        #results_dict["z_test_loss"].append(z_test_loss)
         results_dict["learning_rate"].append(learning_rate)
         df = pd.DataFrame.from_dict(results_dict).reset_index()
 
