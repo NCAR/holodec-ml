@@ -1,12 +1,12 @@
 seed: 1000
-save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/batch4"
+save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/zlossinv"
 
 data:
     n_bins: 1000
     data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
     raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
-    tile_size: 512
-    step_size: 512
+    tile_size: 256
+    step_size: 128
     # breaks predict_on_manual when 0. why?
     marker_size: 10
     total_positive: 6
@@ -81,8 +81,8 @@ optimizer:
 trainer:
     epochs: 1000
     # 1000
-    train_batch_size: 16
-    valid_batch_size: 32
+    train_batch_size: 8
+    valid_batch_size: 16
     batches_per_epoch: 250
     # 250
     valid_batches_per_epoch: 100

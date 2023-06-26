@@ -378,11 +378,8 @@ class FullSizeHolograms(Dataset):
         
         #get tiles, slicing along coords in idx2slice array that maps coord position to slice range
         slice_coords = self.idx2slice[list(self.idx2slice)[idx % len(self.idx2slice)]]
-        
-        
         image_stack = image_stack[:, slice_coords[0], slice_coords[1]]
         masks_stack = masks_stack[:, slice_coords[0], slice_coords[1]]
-        print(image_stack.shape, masks_stack.shape)
         
         return (image_stack, masks_stack)
     
@@ -602,6 +599,7 @@ def trainer(conf, trial=False):
         unet.train()
 
         batch_loss = []
+        mask_loss, z_loss = [],[]
 
         # set up a custom tqdm
         batch_group_generator = tqdm.tqdm(enumerate(train_loader), total = batches_per_epoch, leave = True)
@@ -609,7 +607,7 @@ def trainer(conf, trial=False):
             # Move data to the GPU, if not there already
             #inputs, y is getitem
             
-            mask_loss, z_loss = [],[]
+            
             inputs = inputs.to(device)
             y = y.to(device)         
             # Clear gradient
@@ -626,14 +624,23 @@ def trainer(conf, trial=False):
             mask_loss.append(loss.detach().cpu().numpy()) 
             mseloss = torch.nn.MSELoss()
             
-            #zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
-            #z_loss.append(zloss.detach().cpu().numpy())
-            #loss += zloss
+            zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
+            
+            if not np.isfinite(zloss.cpu().item()):
+                    print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
+                    logging.warning("nan z-trainloss! dumping file...")
+                    y_dumploc = conf["save_loc"] + "/yclone_train.pt"
+                    torch.save(y.float(), y_dumploc)
+                    x_dumploc = conf["save_loc"] + "/xclone_train.pt"
+                    torch.save(inputs.float(), x_dumploc)
+                    sys.exit(1)    
+            z_loss.append(zloss.detach().cpu().numpy())
+            loss += zloss
 
             # on inference, pred_mask needs to be reconstructed (untiled and unpadded)
 
             if not np.isfinite(loss.cpu().item()):
-                torch.save(loss, "panic_loss.pt")
+                
                 logging.warning(
                     f"Trial {trial.number} is being pruned due to loss = NaN while training")
                 if trial:
@@ -656,8 +663,8 @@ def trainer(conf, trial=False):
             # ITERATE TO HERE
 
             # update tqdm
-            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_loss))
-            #to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_loss), np.mean(z_loss))
+            #to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_loss))
+            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_loss), np.mean(z_loss))
             to_print += " lr: {:.12f}".format(optimizer.param_groups[0]["lr"])
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
@@ -673,7 +680,7 @@ def trainer(conf, trial=False):
         # Compuate final performance metrics before doing validation
         train_loss = np.mean(batch_loss)
         mask_loss = np.mean(mask_loss)
-        #z_loss = np.mean(z_loss)
+        z_loss = np.mean(z_loss)
         # clear the cached memory from the gpu
         torch.cuda.empty_cache()
         gc.collect()
@@ -686,12 +693,14 @@ def trainer(conf, trial=False):
         with torch.no_grad():
 
             batch_test_loss = []
-
+            mask_test_loss, z_test_loss = [],[]
+            
+            
             # set up a custom tqdm
             batch_group_generator = tqdm.tqdm(enumerate(test_loader), leave=True)
             for k, (inputs, y) in batch_group_generator:
                 
-                mask_test_loss, z_test_loss = [],[]
+                
                     
                 # Move data to the GPU, if not there already
                 inputs = inputs.to(device)
@@ -705,16 +714,26 @@ def trainer(conf, trial=False):
                 loss = test_criterion(mask, y.clone()[:,0:1,:,:].float())
                 mask_test_loss.append(loss.detach().cpu().numpy())
                 mseloss = torch.nn.MSELoss()
-                #zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
-                #z_test_loss.append(zloss.detach().cpu().numpy())
-                #loss += zloss               
+                zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
+                        
+                if not np.isfinite(zloss.cpu().item()):
+                    print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
+                    logging.warning("nan z-trainloss! dumping file...")
+                    y_dumploc = conf["save_loc"] + "/yclone_test.pt"
+                    torch.save(y.float(), y_dumploc)
+                    x_dumploc = conf["save_loc"] + "/xclone_test.pt"
+                    torch.save(inputs.float(), x_dumploc)
+                    sys.exit(1)         
+                            
+                        
+                        
+                z_test_loss.append(zloss.detach().cpu().numpy())
+                loss += zloss               
 
                 batch_test_loss.append(loss.item())
                 # update tqdm
-                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_loss), np.mean(z_test_loss))
-                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(
-                    epoch, k, np.mean(batch_test_loss), np.mean(mask_test_loss)
-                )
+                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_loss), np.mean(z_test_loss))
+                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_loss))
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
 
@@ -734,7 +753,7 @@ def trainer(conf, trial=False):
         # Use the supplied metric in the config file as the performance metric to toggle learning rate and early stopping
         test_loss = np.mean(batch_test_loss)
         mask_test_loss = np.mean(mask_test_loss)
-        #z_test_loss = np.mean(z_test_loss)
+        z_test_loss = np.mean(z_test_loss)
 
         if trial:
             if not np.isfinite(test_loss):
@@ -766,8 +785,8 @@ def trainer(conf, trial=False):
         #results_dict["manual_loss"].append(man_loss)
         results_dict["mask_train_loss"].append(mask_loss)
         results_dict["mask_test_loss"].append(mask_test_loss)
-        #results_dict["z_train_loss"].append(z_loss)
-        #results_dict["z_test_loss"].append(z_test_loss)
+        results_dict["z_train_loss"].append(z_loss)
+        results_dict["z_test_loss"].append(z_test_loss)
         results_dict["learning_rate"].append(learning_rate)
         df = pd.DataFrame.from_dict(results_dict).reset_index()
 
