@@ -42,6 +42,7 @@ warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 
+
 available_ncpus = len(psutil.Process().cpu_affinity())
 
 
@@ -357,7 +358,7 @@ class LoadHolograms(Dataset):
             prop_phases.append(prop_phase)  
             # Mask (y-label)
             if k == 0:
-                mask, num_particles, z_mask = create_mask(self.propagator, hologram_idx, z_ind, z_props[0])
+                mask, num_particles, z_mask = create_mask(self.propagator, hologram_idx, z_ind, z_prop)
                 if im["horizontal_flip"]:
                     mask = torch.flip(mask, dims=(1,))
                     z_mask = torch.flip(z_mask, dims= (1,))
@@ -374,11 +375,12 @@ class LoadHolograms(Dataset):
         phases_window = torch.cat(prop_phases, dim = 0)
         masks_window = torch.cat(masks, dim = 0)
         z_masks_window = torch.cat(z_masks, dim = 0)
-        z_masks_window /= (z_props[1] - z_props[0])
+        z_masks_window /= (z_props[-1] - z_props[0])
         
         # cat images and masks in color dim (0 since batch not added yet)
         image_stack = torch.cat([synth_window, phases_window], dim = 0)
         masks_stack = torch.cat([masks_window, z_masks_window], dim = 0)
+        #masks_stack = torch.cat([masks_window], dim = 0)
         
         #get tiles, slicing along coords in idx2slice array that maps coord position to slice range
         slice_coords = self.idx2slice[list(self.idx2slice)[idx % len(self.idx2slice)]]
@@ -590,7 +592,12 @@ def trainer(conf, trial=False):
 
         batch_loss = []
         mask_losses, z_losses = [],[]
-
+        
+        train_niter = 0
+        train_npos = 0
+        
+        
+        
         # set up a custom tqdm
         batch_group_generator = tqdm.tqdm(enumerate(train_loader), total = batches_per_epoch, leave = True)
         for k, (inputs, y) in batch_group_generator:
@@ -608,29 +615,36 @@ def trainer(conf, trial=False):
             #print(pred_mask.shape)
 
             # get loss for the predicted output
-            mask, z_mask = pred_mask[:,0:1,:,:].clone(), pred_mask[:,1:2,:,:].clone()
+            mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
             #print(mask.shape, z_mask.shape, y.shape)
+           
             loss = train_criterion(mask, y.clone()[:,0:1,:,:].float())
-            mask_losses.append(loss.detach().cpu().numpy()) 
-            mseloss = torch.nn.MSELoss()
+            mask_losses.append(loss.detach().cpu().numpy())
+            z_pred = y[:,1:2,:,:].float()
+            lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
+            z_pred = z_pred[lossfilter]
+            z_mask = z_mask[lossfilter]
+            L1Loss = torch.nn.L1Loss()
             
-            zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
+            zloss = L1Loss(z_pred, z_mask)
+
+            if not np.isfinite(zloss.cpu().item()):
+                    print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
+                    logging.warning("nan z-trainloss! dumping file...")
+                    y_dumploc = conf["save_loc"] + "/yclone_train.pt"
+                    torch.save(y.float(), y_dumploc)
+                    x_dumploc = conf["save_loc"] + "/xclone_train.pt"
+                    torch.save(inputs.float(), x_dumploc)
+                    z_dumploc = conf["save_loc"] + "/zclone_train.pt"
+                    torch.save(z_mask.float(), z_dumploc)
+                    sys.exit(1)    
+            z_losses.append(zloss.detach().cpu().numpy())
+            loss += zloss
             
-            #if not np.isfinite(zloss.cpu().item()):
-                    #print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
-                    #logging.warning("nan z-trainloss! dumping file...")
-                    #y_dumploc = conf["save_loc"] + "/yclone_train.pt"
-                    #torch.save(y.float(), y_dumploc)
-                    #x_dumploc = conf["save_loc"] + "/xclone_train.pt"
-                    #torch.save(inputs.float(), x_dumploc)
-                    #sys.exit(1)    
-            #z_losses.append(zloss.detach().cpu().numpy())
-            #loss += zloss
 
             # on inference, pred_mask needs to be reconstructed (untiled and unpadded)
 
             if not np.isfinite(loss.cpu().item()):
-                
                 logging.warning(
                     f"Trial {trial.number} is being pruned due to loss = NaN while training")
                 if trial:
@@ -653,11 +667,16 @@ def trainer(conf, trial=False):
             # ITERATE TO HERE
 
             # update tqdm
-            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses))
-            #to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_loss), np.mean(z_loss))
+            #to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses))
+            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses), np.mean(z_losses))
             to_print += " lr: {:.12f}".format(optimizer.param_groups[0]["lr"])
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
+            
+            train_niter += 1
+            
+            if (int(torch.count_nonzero(mask)) != 0):
+                 train_npos += 1
             
             if k >= batches_per_epoch and k > 0:
                 break
@@ -670,7 +689,8 @@ def trainer(conf, trial=False):
         # Compuate final performance metrics before doing validation
         train_loss = np.mean(batch_loss)
         mask_loss = np.mean(mask_losses)
-       # z_loss = np.mean(z_losses)
+        train_posrate = train_npos / train_niter
+        z_loss = np.mean(z_losses)
         # clear the cached memory from the gpu
         torch.cuda.empty_cache()
         gc.collect()
@@ -684,6 +704,9 @@ def trainer(conf, trial=False):
 
             batch_test_loss = []
             mask_test_losses, z_test_losses = [],[]
+            
+            test_niter = 0
+            test_npos = 0
             
             
             # set up a custom tqdm
@@ -699,37 +722,46 @@ def trainer(conf, trial=False):
                 # get output from the model, given the inputs
                 pred_mask = unet(inputs)
                 # get loss for the predicted output
-                mask, z_mask = pred_mask[:,0:1,:,:].clone(), pred_mask[:,1:2,:,:].clone()
+                mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
 
                 loss = test_criterion(mask, y.clone()[:,0:1,:,:].float())
                 mask_test_losses.append(loss.detach().cpu().numpy())
-                mseloss = torch.nn.MSELoss()
-                
-                #zloss = mseloss(z_mask, y.clone()[:,1:2,:,:].float())
+                L1Loss = torch.nn.L1Loss()
+                z_pred = y[:,1:2,:,:].float()
+                lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
+                z_pred = z_pred[lossfilter]
+                z_mask = z_mask[lossfilter]
+                zloss = L1Loss(z_pred, z_mask)       
+
+                if not np.isfinite(zloss.cpu().item()):
+                    print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
+                    logging.warning("nan z-trainloss! dumping file...")
+                    y_dumploc = conf["save_loc"] + "/yclone_test.pt"
+                    torch.save(y.float(), y_dumploc)
+                    x_dumploc = conf["save_loc"] + "/xclone_test.pt"
+                    torch.save(inputs.float(), x_dumploc)
+                    z_dumploc = conf["save_loc"] + "/zclone_test.pt"
+                    torch.save(z_mask.float(), z_dumploc)
+                    sys.exit(1)         
+
                         
-                
-                #if not np.isfinite(zloss.cpu().item()):
-                    #print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
-                   #logging.warning("nan z-trainloss! dumping file...")
-                   #y_dumploc = conf["save_loc"] + "/yclone_test.pt"
-                    #torch.save(y.float(), y_dumploc)
-                    #x_dumploc = conf["save_loc"] + "/xclone_test.pt"
-                    #torch.save(inputs.float(), x_dumploc)
-                    #sys.exit(1)         
-                            
                         
-                        
-                #z_test_losses.append(zloss.detach().cpu().numpy())
-                #loss += zloss               
+                z_test_losses.append(zloss.detach().cpu().numpy())
+                loss += zloss               
 
                 batch_test_loss.append(loss.item())
                 # update tqdm
-                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses), np.mean(z_test_losses))
-                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses))
+                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses), np.mean(z_test_losses))
+                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses))
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
 
-
+                test_niter += 1
+                
+                if (int(torch.count_nonzero(mask)) != 0):
+                    test_npos += 1
+                
+                
                 if k >= valid_batches_per_epoch and k > 0:
                     break
             
@@ -745,7 +777,8 @@ def trainer(conf, trial=False):
         # Use the supplied metric in the config file as the performance metric to toggle learning rate and early stopping
         test_loss = np.mean(batch_test_loss)
         mask_test_loss = np.mean(mask_test_losses)
-        #z_test_loss = np.mean(z_test_losses)
+        test_posrate = test_npos/test_niter
+        z_test_loss = np.mean(z_test_losses)
 
         if trial:
             if not np.isfinite(test_loss):
@@ -777,9 +810,11 @@ def trainer(conf, trial=False):
         #results_dict["manual_loss"].append(man_loss)
         results_dict["mask_train_loss"].append(mask_loss)
         results_dict["mask_test_loss"].append(mask_test_loss)
-        #results_dict["z_train_loss"].append(z_loss)
-        #results_dict["z_test_loss"].append(z_test_loss)
+        results_dict["z_train_loss"].append(z_loss)
+        results_dict["z_test_loss"].append(z_test_loss)
         results_dict["learning_rate"].append(learning_rate)
+        results_dict["training_truepr"].append(train_posrate)
+        results_dict["test_truepr"].append(test_posrate)
         df = pd.DataFrame.from_dict(results_dict).reset_index()
 
         # Save the dataframe to disk
@@ -968,7 +1003,6 @@ def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
 
 
 if __name__ == "__main__":
-
     description = "Train a segmengation model on a hologram data set"
     parser = ArgumentParser(description=description)
     parser.add_argument(
