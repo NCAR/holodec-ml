@@ -434,6 +434,7 @@ def trainer(conf, trial=False):
     batches_per_epoch = conf["trainer"]["batches_per_epoch"]
     valid_batches_per_epoch = conf["trainer"]["valid_batches_per_epoch"]
     stopping_patience = conf["trainer"]["stopping_patience"]
+    z_weight = int(conf["trainer"]["z_weight"])
     grad_clip = 1.0
     model_loc = conf["save_loc"]
 
@@ -563,7 +564,8 @@ def trainer(conf, trial=False):
         cycle_mult=1.0,
         max_lr=learning_rate,
         min_lr=1e-3 * learning_rate,
-        warmup_steps=50,
+        warmup_steps=batches_per_epoch / 2,
+        # warmup_steps = 50,
         gamma=0.8,
     )
 
@@ -639,7 +641,7 @@ def trainer(conf, trial=False):
                     torch.save(z_mask.float(), z_dumploc)
                     sys.exit(1)    
             z_losses.append(zloss.detach().cpu().numpy())
-            loss += zloss
+            loss += (z_weight * zloss)
             
 
             # on inference, pred_mask needs to be reconstructed (untiled and unpadded)
@@ -747,7 +749,7 @@ def trainer(conf, trial=False):
                         
                         
                 z_test_losses.append(zloss.detach().cpu().numpy())
-                loss += zloss               
+                loss += (z_weight * zloss)               
 
                 batch_test_loss.append(loss.item())
                 # update tqdm

@@ -1,5 +1,5 @@
 seed: 1000
-save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/batch2"
+save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/holodec-classic"
 
 data:
     n_bins: 1000
