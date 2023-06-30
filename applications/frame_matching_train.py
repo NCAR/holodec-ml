@@ -435,6 +435,7 @@ def trainer(conf, trial=False):
     valid_batches_per_epoch = conf["trainer"]["valid_batches_per_epoch"]
     stopping_patience = conf["trainer"]["stopping_patience"]
     z_weight = int(conf["trainer"]["z_weight"])
+    positive_label_weight = float(conf["trainer"]["positive_label_weight"])
     grad_clip = 1.0
     model_loc = conf["save_loc"]
 
@@ -608,7 +609,13 @@ def trainer(conf, trial=False):
             
             
             inputs = inputs.to(device)
-            y = y.to(device)         
+            y = y.to(device) 
+
+            for i in range(y.shape[0]):
+                if (int(torch.count_nonzero(y[i])) > 0):
+                    y[i:i+1,:,:,:] = positive_label_weight * y[i:i+1,:,:,:]
+                    
+            
             # Clear gradient
             optimizer.zero_grad()
 
@@ -619,8 +626,9 @@ def trainer(conf, trial=False):
             # get loss for the predicted output
             mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
             #print(mask.shape, z_mask.shape, y.shape)
-           
-            loss = train_criterion(mask, y.clone()[:,0:1,:,:].float())
+            real_y = (y.clone()[:,0:1,:,:].float())
+            
+            loss = train_criterion(mask, real_y)
             mask_losses.append(loss.detach().cpu().numpy())
             z_pred = y[:,1:2,:,:].float()
             lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
