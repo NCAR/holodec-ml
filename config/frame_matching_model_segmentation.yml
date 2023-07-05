@@ -1,22 +1,22 @@
 seed: 1000
 # brought down to 100 to help sampling imbalance
-save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/batch2"
+save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/batch8"
 
 data:
     n_bins: 1000
     data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
     raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
-    tile_size: 512
+    tile_size: 1024
     # brought up to help sampling imbalance
     step_size: 256
     # breaks predict_on_manual when 0. why?
     marker_size: 10
-    total_positive: 6
-    total_negative: 6
+    total_positive: 10
+    total_negative: 10
     total_training: 100000
     transform_mode: 'None'
     #prefix: "random"
-    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic"
+    output_path: "/glade/scratch/hkoutlaw01"
     use_cached: True
     device: "cpu"
     cores: 8
@@ -47,16 +47,16 @@ transforms:
             rate: 0.5
         Normalize:
             mode: 'sym'
-        #GaussianBlur:
-            #rate: 1.0
-            #kernel_size: 1
-            #sigma: 2.1252219359742823
-        #GaussianNoise:
-            #rate: 1.0
-            #noise: 0.3258530643453389
-        #AdjustBrightness:
-            #rate: 1.0
-            #brightness_factor: 1.269735791766263
+        GaussianBlur:
+            rate: 1.0
+            kernel_size: 1
+            sigma: 2.1252219359742823
+        GaussianNoise:
+            rate: 1.0
+            noise: 0.3258530643453389
+        AdjustBrightness:
+            rate: 1.0
+            brightness_factor: 1.269735791766263
         ToTensor: False
     validation:
         Normalize:
@@ -69,7 +69,7 @@ transforms:
 model:
     name: "pspnet"
     encoder_name: "vgg11"
-    encoder_weights: "imagenet"
+    #encoder_weights: "imagenet"
     in_channels: 2
     classes: 2
     activation: "sigmoid"
@@ -83,16 +83,18 @@ optimizer:
 trainer:
     epochs: 1000
     # 1000
-    train_batch_size: 32
-    valid_batch_size: 64
-    batches_per_epoch: 50
+    train_batch_size: 8
+    valid_batch_size: 16
+    batches_per_epoch: 100
     # 250
-    valid_batches_per_epoch: 50
+    valid_batches_per_epoch: 100
     # 100
     stopping_patience: 4
     training_loss: "focal-tyversky"
     validation_loss: "dice"
-    z_weight: 0
+    z_weight: 0.2
+    positive_label_weight: 10
+    loss_alpha: 0.7
     
 inference:
     mode: "mask"

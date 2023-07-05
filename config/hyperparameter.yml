@@ -1,28 +1,28 @@
-log:
-  save_path: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/manopt/echo/log.txt"
+log: True
+save_path: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo"
 
 pbs:
   jobs: 15
-  kernel: "ncar_pylib /glade/work/$USER/py37" # ncar_20200417
   bash: ["source ~/.bashrc"]
   batch:
     N: "holo-echo"
     l: ["select=1:ncpus=8:ngpus=1:mem=128GB", "walltime=24:00:00", "gpu_type=v100"]
     A: "NAML0001"
     q: "casper"
-    o: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/manopt/echo/out"
-    e: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/manopt/echo/out"
+    o: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo/out"
+    e: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo/out"
     
 optuna:
   study_name: "holodecml"
-  storage: "sqlite:////glade/work/schreck/repos/HOLO/clean/holodec-ml/results/manopt/echo/holodec.db"
+  storage: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo/holodec.db"
+  storage_type: "sqlite"
   reload: 1
-  objective: "/glade/work/schreck/repos/HOLO/clean/holodec-ml/applications/objective.py"
+  objective: "/glade/work/hkoutlaw01/holorepos/holodec-ml/applications/frame_matching_train.py"
   direction: "minimize"
   metric: "manual_loss"
   n_trials: 999
   gpu: True
-  save_path: '/glade/work/schreck/repos/HOLO/clean/holodec-ml/results/manopt/echo/'
+  save_path: '/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo/'
   sampler:
     type: "TPESampler"
     n_startup_trials: 100
@@ -43,16 +43,34 @@ optuna:
       settings:
         name: "transform_mode"
         choices: ["None", "standard", "min-max"]
+    data:lookahead:
+        type: "int"
+        settings:
+            name: "lookahead"
+            low: 0
+            high: 5
+    data:positive_label_weight:
+        type: "float"
+        settings:
+            name: "positive_label_weight"
+            low: 1
+            high: 1000
+    data:loss_alpha:
+        type: "float"
+        settings:
+            name: "loss_alpha"
+            low: 0
+            high: 1
     model:name:
       type: "categorical"
       settings:
         name: "model_name"
         choices: ["unet", "unet++", "manet", "linknet", "fpn", "pspnet", "pan", "deeplabv3", "deeplabv3+"]
-    model:encoder_name:
-      type: "categorical"
-      settings:
-        name: "encoder_name"
-        choices: ["resnet18", "resnet152", "densenet121", "xception", "efficientnet-b0", "mobilenet_v2", "dpn68", "vgg11"]
+    #model:encoder_name:
+      #type: "categorical"
+      #settings:
+        #name: "encoder_name"
+        #choices: ["resnet18", "resnet152", "densenet121", "xception", "efficientnet-b0", "mobilenet_v2", "dpn68", "vgg11"]
     transforms:training:GaussianBlur:sigma:
       type: "float"
       settings:

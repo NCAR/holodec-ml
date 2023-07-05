@@ -311,7 +311,7 @@ class LoadHolograms(Dataset):
         #plane_idx = idx // len(self.propagator.h_ds.hologram_number)
         hologram_idx, plane_idx = self.indices[(idx) // len(self.idx2slice)]
         z_props = self.propagator.z_centers[plane_idx: plane_idx + self.lookahead + 1]
-        z_props -= (z_props[1] - z_props[0]) / 2
+        #z_props -= (z_props[1] - z_props[0]) / 2
         plane_indices = np.arange(plane_idx, plane_idx + self.lookahead + 1)
         # select hologram
         image = self.propagator.h_ds["image"].isel(hologram_number=hologram_idx).values
@@ -477,6 +477,7 @@ def trainer(conf, trial=False):
         )
         device_ids = list(range(torch.cuda.device_count()))
     logging.info(f"There are {torch.cuda.device_count()} GPUs available")
+
     logging.info(
         f"Using device {data_device} to perform wave propagation, and {device_ids} for training the model"
     )
@@ -637,9 +638,7 @@ def trainer(conf, trial=False):
             
             loss = train_criterion(mask, real_y)
             """
-            
 
-            
             loss = train_criterion(pred_mask, y, alpha = loss_weights[0], beta = loss_weights[1])
             mask_losses.append(loss.detach().cpu().numpy())
             
@@ -919,6 +918,7 @@ class Objective(BaseObjective):
         BaseObjective.__init__(self, config, metric, device)
 
     def train(self, trial, conf):
+        trainer(conf, trial=trial)
         try:
             return trainer(conf, trial=trial)
 
