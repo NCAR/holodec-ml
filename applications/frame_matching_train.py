@@ -379,8 +379,10 @@ class LoadHolograms(Dataset):
         
         # cat images and masks in color dim (0 since batch not added yet)
         image_stack = torch.cat([synth_window, phases_window], dim = 0)
+        """
         masks_stack = torch.cat([masks_window, z_masks_window], dim = 0)
-        #masks_stack = torch.cat([masks_window], dim = 0)
+        """
+        masks_stack = torch.cat([masks_window], dim = 0)
         
         #get tiles, slicing along coords in idx2slice array that maps coord position to slice range
         slice_coords = self.idx2slice[list(self.idx2slice)[idx % len(self.idx2slice)]]
@@ -436,6 +438,9 @@ def trainer(conf, trial=False):
     stopping_patience = conf["trainer"]["stopping_patience"]
     z_weight = int(conf["trainer"]["z_weight"])
     positive_label_weight = float(conf["trainer"]["positive_label_weight"])
+    label_weights = [positive_label_weight, 1 - positive_label_weight]
+    loss_alpha = float(conf["trainer"]["loss_alpha"])
+    loss_weights = [loss_alpha, 1 - loss_alpha]
     grad_clip = 1.0
     model_loc = conf["save_loc"]
 
@@ -565,7 +570,7 @@ def trainer(conf, trial=False):
         cycle_mult=1.0,
         max_lr=learning_rate,
         min_lr=1e-3 * learning_rate,
-        warmup_steps=batches_per_epoch / 2,
+        warmup_steps=50,
         # warmup_steps = 50,
         gamma=0.8,
     )
@@ -613,23 +618,32 @@ def trainer(conf, trial=False):
 
             for i in range(y.shape[0]):
                 if (int(torch.count_nonzero(y[i])) > 0):
-                    y[i:i+1,:,:,:] = positive_label_weight * y[i:i+1,:,:,:]
+                    y[i:i+1,:,:,:] = label_weights[0] * y[i:i+1,:,:,:]
                     
             
             # Clear gradient
             optimizer.zero_grad()
 
             # get output from the model, given the inputs
-            pred_mask = unet(inputs)
+            pred_mask = unet(inputs)[:,0:1,:,:].clone().float()
             #print(pred_mask.shape)
 
             # get loss for the predicted output
+            """
             mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
+            
             #print(mask.shape, z_mask.shape, y.shape)
             real_y = (y.clone()[:,0:1,:,:].float())
             
             loss = train_criterion(mask, real_y)
+            """
+            
+
+            
+            loss = train_criterion(pred_mask, y, alpha = loss_weights[0], beta = loss_weights[1])
             mask_losses.append(loss.detach().cpu().numpy())
+            
+            """
             z_pred = y[:,1:2,:,:].float()
             lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
             z_pred = z_pred[lossfilter]
@@ -650,6 +664,7 @@ def trainer(conf, trial=False):
                     sys.exit(1)    
             z_losses.append(zloss.detach().cpu().numpy())
             loss += (z_weight * zloss)
+            """
             
 
             # on inference, pred_mask needs to be reconstructed (untiled and unpadded)
@@ -677,15 +692,15 @@ def trainer(conf, trial=False):
             # ITERATE TO HERE
 
             # update tqdm
-            #to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses))
-            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses), np.mean(z_losses))
+            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses))
+            #to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses), np.mean(z_losses))
             to_print += " lr: {:.12f}".format(optimizer.param_groups[0]["lr"])
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
             
             train_niter += 1
             
-            if (int(torch.count_nonzero(mask)) != 0):
+            if (int(torch.count_nonzero(pred_mask)) != 0):
                  train_npos += 1
             
             if k >= batches_per_epoch and k > 0:
@@ -700,7 +715,9 @@ def trainer(conf, trial=False):
         train_loss = np.mean(batch_loss)
         mask_loss = np.mean(mask_losses)
         train_posrate = train_npos / train_niter
+        """
         z_loss = np.mean(z_losses)
+        """
         # clear the cached memory from the gpu
         torch.cuda.empty_cache()
         gc.collect()
@@ -728,14 +745,24 @@ def trainer(conf, trial=False):
                 # Move data to the GPU, if not there already
                 inputs = inputs.to(device)
                 y = y.to(device)
+                
 
                 # get output from the model, given the inputs
-                pred_mask = unet(inputs)
+                pred_mask = unet(inputs)[:,0:1,:,:].clone().float()
+                
                 # get loss for the predicted output
+                
+                """
                 mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
+                
 
                 loss = test_criterion(mask, y.clone()[:,0:1,:,:].float())
+                
+                """
+                
+                loss = test_criterion(pred_mask, y)
                 mask_test_losses.append(loss.detach().cpu().numpy())
+                """
                 L1Loss = torch.nn.L1Loss()
                 z_pred = y[:,1:2,:,:].float()
                 lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
@@ -757,18 +784,19 @@ def trainer(conf, trial=False):
                         
                         
                 z_test_losses.append(zloss.detach().cpu().numpy())
-                loss += (z_weight * zloss)               
+                loss += (z_weight * zloss)     
+                """
 
                 batch_test_loss.append(loss.item())
                 # update tqdm
-                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses), np.mean(z_test_losses))
-                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses))
+                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses), np.mean(z_test_losses))
+                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses))
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
 
                 test_niter += 1
                 
-                if (int(torch.count_nonzero(mask)) != 0):
+                if (int(torch.count_nonzero(pred_mask)) != 0):
                     test_npos += 1
                 
                 
@@ -788,8 +816,9 @@ def trainer(conf, trial=False):
         test_loss = np.mean(batch_test_loss)
         mask_test_loss = np.mean(mask_test_losses)
         test_posrate = test_npos/test_niter
+        """
         z_test_loss = np.mean(z_test_losses)
-
+        """
         if trial:
             if not np.isfinite(test_loss):
                 raise optuna.TrialPruned()
@@ -820,8 +849,10 @@ def trainer(conf, trial=False):
         #results_dict["manual_loss"].append(man_loss)
         results_dict["mask_train_loss"].append(mask_loss)
         results_dict["mask_test_loss"].append(mask_test_loss)
+        """
         results_dict["z_train_loss"].append(z_loss)
         results_dict["z_test_loss"].append(z_test_loss)
+        """
         results_dict["learning_rate"].append(learning_rate)
         results_dict["training_truepr"].append(train_posrate)
         results_dict["test_truepr"].append(test_posrate)
