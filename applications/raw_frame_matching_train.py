@@ -14,8 +14,6 @@ from collections import defaultdict
 from argparse import ArgumentParser
 from pathlib import Path
 from torch.utils.data import Dataset
-from scipy.signal import convolve2d
-from torch.multiprocessing import set_start_method
 
 
 import xarray as xr
@@ -42,6 +40,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 
 
 available_ncpus = len(psutil.Process().cpu_affinity())
@@ -88,6 +87,7 @@ def launch_pbs_jobs(config, save_path="./"):
     print(jobid)
     os.remove("launcher.sh")
 
+    
 
 def create_mask(prop, h_idx, z_idx, z_ref):
     hid = h_idx + 1
@@ -103,105 +103,94 @@ def create_mask(prop, h_idx, z_idx, z_ref):
     # Initialize the UNET mask
     unet_mask = np.zeros((prop.x_arr.shape[0], prop.y_arr.shape[0]))
     z_mask = np.zeros((prop.x_arr.shape[0], prop.y_arr.shape[0]))
-    num_particles = 0
-
+    num_particles = 0 
+    
     if z_idx in z_indices:
         cond = np.where(z_idx == z_indices)
         x_part = x_part[cond]
         y_part = y_part[cond]
         z_part = z_part[cond]
         d_part = d_part[cond]
-
-        # print(x_part, y_part, z_part, d_part)
-
+        
+        #print(x_part, y_part, z_part, d_part)
+        
         # Build the UNET mask using vectorized operations
         for part_idx in range(len(cond[0])):
-            y_diff = prop.y_arr[None, :] * 1e6 - y_part[part_idx]
-            x_diff = prop.x_arr[:, None] * 1e6 - x_part[part_idx]
-            d_squared = (d_part[part_idx] / 2) ** 2
+            y_diff = (prop.y_arr[None, :] * 1e6 - y_part[part_idx])
+            x_diff = (prop.x_arr[:, None] * 1e6 - x_part[part_idx])
+            d_squared = (d_part[part_idx] / 2)**2
             unet_mask += ((y_diff**2 + x_diff**2) < d_squared).astype(float)
-            z_diff = z_part - z_ref
+            z_diff = (z_part - z_ref)
             for particle in z_diff:
-                z_mask += ((y_diff**2 + x_diff**2) < d_squared).astype(
-                    float
-                ) * particle
+                z_mask += ((y_diff**2 + x_diff**2) < d_squared).astype(float) * particle
                 num_particles += 1
 
-    return (
-        torch.from_numpy(unet_mask).unsqueeze(0),
-        num_particles,
-        torch.from_numpy(z_mask).unsqueeze(0),
-    )
+    return torch.from_numpy(unet_mask).unsqueeze(0), num_particles, torch.from_numpy(z_mask).unsqueeze(0)
 
 
+
+# wave propagator class, from propagator.py
 class WavePropagator(object):
-    def __init__(
-        self,
-        data_path,
-        n_bins=1000,
-        step_size=128,
-        tile_size=128,
-        marker_size=10,
-        transform_mode=None,
-        device="cpu",
-    ):
+
+    def __init__(self,
+                 data_path,
+                 n_bins=1000,
+                 step_size=128,
+                 tile_size = 128,
+                 marker_size=10,
+                 transform_mode=None,
+                 device="cpu"):
 
         self.h_ds = xr.open_dataset(data_path)
 
-        if "zMin" in self.h_ds.attrs:
-            self.zMin = self.h_ds.attrs["zMin"]  # minimum z in sample volume
-            self.zMax = self.h_ds.attrs["zMax"]
+
+        if 'zMin' in self.h_ds.attrs:
+            self.zMin = self.h_ds.attrs['zMin']  # minimum z in sample volume
+            self.zMax = self.h_ds.attrs['zMax']
         else:  # some of the raw data does not have this parameter
             # should warn the user here through the logger
             self.zMin = 0.014
-            self.zMax = 0.158  # 15.8 - 1.4 / (1000)
+            self.zMax = 0.158 #15.8 - 1.4 / (1000)
 
         self.n_bins = n_bins
-        self.z_bins = (
-            np.linspace(self.zMin, self.zMax, n_bins + 1) * 1e6
-        )  # histogram bin edges
-        self.z_centers = self.z_bins[:-1] + 0.5 * np.diff(
-            self.z_bins
-        )  # histogram bin center
-
-        self.tile_size = tile_size
-        self.step_size = step_size
-
+        self.z_bins = np.linspace(
+            self.zMin, self.zMax, n_bins+1)*1e6  # histogram bin edges
+        self.z_centers = self.z_bins[:-1] + 0.5 * \
+            np.diff(self.z_bins)  # histogram bin center
+        
+        self.tile_size = step_size
+        self.step_size = tile_size
+        
         # UNET gaussian marker width (standard deviation) in um
         self.marker_size = marker_size
         self.device = device
 
-        self.dx = self.h_ds.attrs["dx"]  # horizontal resolution
-        self.dy = self.h_ds.attrs["dy"]  # vertical resolution
-        self.Nx = int(self.h_ds.attrs["Nx"])  # number of horizontal pixels
-        self.Ny = int(self.h_ds.attrs["Ny"])  # number of vertical pixels
-        self.lam = self.h_ds.attrs["lambda"]  # wavelength
+
+        self.dx = self.h_ds.attrs['dx']      # horizontal resolution
+        self.dy = self.h_ds.attrs['dy']      # vertical resolution
+        self.Nx = int(self.h_ds.attrs['Nx'])  # number of horizontal pixels
+        self.Ny = int(self.h_ds.attrs['Ny'])  # number of vertical pixels
+        self.lam = self.h_ds.attrs['lambda']  # wavelength
         self.image_norm = 255.0
         self.transform_mode = transform_mode
-        self.x_arr = np.arange(-self.Nx // 2, self.Nx // 2) * self.dx
-        self.y_arr = np.arange(-self.Ny // 2, self.Ny // 2) * self.dy
+        self.x_arr = np.arange(-self.Nx//2, self.Nx//2)*self.dx
+        self.y_arr = np.arange(-self.Ny//2, self.Ny//2)*self.dy
 
-        self.tile_x_bins = (
-            np.arange(-self.Nx // 2, self.Nx // 2, self.step_size) * self.dx * 1e6
-        )
-        self.tile_y_bins = (
-            np.arange(-self.Ny // 2, self.Ny // 2, self.step_size) * self.dy * 1e6
-        )
+        self.tile_x_bins = np.arange(-self.Nx//2,
+                                     self.Nx//2, self.step_size)*self.dx*1e6
+        self.tile_y_bins = np.arange(-self.Ny//2,
+                                     self.Ny//2, self.step_size)*self.dy*1e6
 
-        self.fx = (
-            torch.fft.fftfreq(self.Nx, self.dx, device=self.device)
-            .unsqueeze(0)
-            .unsqueeze(2)
-        )
-        self.fy = (
-            torch.fft.fftfreq(self.Ny, self.dy, device=self.device)
-            .unsqueeze(0)
-            .unsqueeze(1)
-        )
+        self.fx = torch.fft.fftfreq(
+            self.Nx, self.dx, device=self.device).unsqueeze(0).unsqueeze(2)
+        self.fy = torch.fft.fftfreq(
+            self.Ny, self.dy, device=self.device).unsqueeze(0).unsqueeze(1)
 
+        
         self.create_mapping()
-
-    def torch_holo_set(self, Ein: torch.tensor, z_tnsr: torch.tensor):
+    def torch_holo_set(self,
+                       Ein: torch.tensor,
+                       z_tnsr: torch.tensor):
         """
         Propagates an electric field a distance z
         Ein complex torch.tensor
@@ -239,49 +228,41 @@ class WavePropagator(object):
             Ein /= torch.max(Ein)
 
         Etfft = torch.fft.fft2(Ein)
-        Eofft = Etfft * torch.exp(
-            1j
-            * 2
-            * np.pi
-            * z_tnsr
-            / self.lam
-            * torch.sqrt(1 - self.lam**2 * (self.fx**2 + self.fy**2))
-        )
+        Eofft = Etfft*torch.exp(1j*2*np.pi*z_tnsr/self.lam *
+                                torch.sqrt(1-self.lam**2*(self.fx**2+self.fy**2)))
 
         # It might be helpful if we could omit this step.  It would save an inverse fft.
         Eout = torch.fft.ifft2(Eofft)
         return Eout
-
+    
+    
     def create_mapping(self):
         """
-        Create map from tile coordinates (x,y) to indices to slice in image to extract that tile.
+        Create map from tile coordinates (x,y) to indices to slice in image to extract that tile. 
         """
         self.idx2slice = {}
-        for row_idx in range(self.Nx // self.step_size):
+        for row_idx in range(self.Nx//self.step_size):
 
-            if row_idx * self.step_size + self.tile_size > self.Nx:
-                image_pixel_x = self.Nx - self.tile_size
+            if row_idx*self.step_size+self.tile_size > self.Nx:
+                image_pixel_x = self.Nx-self.tile_size
                 row_slice = slice(-self.tile_size, None)
                 row_break = True
             else:
-                image_pixel_x = row_idx * self.step_size
-                row_slice = slice(
-                    row_idx * self.step_size, row_idx * self.step_size + self.tile_size
-                )
+                image_pixel_x = row_idx*self.step_size
+                row_slice = slice(row_idx*self.step_size,
+                                  row_idx*self.step_size+self.tile_size)
                 row_break = False
 
-            for col_idx in range(self.Ny // self.step_size):
+            for col_idx in range(self.Ny//self.step_size):
 
-                if col_idx * self.step_size + self.tile_size > self.Ny:
-                    image_pixel_y = self.Ny - self.tile_size
+                if col_idx*self.step_size+self.tile_size > self.Ny:
+                    image_pixel_y = self.Ny-self.tile_size
                     col_slice = slice(-self.tile_size, None)
                     col_break = True
                 else:
-                    image_pixel_y = col_idx * self.step_size
-                    col_slice = slice(
-                        col_idx * self.step_size,
-                        col_idx * self.step_size + self.tile_size,
-                    )
+                    image_pixel_y = col_idx*self.step_size
+                    col_slice = slice(col_idx*self.step_size,
+                                      col_idx*self.step_size+self.tile_size)
                     col_break = False
 
                 self.idx2slice[row_idx, col_idx] = (row_slice, col_slice)
@@ -291,22 +272,17 @@ class WavePropagator(object):
 
             if row_break:
                 break
+                
+                
+                
+    def collate_image(self, idx_dict, image = None, mask = None):
+        x, y = zip(*[(image[:, row_slice, col_slice], mask[row_slice, col_slice]) for ((row_idx, col_idx, row_slice, col_slice)) in idx_dict])
 
 
 class LoadHolograms(Dataset):
-    def __init__(
-        self,
-        file_path,
-        n_bins=1000,
-        shuffle=False,
-        device="cpu",
-        transform=False,
-        lookahead=0,
-        step_size=32,
-        tile_size=32,
-        balance=True,
-    ):
-
+    
+    def __init__(self, file_path, n_bins = 1000, shuffle = False, device = "cpu", transform = False, lookahead =0, step_size = 32, tile_size = 32):
+        
         # num of waveprop windows
         self.n_bins = n_bins
         # device used
@@ -316,66 +292,34 @@ class LoadHolograms(Dataset):
         # num of frames to look ahead
         self.lookahead = lookahead
         # wavepropagator object on device
-        self.propagator = WavePropagator(
-            file_path,
-            n_bins=n_bins,
-            device=device,
-            step_size=step_size,
-            tile_size=tile_size,
-        )
+        self.propagator = WavePropagator(file_path, n_bins = n_bins, device = device, step_size = step_size, tile_size = tile_size)
         self.transform = transform
-        self.indices = [
-            (x, y)
-            for x in self.propagator.h_ds.hologram_number
-            for y in range(self.n_bins - self.lookahead)
-        ]
-
+        self.indices =  [(x,y) for x in self.propagator.h_ds.hologram_number for y in range(self.n_bins - self.lookahead)]
+        
         self.tile_size = tile_size
         self.idx2slice = self.propagator.idx2slice
-        self.balance = balance
 
     def __len__(self):
-        if self.balance:
-            return len(self.propagator.h_ds.hologram_number) * len(self.indices)
         return len(self.indices) * len(self.idx2slice)
 
     def __getitem__(self, idx):
-
-        if self.balance:
-            image_lst = []
-            while len(image_lst) == 0:
-                # flip coin
-                infocus, outfocus = random.choice([[0, 1], [1, 0]])
-                image_lst, particle_unet_labels_lst, particle_in_focus_lst = self.get_reconstructed_sub_images(
-                    idx, part_per_holo=infocus, empt_per_holo=outfocus
-                )
-            return image_lst[0], particle_unet_labels_lst[0].squeeze(0), particle_in_focus_lst
-
-        else:
-            return self.random_batcher(idx)
-
-    def random_batcher(self, idx):
-
+        
         if self.shuffle:
             idx = random.choice(range(self.__len__()))
-
-        # hologram_idx = idx // self.n_bins
-        # plane_idx = idx // len(self.propagator.h_ds.hologram_number)
+            
+        #hologram_idx = idx // self.n_bins 
+        #plane_idx = idx // len(self.propagator.h_ds.hologram_number)
         hologram_idx, plane_idx = self.indices[(idx) // len(self.idx2slice)]
-        z_props = self.propagator.z_centers[plane_idx : plane_idx + self.lookahead + 1]
-        # z_props -= (z_props[1] - z_props[0]) / 2
+        z_props = self.propagator.z_centers[plane_idx: plane_idx + self.lookahead + 1]
+        #z_props -= (z_props[1] - z_props[0]) / 2
         plane_indices = np.arange(plane_idx, plane_idx + self.lookahead + 1)
         # select hologram
-        image = (
-            self.propagator.h_ds["image"]
-            .isel(hologram_number=hologram_idx)
-            .values.astype(float)
-        )
-
+        image = self.propagator.h_ds["image"].isel(hologram_number=hologram_idx).values.astype(float)
+        
         im = {
             "image": np.expand_dims(image, 0),
             "horizontal_flip": False,
-            "vertical_flip": False,
+            "vertical_flip": False
         }
 
         # add transformations here
@@ -383,360 +327,174 @@ class LoadHolograms(Dataset):
             for image_transform in self.transform:
                 im = image_transform(im)
         image = im["image"]
-
+        
+        # Update the mask if we flipped the original image
+        
+        
+        # prop
+        
         # make tensors of size lookahead + 1, and then add tensors
-        prop_synths = torch.empty((len(z_props), image.shape[-2], image.shape[-1]))
-        prop_phases = torch.empty((len(z_props), image.shape[-2], image.shape[-1]))
-        masks = torch.empty((1, image.shape[-2], image.shape[-1]))
-        z_masks = torch.empty((1, image.shape[-2], image.shape[-1]))
+        prop_synths = []
+        prop_phases = []
+        masks = []
+        z_masks = []
+        particles_in_frames = []
+        
+        #num_frames = len(plane_indices)
+        #idx_ran = random.choice(range(num_frames))
+        #z_prop = z_props[idx_ran]
+        #z_ind = plane_indices[idx_ran]
 
         for k, (z_prop, z_ind) in enumerate(zip(z_props, plane_indices)):
             image_prop = self.propagator.torch_holo_set(
                 image.to(self.device),
-                torch.FloatTensor([z_prop * 1e-6]).to(self.device),
+                torch.FloatTensor([z_prop*1e-6]).to(self.device)
             )
             # ABS (x-input)
-            prop_synth = torch.abs(image_prop).squeeze(0)
-            prop_synths[k] = prop_synth
+            prop_synth = torch.abs(image_prop)
+            prop_synths.append(prop_synth)
             # Phase (x-input)
-            prop_phase = torch.angle(image_prop).squeeze(0)
-            prop_phases[k] = prop_phase
+            prop_phase = torch.angle(image_prop)
+            prop_phases.append(prop_phase)  
             # Mask (y-label)
             if k == 0:
-                mask, num_particles, z_mask = create_mask(
-                    self.propagator, hologram_idx, z_ind, z_prop
-                )
+                mask, num_particles, z_mask = create_mask(self.propagator, hologram_idx, z_ind, z_prop)
                 if im["horizontal_flip"]:
-                    mask = torch.flip(mask, [1])
-                    z_mask = torch.flip(z_mask, [1])
+                    mask = torch.flip(mask, dims=(1,))
+                    z_mask = torch.flip(z_mask, dims= (1,))
                 if im["vertical_flip"]:
-                    mask = torch.flip(mask, [2])
-                    z_mask = torch.flip(z_mask, [2])
-                masks[k] = mask
-                z_masks[k] = z_mask
-
-        # z_masks_window /= (z_props[-1] - z_props[0])
-
+                    mask = torch.flip(mask, dims=(2,))
+                    z_mask = torch.flip(z_mask, dims= (2,))
+                masks.append(mask)
+                z_masks.append(z_mask)
+        
+        # cat target frames with lookahead context frames, convert to ndarrays
+        synth_window = torch.cat(prop_synths, dim = 0)
+        phases_window = torch.cat(prop_phases, dim = 0)
+        masks_window = torch.cat(masks, dim = 0)
+        z_masks_window = torch.cat(z_masks, dim = 0)
+        z_masks_window /= (z_props[-1] - z_props[0])
+        
         # cat images and masks in color dim (0 since batch not added yet)
-        image_stack = torch.cat([prop_synths, prop_phases], dim=0)
-
-        # get tiles, slicing along coords in idx2slice array that maps coord position to slice range
+        image_stack = torch.cat([synth_window, phases_window], dim = 0)
+        """
+        masks_stack = torch.cat([masks_window, z_masks_window], dim = 0)
+        """
+        masks_stack = torch.cat([masks_window], dim = 0)
+        
+        #get tiles, slicing along coords in idx2slice array that maps coord position to slice range
         slice_coords = self.idx2slice[list(self.idx2slice)[idx % len(self.idx2slice)]]
         image_stack = image_stack[:, slice_coords[0], slice_coords[1]]
-        masks = masks[slice_coords[0], slice_coords[1]]
+        masks_stack = masks_stack[:, slice_coords[0], slice_coords[1]]
+        return (image_stack, masks_stack)
+    
+    def get_full_plane(self, idx):
+        if self.shuffle:
+            idx = random.choice(range(self.__len__()))
+            
+        #hologram_idx = idx // self.n_bins 
+        #plane_idx = idx // len(self.propagator.h_ds.hologram_number)
+        hologram_idx, plane_idx = self.indices[(idx) // len(self.idx2slice)]
+        z_props = self.propagator.z_centers[plane_idx: plane_idx + self.lookahead + 1]
+        #z_props -= (z_props[1] - z_props[0]) / 2
+        plane_indices = np.arange(plane_idx, plane_idx + self.lookahead + 1)
+        # select hologram
+        image = self.propagator.h_ds["image"].isel(hologram_number=hologram_idx).values
+        
+        im = {
+            "image": np.expand_dims(image, 0),
+            "horizontal_flip": False,
+            "vertical_flip": False
+        }
 
-        return (image_stack, masks)
+        # add transformations here
+        if self.transform:
+            for image_transform in self.transform:
+                im = image_transform(im)
+        image = im["image"]
+        
+        # Update the mask if we flipped the original image
+        
+        
+        # prop
+        
+        # make tensors of size lookahead + 1, and then add tensors
+        prop_synths = []
+        prop_phases = []
+        masks = []
+        z_masks = []
+        particles_in_frames = []
+        
+        #num_frames = len(plane_indices)
+        #idx_ran = random.choice(range(num_frames))
+        #z_prop = z_props[idx_ran]
+        #z_ind = plane_indices[idx_ran]
+        
+        for k, (z_prop, z_ind) in enumerate(zip(z_props, plane_indices)):
+            image_prop = self.propagator.torch_holo_set(
+                image.to(self.device),
+                torch.FloatTensor([z_prop*1e-6]).to(self.device)
+            )
+            # ABS (x-input)
+            prop_synth = torch.abs(image_prop)
+            prop_synths.append(prop_synth)
+            # Phase (x-input)
+            prop_phase = torch.angle(image_prop)
+            prop_phases.append(prop_phase)  
+            # Mask (y-label)
+            if k == 0:
+                mask, num_particles, z_mask = create_mask(self.propagator, hologram_idx, z_ind, z_prop)
+                if im["horizontal_flip"]:
+                    mask = torch.flip(mask, dims=(1,))
+                    z_mask = torch.flip(z_mask, dims= (1,))
+                if im["vertical_flip"]:
+                    mask = torch.flip(mask, dims=(2,))
+                    z_mask = torch.flip(z_mask, dims= (2,))
+                masks.append(mask)
+                z_masks.append(z_mask)
 
+        
+        
+        # cat target frames with lookahead context frames, convert to ndarrays
+        synth_window = torch.cat(prop_synths, dim = 0)
+        phases_window = torch.cat(prop_phases, dim = 0)
+        masks_window = torch.cat(masks, dim = 0)
+        z_masks_window = torch.cat(z_masks, dim = 0)
+        z_masks_window /= (z_props[-1] - z_props[0])
+        
+        # cat images and masks in color dim (0 since batch not added yet)
+        image_stack = torch.cat([synth_window, phases_window], dim = 0)
+        """
+        masks_stack = torch.cat([masks_window, z_masks_window], dim = 0)
+        """
+        masks_stack = torch.cat([masks_window], dim = 0)
+        
+        return (image_stack, masks_stack)
+        
     def sequential_tile(self, full_plane):
         tiles_dict = defaultdict()
         for slice_coords in self.idx2slice:
-            tiles_dict[slice_coords] = full_plane[
-                :, self.idx2slice[slice_coords][0], self.idx2slice[slice_coords][1]
-            ]
+            tiles_dict[slice_coords] = full_plane[:,self.idx2slice[slice_coords][0], self.idx2slice[slice_coords][1]]
         return tiles_dict
-
+    
     def tile_reconstruct(self, tile_dict):
-        largex, largey = (
-            self.idx2slice[list(self.idx2slice.keys())[-1]][0].stop,
-            self.idx2slice[list(self.idx2slice.keys())[-1]][1].stop,
-        )
+        largex, largey = self.idx2slice[list(self.idx2slice.keys())[-1]][0].stop, self.idx2slice[list(self.idx2slice.keys())[-1]][1].stop
         print(largex, largey)
-        template = torch.zeros(
-            tile_dict[list(tile_dict.keys())[0]].shape[0], largex, largey
-        )
+        template = torch.zeros(tile_dict[list(tile_dict.keys())[0]].shape[0],largex, largey)
         for coords in tile_dict:
             tile = tile_dict[coords]
             slice_coords = self.idx2slice[coords]
             template[:, slice_coords[0], slice_coords[1]] += tile
         return template
 
-    def get_reconstructed_sub_images(
-        self, h_idx, part_per_holo=None, empt_per_holo=None
-    ):
-        """
-        Reconstruct a hologram at specific planes to provide training data
-        with a specified number of sub images containing and not containing
-        particles
-        """
-        h_idx = h_idx // len(self.indices)
-        self.step_size = self.propagator.step_size
-        self.tile_size = self.propagator.tile_size
-        step_size = self.step_size
-        tile_size = self.tile_size
-
-        #### roughly half of the empty cases should be near in focus ####
-        empt_near_cnt = empt_per_holo // 2
-        ####
-
-        # locate particle information corresponding to this hologram
-        self.h_ds = self.propagator.h_ds
-        particle_idx = np.where(self.h_ds["hid"].values == h_idx + 1)
-
-        x_part = self.h_ds["x"].values[particle_idx]
-        y_part = self.h_ds["y"].values[particle_idx]
-        z_part = self.h_ds["z"].values[particle_idx]
-        # not used but here it is
-        d_part = self.h_ds["d"].values[particle_idx]
-
-        # create a 3D histogram
-        in_data = np.stack((x_part, y_part, z_part)).T
-        h_part = np.histogramdd(
-            in_data,
-            bins=[
-                self.propagator.tile_x_bins,
-                self.propagator.tile_y_bins,
-                self.propagator.z_bins,
-            ],
-        )[0]
-        # specify the z bin locations of the particles
-        z_part_bin_idx = np.digitize(z_part, self.propagator.z_bins) - 1
-
-        # smoothing kernel accounts for overlapping subimages when the
-        # subimage is larger than the stride
-        ratio = self.tile_size // self.step_size
-        if self.step_size < self.tile_size:
-            overlap_kernel = np.ones((ratio, ratio))
-            for z_idx in range(h_part.shape[-1]):
-                h_part[:, :, z_idx] = convolve2d(h_part[:, :, z_idx], overlap_kernel)[
-                    ratio - 1 : h_part.shape[0] + ratio - 1,
-                    ratio - 1 : h_part.shape[1] + ratio - 1,
-                ]
-
-        # locate all the cases where particles are and are not present
-        # to sample from those cases
-        if self.step_size < self.tile_size:
-            # note that the last bin is ommitted from each to avoid edge cases where
-            # the image is not complete
-
-            edge_idx = ratio - 1
-
-            # find the locations where particles are in focus
-            loc_idx = np.where(h_part[:-edge_idx, :-edge_idx, :] > 0)
-            # find locations where particles are not in focus
-            empt_idx = np.where(h_part[:-edge_idx, :-edge_idx, :] == 0)
-            #### find locations where particles are nearly in focus  ####
-            zdiff = np.diff(h_part[:-edge_idx, :-edge_idx, :], axis=2)
-            zero_pad = np.zeros(h_part[:-edge_idx, :-edge_idx, :].shape[0:2] + (1,))
-            near_empt_idx = np.where(
-                (h_part[:-edge_idx, :-edge_idx, :] == 0)
-                & (
-                    (np.concatenate([zdiff, zero_pad], axis=2) == 1)
-                    | (np.concatenate([zero_pad, zdiff], axis=2) == -1)
-                )
-            )
-            ####
-        else:
-            # find the locations where particles are in focus
-            loc_idx = np.where(h_part > 0)
-            # find locations where particles are not in focus
-            empt_idx = np.where(h_part == 0)
-            #### find locations where particles are nearly in focus ####
-            zdiff = np.diff(h_part, axis=2)
-            zero_pad = np.zeros(h_part.shape[0:2] + (1,))
-            near_empt_idx = np.where(
-                (h_part == 0)
-                & (
-                    (np.concatenate([zdiff, zero_pad], axis=2) == 1)
-                    | (np.concatenate([zero_pad, zdiff], axis=2) == -1)
-                )
-            )
-            ####
-            
-        loc_x_idx = loc_idx[0]
-        loc_y_idx = loc_idx[1]
-        loc_z_idx = loc_idx[2]
-
-        # select sub images with particles in them
-        if part_per_holo > loc_idx[0].size:
-            pass
-            # pick the entire set
-            
-        else:
-            # randomly select particles from the set
-            sel_part_idx = np.random.choice(
-                np.arange(loc_x_idx.size, dtype=int), size=part_per_holo, replace=False
-            )
-            loc_x_idx = loc_x_idx[sel_part_idx]
-            loc_y_idx = loc_y_idx[sel_part_idx]
-            loc_z_idx = loc_z_idx[sel_part_idx]
-
-        # randomly select empties from the empty set
-        #### Add nearly in focus cases to the training data ####
-        sel_empt_idx = np.random.choice(
-            np.arange(near_empt_idx[0].size, dtype=int),
-            size=empt_near_cnt,
-            replace=False,
-        )  # select nearly in focus cases
-        
-        ####
-        sel_empt_idx = np.concatenate(
-            [
-                np.random.choice(
-                    np.arange(empt_idx[0].size, dtype=int),
-                    size=(empt_per_holo - empt_near_cnt),
-                    replace=False,
-                ),
-                sel_empt_idx,
-            ]
-        )  # select random out of focus cases
-        empt_x_idx = empt_idx[0][sel_empt_idx]
-        empt_y_idx = empt_idx[1][sel_empt_idx]
-        empt_z_idx = empt_idx[2][sel_empt_idx]
-
-        # full set of plane indices to reconstruct (empty and with particles)
-        z_full_idx = np.unique(np.concatenate((loc_z_idx, empt_z_idx)))
-        _z_full_idx = []
-        for zp in z_full_idx:
-            if zp >= (self.n_bins-self.lookahead):
-                _z_full_idx.append(zp - self.lookahead - 1)
-            else:
-                _z_full_idx.append(zp)
-        z_full_idx = np.array(_z_full_idx)
-
-        # build the torch tensor for reconstruction
-        z_plane = (
-            torch.tensor(
-                self.propagator.z_centers[z_full_idx] * 1e-6, device=self.device
-            )
-            .unsqueeze(-1)
-            .unsqueeze(-1)
-        )
-
-        # grab the sub images corresponding to the selected data points
-        particle_in_focus_lst = []  # training labels for if particle is in focus
-        particle_unet_labels_lst = []  # training labels for if particle is in focus
-        image_lst = []  # sliced reconstructed image
-        image_index_lst = []  # indices used to identify the image slice
-        image_corner_coords = []  # coordinates of the corner of the image slice
-
-        for sub_idx, z_idx in enumerate(z_full_idx):
-            z_props = self.propagator.z_centers[z_idx : z_idx + self.lookahead + 1]
-            plane_indices = np.arange(z_idx, z_idx + self.lookahead + 1)
-            # select hologram
-            image = (
-                self.propagator.h_ds["image"]
-                .isel(hologram_number=h_idx)
-                .values.astype(float)
-            )
-
-            im = {
-                "image": np.expand_dims(image, 0),
-                "horizontal_flip": False,
-                "vertical_flip": False,
-            }
-
-            # add transformations here
-            if self.transform:
-                for image_transform in self.transform:
-                    im = image_transform(im)
-            image = im["image"]
-
-            # make tensors of size lookahead + 1, and then add tensors
-            prop_synths = torch.empty((len(z_props), image.shape[-2], image.shape[-1]))
-            prop_phases = torch.empty((len(z_props), image.shape[-2], image.shape[-1]))
-            masks = torch.empty((1, image.shape[-2], image.shape[-1]))
-            z_masks = torch.empty((1, image.shape[-2], image.shape[-1]))
-
-            for k, (z_prop, z_ind) in enumerate(zip(z_props, plane_indices)):
-                image_prop = self.propagator.torch_holo_set(
-                    image.to(self.device),
-                    torch.FloatTensor([z_prop * 1e-6]).to(self.device),
-                )
-                # ABS (x-input)
-                prop_synth = torch.abs(image_prop).squeeze(0)
-                prop_synths[k] = prop_synth
-                # Phase (x-input)
-                prop_phase = torch.angle(image_prop).squeeze(0)
-                prop_phases[k] = prop_phase
-                # Mask (y-label)
-                if k == 0:
-                    mask, num_particles, z_mask = create_mask(
-                        self.propagator, h_idx, z_ind, z_prop
-                    )
-                    if im["horizontal_flip"]:
-                        mask = torch.flip(mask, [1])
-                        z_mask = torch.flip(z_mask, [1])
-                    if im["vertical_flip"]:
-                        mask = torch.flip(mask, [2])
-                        z_mask = torch.flip(z_mask, [2])
-                    masks[k] = mask
-                    z_masks[k] = z_mask
-            # z_masks_window /= (z_props[-1] - z_props[0])
-
-            # cat images and masks in color dim (0 since batch not added yet)
-            image_stack = torch.cat([prop_synths, prop_phases], dim=0)
-
-            # Build the mask and pick out
-            part_set_idx = np.where(loc_z_idx == z_idx)[0]
-            empt_set_idx = np.where(empt_z_idx == z_idx)[0]
-
-            # initialize the UNET mask
-            # locate all particles in this plane
-            part_in_plane_idx = np.where(z_part_bin_idx == z_idx)[0] 
-
-            for part_idx in part_set_idx:
-                x_idx = loc_x_idx[part_idx]
-                y_idx = loc_y_idx[part_idx]
-                image_lst.append(
-                    image_stack[
-                        :,
-                        x_idx * step_size : (x_idx * step_size + tile_size),
-                        y_idx * step_size : (y_idx * step_size + tile_size),
-                    ]
-                )
-                image_index_lst.append([x_idx, y_idx, z_idx])
-                image_corner_coords.append(
-                    [
-                        self.propagator.x_arr[x_idx * step_size],
-                        self.propagator.y_arr[y_idx * step_size],
-                    ]
-                )
-                particle_in_focus_lst.append(1)
-                particle_unet_labels_lst.append(
-                    masks[
-                        :,
-                        x_idx * step_size : (x_idx * step_size + tile_size),
-                        y_idx * step_size : (y_idx * step_size + tile_size),
-                    ]
-                )
-
-            for empt_idx in empt_set_idx:
-                x_idx = empt_x_idx[empt_idx]
-                y_idx = empt_y_idx[empt_idx]
-                image_lst.append(
-                    image_stack[
-                        :,
-                        x_idx * step_size : (x_idx * step_size + tile_size),
-                        y_idx * step_size : (y_idx * step_size + tile_size),
-                    ]
-                )
-                image_index_lst.append([x_idx, y_idx, z_idx])
-                image_corner_coords.append(
-                    [
-                        self.propagator.x_arr[x_idx * step_size],
-                        self.propagator.y_arr[y_idx * step_size],
-                    ]
-                )
-                particle_in_focus_lst.append(0)
-                particle_unet_labels_lst.append(
-                    masks[
-                        :,
-                        x_idx * step_size : (x_idx * step_size + tile_size),
-                        y_idx * step_size : (y_idx * step_size + tile_size),
-                    ]
-                )
-                
-        #print("Returning", len(image_lst))
-            
-        return image_lst, particle_unet_labels_lst, particle_in_focus_lst
-
 
 def trainer(conf, trial=False):
+
     seed = 1000 if "seed" not in conf else conf["seed"]
     seed_everything(seed)
     lookahead = int(conf["data"]["lookahead"])
     conf["model"]["in_channels"] = 2 * (conf["data"]["lookahead"] + 1)
-
+    
     n_bins = int(conf["data"]["n_bins"])
     tile_size = int(conf["data"]["tile_size"])
     step_size = int(conf["data"]["step_size"])
@@ -817,7 +575,6 @@ def trainer(conf, trial=False):
             else torch.device("cpu")
         )
         device_ids = list(range(torch.cuda.device_count()))
-        
     logging.info(f"There are {torch.cuda.device_count()} GPUs available")
 
     logging.info(
@@ -843,30 +600,11 @@ def trainer(conf, trial=False):
     train_transforms = LoadTransformations(conf["transforms"]["training"])
     valid_transforms = LoadTransformations(conf["transforms"]["validation"])
 
+    
     # Load data class for reading and preparing data in matched frames
     #data_device = "cuda:0"
-    train_dataset = LoadHolograms(
-        "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc",
-        shuffle=True,
-        device=data_device,
-        n_bins=n_bins,
-        transform=train_transforms,
-        lookahead=lookahead,
-        tile_size=tile_size,
-        step_size=step_size,
-        balance = True
-    )
-    test_dataset = LoadHolograms(
-        "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_validation.nc",
-        shuffle=False,
-        device=data_device,
-        n_bins=n_bins,
-        transform=valid_transforms,
-        lookahead=lookahead,
-        tile_size=tile_size,
-        step_size=step_size,
-        balance = True
-    )
+    train_dataset = LoadHolograms("/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc", shuffle = True, device = data_device, n_bins = n_bins, transform = train_transforms, lookahead = lookahead, tile_size = tile_size, step_size = step_size)
+    test_dataset = LoadHolograms("/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_validation.nc", shuffle = False, device = data_device, n_bins = n_bins, transform = valid_transforms, lookahead = lookahead, tile_size = tile_size, step_size = step_size)
 
     # Load the iterators for batching the data
     train_loader = torch.utils.data.DataLoader(
@@ -880,7 +618,7 @@ def trainer(conf, trial=False):
     test_loader = torch.utils.data.DataLoader(
         test_dataset,
         batch_size=valid_batch_size,
-        num_workers=8,
+        num_workers=8,  # 0 = One worker with the main process
         #pin_memory=True,
         shuffle=False,
     )
@@ -898,7 +636,8 @@ def trainer(conf, trial=False):
         )
         unet.load_state_dict(checkpoint["model_state_dict"])
         learning_rate = checkpoint["optimizer_state_dict"]["param_groups"][0]["lr"]
-
+        
+    
     unet = unet.to(device)
 
     # Multi-gpu support
@@ -956,27 +695,26 @@ def trainer(conf, trial=False):
     manual_loss = []
     for epoch in range(start_epoch, epochs):
         # Train the model
-
+        
         unet.train()
 
         batch_loss = []
-        mask_losses, z_losses = [], []
-
+        mask_losses, z_losses = [],[]
+        
         train_niter = 0
         train_npos = 0
-
+        
         # set up a custom tqdm
         imb = []
-        batch_group_generator = tqdm.tqdm(
-            enumerate(train_loader), total=batches_per_epoch, leave=True
-        )
-
-        for k, (inputs, y, infocus_list) in batch_group_generator:
+        batch_group_generator = tqdm.tqdm(enumerate(train_loader), total = batches_per_epoch, leave = True)
+        for k, (inputs, y) in batch_group_generator:
             # Move data to the GPU, if not there already
-            # inputs, y is getitem
+            #inputs, y is getitem
+            
             inputs = inputs.to(device)
-            y = y.to(device)
+            y = y.to(device) 
 
+                    
             # Clear gradient
             optimizer.zero_grad()
 
@@ -992,12 +730,12 @@ def trainer(conf, trial=False):
             
             loss = train_criterion(mask, real_y)
             """
-            loss = train_criterion(pred_mask.float(), y.float())
-            # loss = train_criterion(label_weights[0] * pred_mask, label_weights[0] * y, alpha = loss_weights[0], beta = loss_weights[1])
-            mask_losses.append(loss.detach().cpu().numpy())
-            
-            imb += list(infocus_list[0].numpy())
+            #loss = train_criterion(pred_mask.float(), y.float())
 
+            loss = train_criterion(label_weights[0] * pred_mask[:,0:1,:,:].float(), label_weights[0] * y[:,0:1,:,:].float(), alpha = loss_weights[0], beta = loss_weights[1])
+            mask_losses.append(loss.detach().cpu().numpy())
+            imb.append(float(y.sum() > 0))
+            
             """
             z_pred = y[:,1:2,:,:].float()
             lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
@@ -1020,13 +758,13 @@ def trainer(conf, trial=False):
             z_losses.append(zloss.detach().cpu().numpy())
             loss += (z_weight * zloss)
             """
+            
 
             # on inference, pred_mask needs to be reconstructed (untiled and unpadded)
 
             if not np.isfinite(loss.cpu().item()):
                 logging.warning(
-                    f"Trial {trial.number} is being pruned due to loss = NaN while training"
-                )
+                    f"Trial {trial.number} is being pruned due to loss = NaN while training")
                 if trial:
                     raise optuna.TrialPruned()
                 else:
@@ -1035,6 +773,7 @@ def trainer(conf, trial=False):
             # get gradients w.r.t to parameters
             loss.backward()
             batch_loss.append(loss.item())
+            
 
             # gradient clip
             torch.nn.utils.clip_grad_norm_(unet.parameters(), grad_clip)
@@ -1042,24 +781,26 @@ def trainer(conf, trial=False):
             # update parameters
             optimizer.step()
 
+
             # ITERATE TO HERE
 
             # update tqdm
-            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} imbalance: {:.6f}".format(
-                epoch, k, np.mean(batch_loss), np.mean(mask_losses), np.mean(imb)
-            )
-            # to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses), np.mean(z_losses))
+            to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} imbalance: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses), np.mean(imb))
+            #to_print = "Epoch {}.{} train_loss: {:.6f} mask_loss: {:.6f} z_loss: {:.6f}".format(epoch, k, np.mean(batch_loss), np.mean(mask_losses), np.mean(z_losses))
             to_print += " lr: {:.12f}".format(optimizer.param_groups[0]["lr"])
             batch_group_generator.set_description(to_print)
             batch_group_generator.update()
-
+            
             train_niter += 1
-
+            
+            if (int(torch.count_nonzero(pred_mask)) != 0):
+                 train_npos += 1
+            
             if k >= batches_per_epoch and k > 0:
                 break
 
             lr_scheduler.step()  # epoch + k / batches_per_epoch
-
+                    
         # Shutdown the progbar
         batch_group_generator.close()
 
@@ -1073,30 +814,34 @@ def trainer(conf, trial=False):
         # clear the cached memory from the gpu
         torch.cuda.empty_cache()
         gc.collect()
-
+    
         # Test the model
         unet.eval()
         with torch.no_grad():
 
             batch_test_loss = []
-            mask_test_losses, z_test_losses = [], []
-
+            mask_test_losses, z_test_losses = [],[]
+            
             test_niter = 0
             test_npos = 0
-
+            
+            
             # set up a custom tqdm
-            batch_group_generator = tqdm.tqdm(enumerate(test_loader), leave=True, total=valid_batches_per_epoch)
-            for k, (inputs, y, infocus_list) in batch_group_generator:
-
+            batch_group_generator = tqdm.tqdm(enumerate(test_loader), leave=True)
+            for k, (inputs, y) in batch_group_generator:
+                
+                
+                    
                 # Move data to the GPU, if not there already
                 inputs = inputs.to(device)
                 y = y.to(device)
+                
 
                 # get output from the model, given the inputs
-                pred_mask = unet(inputs).clone().float()
-
+                pred_mask = unet(inputs)[:,0:1,:,:].clone().float()
+                
                 # get loss for the predicted output
-
+                
                 """
                 mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
                 
@@ -1104,8 +849,8 @@ def trainer(conf, trial=False):
                 loss = test_criterion(mask, y.clone()[:,0:1,:,:].float())
                 
                 """
-
-                loss = test_criterion(pred_mask, y.float())
+                
+                loss = test_criterion(pred_mask, y)
                 mask_test_losses.append(loss.detach().cpu().numpy())
                 """
                 L1Loss = torch.nn.L1Loss()
@@ -1134,28 +879,33 @@ def trainer(conf, trial=False):
 
                 batch_test_loss.append(loss.item())
                 # update tqdm
-                # to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses), np.mean(z_test_losses))
-                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(
-                    epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses)
-                )
+                #to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses), np.mean(z_test_losses))
+                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses))
                 batch_group_generator.set_description(to_print)
                 batch_group_generator.update()
 
                 test_niter += 1
-
+                
+                if (int(torch.count_nonzero(pred_mask)) != 0):
+                    test_npos += 1
+                
+                
                 if k >= valid_batches_per_epoch and k > 0:
                     break
+            
 
             # Shutdown the progbar
             batch_group_generator.close()
-
+            
+            
         # Load the manually labeled data
-        # man_loss = predict_on_manual(epoch, conf, unet, device)  # + np.mean(batch_loss)
-        # manual_loss.append(float(man_loss))
+        #man_loss = predict_on_manual(epoch, conf, unet, device)  # + np.mean(batch_loss)
+        #manual_loss.append(float(man_loss))
 
         # Use the supplied metric in the config file as the performance metric to toggle learning rate and early stopping
         test_loss = np.mean(batch_test_loss)
         mask_test_loss = np.mean(mask_test_losses)
+        test_posrate = test_npos/test_niter
         """
         z_test_loss = np.mean(z_test_losses)
         """
@@ -1186,7 +936,7 @@ def trainer(conf, trial=False):
         results_dict["epoch"].append(epoch)
         results_dict["train_loss"].append(train_loss)
         results_dict["valid_loss"].append(test_loss)
-        # results_dict["manual_loss"].append(man_loss)
+        #results_dict["manual_loss"].append(man_loss)
         results_dict["mask_train_loss"].append(mask_loss)
         results_dict["mask_test_loss"].append(mask_test_loss)
         """
@@ -1194,7 +944,8 @@ def trainer(conf, trial=False):
         results_dict["z_test_loss"].append(z_test_loss)
         """
         results_dict["learning_rate"].append(learning_rate)
-
+        results_dict["training_truepr"].append(train_posrate)
+        results_dict["test_truepr"].append(test_posrate)
         df = pd.DataFrame.from_dict(results_dict).reset_index()
 
         # Save the dataframe to disk
@@ -1238,12 +989,13 @@ def trainer(conf, trial=False):
             if len(epoch_test_losses) == 0:
                 raise optuna.TrialPruned()
 
+
     best_epoch = [
         i for i, j in enumerate(epoch_test_losses) if j == min(epoch_test_losses)
     ][0]
 
     result = {
-        # "manual_loss": manual_loss[best_epoch],
+        #"manual_loss": manual_loss[best_epoch],
         "mask_loss": epoch_test_losses[best_epoch]
     }
 
@@ -1412,17 +1164,16 @@ if __name__ == "__main__":
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     root.addHandler(ch)
-    
-    # Set the multiprocessing start method to 'spawn'
-    #set_start_method('spawn')
 
     # Load the configuration and get the relevant variables
     with open(config) as cf:
         conf = yaml.load(cf, Loader=yaml.FullLoader)
 
+        
     # Edit color channels to be compatible with lookahead
     conf["model"]["in_channels"] = 2 * (conf["data"]["lookahead"] + 1)
-
+    
+    
     # Launch PBS jobs
     if launch:
         logging.info("Launching to PBS")

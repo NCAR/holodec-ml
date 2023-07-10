@@ -22,7 +22,7 @@ optuna:
   metric: "manual_loss"
   n_trials: 999
   gpu: True
-  save_path: '/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo/'
+  save_path: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo"
   sampler:
     type: "TPESampler"
     n_startup_trials: 100
@@ -66,29 +66,29 @@ optuna:
       settings:
         name: "model_name"
         choices: ["unet", "unet++", "manet", "linknet", "fpn", "pspnet", "pan", "deeplabv3", "deeplabv3+"]
-    #model:encoder_name:
-      #type: "categorical"
-      #settings:
-        #name: "encoder_name"
-        #choices: ["resnet18", "resnet152", "densenet121", "xception", "efficientnet-b0", "mobilenet_v2", "dpn68", "vgg11"]
-    transforms:training:GaussianBlur:sigma:
-      type: "float"
+    model:encoder_name:
+      type: "categorical"
       settings:
-        name: "sigma"
-        low: 0.0
-        high: 5.0
-    transforms:training:GaussianNoise:noise:
-      type: "float"
-      settings:
-        name: "noise"
-        low: 0.0
-        high: 1.0
-    transforms:training:AdjustBrightness:brightness_factor:
-      type: "float"
-      settings:
-        name: "brightness_factor"
-        low: 0.0
-        high: 5.0
+        name: "encoder_name"
+        choices: ["resnet18", "resnet152", "densenet121", "xception", "efficientnet-b0", "mobilenet_v2", "dpn68", "vgg11"]
+    # transforms:training:GaussianBlur:sigma:
+    #   type: "float"
+    #   settings:
+    #     name: "sigma"
+    #     low: 0.0
+    #     high: 5.0
+    # transforms:training:GaussianNoise:noise:
+    #   type: "float"
+    #   settings:
+    #     name: "noise"
+    #     low: 0.0
+    #     high: 1.0
+    # transforms:training:AdjustBrightness:brightness_factor:
+    #   type: "float"
+    #   settings:
+    #     name: "brightness_factor"
+    #     low: 0.0
+    #     high: 5.0
     transforms:training:Normalize:mode:
       type: "categorical"
       settings:
