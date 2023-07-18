@@ -6,9 +6,9 @@ data:
     n_bins: 100
     data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
     raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
-    tile_size: 1024
+    tile_size: 512
     # brought up to help sampling imbalance
-    step_size: 512
+    step_size: 128
     # breaks predict_on_manual when 0. why?
     marker_size: 10
     total_positive: 10
@@ -20,7 +20,7 @@ data:
     use_cached: True
     device: "cpu"
     cores: 8
-    lookahead: 1
+    lookahead: 0
     
 style:
     weights:

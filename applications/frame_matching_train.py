@@ -1,6 +1,6 @@
 from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 
-# from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
 from echo.src.base_objective import BaseObjective
@@ -427,28 +427,39 @@ class LoadHolograms(Dataset):
 
         return (image_stack, masks)
 
+    # given a full image, slice coordinates defined in slice.idx2slice, return dict of tiles {(x,y): tensor}
     def sequential_tile(self, full_plane):
         tiles_dict = defaultdict()
         for slice_coords in self.idx2slice:
-            tiles_dict[slice_coords] = full_plane[
-                :, self.idx2slice[slice_coords][0], self.idx2slice[slice_coords][1]
-            ]
+            tiles_dict[slice_coords] = full_plane[:,self.idx2slice[slice_coords][0], self.idx2slice[slice_coords][1]]
         return tiles_dict
-
+    
+        # given dict of tiles {(x,y): tensor tile} (as returned from sequential_tile()), reconstruct full image
+        # stride overlap is sum of both tiles
     def tile_reconstruct(self, tile_dict):
-        largex, largey = (
-            self.idx2slice[list(self.idx2slice.keys())[-1]][0].stop,
-            self.idx2slice[list(self.idx2slice.keys())[-1]][1].stop,
-        )
-        print(largex, largey)
-        template = torch.zeros(
-            tile_dict[list(tile_dict.keys())[0]].shape[0], largex, largey
-        )
+        largex, largey = self.idx2slice[list(self.idx2slice.keys())[-1]][0].stop, self.idx2slice[list(self.idx2slice.keys())[-1]][1].stop
+        template = torch.zeros(1,1,largex, largey)
+        #template = torch.zeros(1,tile_dict[list(tile_dict.keys())[0]].shape[1],largex, largey)
         for coords in tile_dict:
             tile = tile_dict[coords]
             slice_coords = self.idx2slice[coords]
-            template[:, slice_coords[0], slice_coords[1]] += tile
+            template[:, :, slice_coords[0], slice_coords[1]] += tile
         return template
+            
+        # given image index, model, loss function, device, get full images at idx, split in to tiles, and get tile-wise prediction from model
+        # attach back together, and then evaluate loss between full prediction image and fullm ask image
+    def full_inference(self, idx, model, loss = "dice", device = "cpu"):
+        full_image, full_mask = self.get_full_plane(idx, device = device)
+        image_tiles = self.sequential_tile(full_image)
+        mask_tiles = self.sequential_tile(full_mask)
+        with torch.no_grad():
+            for coords in image_tiles:
+                image_tiles[coords] = model(image_tiles[coords].unsqueeze(0))[:,0:1,:,:]
+        full_inference_frame = self.tile_reconstruct(image_tiles).squeeze(0)[0:1,:,:].float()
+        full_inference_mask = self.tile_reconstruct(mask_tiles).squeeze(0).float()
+        test_criterion = load_loss(loss, split = "validation")
+        val_loss = test_criterion(full_inference_frame, full_inference_mask)
+        return(val_loss)
 
     def get_reconstructed_sub_images(
         self, h_idx, part_per_holo=None, empt_per_holo=None
@@ -918,23 +929,23 @@ def trainer(conf, trial=False):
     train_criterion = load_loss(training_loss)
     test_criterion = load_loss(valid_loss, split="validation")
 
-    # Load a learning rate scheduler
-    #             lr_scheduler = ReduceLROnPlateau(
-    #                 optimizer,
-    #                 patience=1,
-    #                 min_lr=1.0e-13,
-    #                 verbose=True
-    #             )
-    lr_scheduler = CosineAnnealingWarmupRestarts(
+    #Load a learning rate scheduler
+    lr_scheduler = ReduceLROnPlateau(
         optimizer,
-        first_cycle_steps=batches_per_epoch,
-        cycle_mult=1.0,
-        max_lr=learning_rate,
-        min_lr=1e-3 * learning_rate,
-        warmup_steps=50,
-        # warmup_steps = 50,
-        gamma=0.8,
+        patience=1,
+        min_lr=1.0e-13,
+        verbose=True
     )
+    # lr_scheduler = CosineAnnealingWarmupRestarts(
+    #     optimizer,
+    #     first_cycle_steps=batches_per_epoch,
+    #     cycle_mult=1.0,
+    #     max_lr=learning_rate,
+    #     min_lr=1e-3 * learning_rate,
+    #     warmup_steps=50,
+    #     # warmup_steps = 50,
+    #     gamma=0.8,
+    # )
 
     # Reload the results saved in the training csv if continuing to train
     if start_epoch == 0:
@@ -1058,7 +1069,7 @@ def trainer(conf, trial=False):
             if k >= batches_per_epoch and k > 0:
                 break
 
-            lr_scheduler.step()  # epoch + k / batches_per_epoch
+            #lr_scheduler.step()  # epoch + k / batches_per_epoch
 
         # Shutdown the progbar
         batch_group_generator.close()
@@ -1207,7 +1218,7 @@ def trainer(conf, trial=False):
             df.to_csv(f"{model_loc}/training_log.csv", index=False)
 
         # Lower the learning rate if we are not improving
-        # lr_scheduler.step(test_loss)
+        lr_scheduler.step(test_loss)
 
         # Report result to the trial
         if trial:

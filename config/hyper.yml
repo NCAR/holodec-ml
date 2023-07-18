@@ -3,7 +3,7 @@ save_path: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/echo"
 
 pbs:
   jobs: 15
-  bash: ["source ~/.bashrc"]
+  bash: ["source ~/.bashrc conda activate holodec"]
   batch:
     N: "holo-echo"
     l: ["select=1:ncpus=8:ngpus=1:mem=128GB", "walltime=24:00:00", "gpu_type=v100"]
