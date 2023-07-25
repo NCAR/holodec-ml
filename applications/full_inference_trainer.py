@@ -1,9 +1,12 @@
-from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
+#from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from holodecml.propagation import InferencePropagator
 from holodecml.transforms import LoadTransformations
 from echo.src.base_objective import BaseObjective
+
+from holodecml.metrics import DistributedROC
+from hagelslag.evaluation.MetricPlotter import roc_curve, performance_diagram
 
 # from holodecml.seed import seed_everything
 from holodecml.data import XarrayReader
@@ -495,9 +498,8 @@ class LoadHolograms(Dataset):
     
         # given dict of tiles {(x,y): tensor tile} (as returned from sequential_tile()), reconstruct full image
         # stride overlap is sum of both tiles
-    def tile_reconstruct(self, tile_dict):
-        largex, largey = self.idx2slice[list(self.idx2slice.keys())[-1]][0].stop, self.idx2slice[list(self.idx2slice.keys())[-1]][1].stop
-        template = torch.zeros(1,1,largex, largey)
+    def tile_reconstruct(self, tile_dict, largex, largey):
+        template = torch.zeros(1, 1, largex, largey)
         counter = torch.zeros(largex, largey)
         #template = torch.zeros(1,tile_dict[list(tile_dict.keys())[0]].shape[1],largex, largey)
         for coords in tile_dict:
@@ -509,30 +511,79 @@ class LoadHolograms(Dataset):
             
         # given image index, model, loss function, device, get full images at idx, split in to tiles, and get tile-wise prediction from model
         # attach back together, and then evaluate loss between full prediction image and fullm ask image
-    def full_inference(self, h_idx, z_idx_list, model, loss = "dice", device = "cpu"):
-        plane_generator = self.get_full_plane(h_idx, z_idx_list, device = device)
-        frame_list = []
-        mask_list = []
-        counter_list = []
-        for (full_image, full_mask) in plane_generator:
-            image_tiles = self.sequential_tile(full_image)
-            mask_tiles = self.sequential_tile(full_mask)
-            with torch.no_grad():
-                for coords in image_tiles:
-                    image_tiles[coords] = model(image_tiles[coords].unsqueeze(0))[:,0:1,:,:]
-            full_inference_frame = self.tile_reconstruct(image_tiles)[0].squeeze(0)[0:1,:,:].float()
-            full_inference_mask, full_mask_counter = self.tile_reconstruct(mask_tiles)
-            counter_list += full_mask_counter.unsqueeze(0).unsqueeze(0)
-            frame_list += full_inference_frame.unsqueeze(0).unsqueeze(0)
-            mask_list += full_mask_counter.unsqueeze(0).unsqueeze(0)
+        
+        
+    def get_full_plane(self, h_idx, z_idx_list, device = "cpu"):
+        image = self.propagator.h_ds['image'].isel(hologram_number=h_idx+1).values
+        # select hologram
+        im = {
+            "image": np.expand_dims(image, 0),
+            "horizontal_flip": False,
+            "vertical_flip": False
+        }
+        
+        if self.transform:
+            for image_transform in self.transform:
+                im = image_transform(im)
+        image = im["image"]
+        
+        for z_idx in z_idx_list:
+            z_props = self.propagator.z_centers[z_idx: z_idx + self.lookahead + 1]
+            # select planes for lookahead
+            plane_indices = np.arange(z_idx, z_idx + self.lookahead + 1)
 
-        inference_frames = torch.cat(frame_list, dim = 0)  
-        mask_frames = torch.cat(mask_list, dim = 0)
-        counter_frames = torch.cat(mask_list, dim = 0)
+            # Make tensors of size lookahead + 1, and then add tensors
+            prop_synths = np.zeros((self.lookahead + 1, *image.shape))
+            prop_phases = np.zeros((self.lookahead + 1, *image.shape))
+            masks = np.zeros((1, *image.shape[-2:]))
+            particles_in_frames = []
+
+            for k, (z_prop, z_ind) in enumerate(zip(z_props, plane_indices)):
+                image_prop = self.propagator.torch_holo_set(
+                    image.to(device),
+                    torch.FloatTensor([z_prop*1e-6]).to(device)
+                )
+                # ABS (x-input)
+                prop_synth = torch.abs(image_prop)
+                prop_synths[k] = prop_synth
+                # Phase (x-input)
+                prop_phase = torch.angle(image_prop)
+                prop_phases[k] = prop_phase  
+                # Mask (y-label)
+                if k == 0:
+                    mask, num_particles, _ = create_mask(self.propagator, h_idx, z_ind, z_prop)
+                    if im["horizontal_flip"]:
+                        mask = torch.flip(mask, dims=(1,))
+                    if im["vertical_flip"]:
+                        mask = torch.flip(mask, dims=(2,))
+                    masks[k] = mask
+                    particles_in_frames.append(num_particles)
+
+            # cat target frames with lookahead context frames, convert to ndarrays
+            synth_window = np.concatenate(prop_synths, axis=0)
+            phases_window = np.concatenate(prop_phases, axis=0)
+            masks_window = np.concatenate(masks, axis=0)
+            
+            # cat images and masks in color dim (0 since batch not added yet)
+            image_stack = np.concatenate([synth_window, phases_window], axis=0)
+            masks_stack = np.concatenate([masks_window], axis=0)
+
+            yield (torch.from_numpy(image_stack).float(), torch.from_numpy(masks_stack).int())
+        
+        
+    def full_inference(self, idx, model, loss = "dice", device = "cpu"):
+        full_image, full_mask = self.get_full_plane(idx, device = device)
+        image_tiles = self.sequential_tile(full_image)
+        mask_tiles = self.sequential_tile(full_mask)
+        with torch.no_grad():
+            for coords in image_tiles:
+                image_tiles[coords] = model(image_tiles[coords].unsqueeze(0))[:,0:1,:,:]
+        full_inference_frame = self.tile_reconstruct(image_tiles)[0].squeeze(0)[0:1,:,:].float()
+        full_inference_mask, full_mask_counter = self.tile_reconstruct(mask_tiles)
         test_criterion = load_loss(loss, split = "validation")
-        val_loss = test_criterion(inference_frames, mask_frames)
-        return(val_loss, mask_frames, counter_frames)
-
+        val_loss = test_criterion(full_inference_frame, full_inference_mask)
+        return(val_loss, full_inference_frame, full_mask_counter)
+            
     def get_reconstructed_sub_images(
         self, h_idx, part_per_holo=None, empt_per_holo=None
     ):
@@ -1067,42 +1118,11 @@ def trainer(conf, trial=False):
             pred_mask = unet(inputs).clone().float()
 
             # get loss for the predicted output
-            """
-            mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
-            
-            #print(mask.shape, z_mask.shape, y.shape)
-            real_y = (y.clone()[:,0:1,:,:].float())
-            
-            loss = train_criterion(mask, real_y)
-            """
             loss = train_criterion(pred_mask.float(), y.float())
             # loss = train_criterion(label_weights[0] * pred_mask, label_weights[0] * y, alpha = loss_weights[0], beta = loss_weights[1])
             mask_losses.append(loss.detach().cpu().numpy())
             
             imb += list(infocus_list[0].numpy())
-
-            """
-            z_pred = y[:,1:2,:,:].float()
-            lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
-            z_pred = z_pred[lossfilter]
-            z_mask = z_mask[lossfilter]
-            L1Loss = torch.nn.L1Loss()
-            
-            zloss = L1Loss(z_pred, z_mask)
-
-            if not np.isfinite(zloss.cpu().item()):
-                    print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
-                    logging.warning("nan z-trainloss! dumping file...")
-                    y_dumploc = conf["save_loc"] + "/yclone_train.pt"
-                    torch.save(y.float(), y_dumploc)
-                    x_dumploc = conf["save_loc"] + "/xclone_train.pt"
-                    torch.save(inputs.float(), x_dumploc)
-                    z_dumploc = conf["save_loc"] + "/zclone_train.pt"
-                    torch.save(z_mask.float(), z_dumploc)
-                    sys.exit(1)    
-            z_losses.append(zloss.detach().cpu().numpy())
-            loss += (z_weight * zloss)
-            """
 
             # on inference, pred_mask needs to be reconstructed (untiled and unpadded)
 
@@ -1150,114 +1170,46 @@ def trainer(conf, trial=False):
         train_loss = np.mean(batch_loss)
         mask_loss = np.mean(mask_losses)
         train_posrate = train_npos / train_niter
-        """
-        z_loss = np.mean(z_losses)
-        """
+
         # clear the cached memory from the gpu
         torch.cuda.empty_cache()
         gc.collect()
 
         
-        ## FULL IMAGE TESTING
-        unet.eval()
-        holograms = []
-        z_indices = []
+        # Test the model with full images
         
+        obs_threshold = 0.5
+        thresholds = np.arange(0, 1, 0.1)
+        total_roc = DistributedROC(thresholds=thresholds, obs_threshold=obs_threshold)
         
-
-
+        h_idx = 0
+        z_idx_list = range(190, 200) #range(1000 - lookahead) #[100, 200, 300, 400, 500, 600, 700, 800, 900] #range(1000 - lookahead)
+        inf_generator = test_dataset.get_full_plane(h_idx, z_idx_list, device = data_device)
         
-        # Test the model
-        unet.eval()
-        with torch.no_grad():
-
-            batch_test_loss = []
-            mask_test_losses, z_test_losses = [], []
-
-            test_niter = 0
-            test_npos = 0
-
-            # set up a custom tqdm
-            batch_group_generator = tqdm.tqdm(enumerate(test_loader), leave=True, total=valid_batches_per_epoch)
-            for k, (inputs, y, infocus_list) in batch_group_generator:
-
-                # Move data to the GPU, if not there already
-                inputs = inputs.to(device)
-                y = y.to(device)
-
-                # get output from the model, given the inputs
-                pred_mask = unet(inputs).clone().float()
-
-                # get loss for the predicted output
-
-                """
-                mask, z_mask = pred_mask[:,0:1,:,:].clone().float(), pred_mask[:,1:2,:,:].clone().float()
-                
-
-                loss = test_criterion(mask, y.clone()[:,0:1,:,:].float())
-                
-                """
-
-                loss = test_criterion(pred_mask, y.float())
-                mask_test_losses.append(loss.detach().cpu().numpy())
-                """
-                L1Loss = torch.nn.L1Loss()
-                z_pred = y[:,1:2,:,:].float()
-                lossfilter = (~torch.isnan(z_pred)) & (~torch.isnan(z_mask)) & (~torch.isinf(z_pred)) & (~torch.isinf(z_mask))
-                z_pred = z_pred[lossfilter]
-                z_mask = z_mask[lossfilter]
-                zloss = L1Loss(z_pred, z_mask)       
-
-                if not np.isfinite(zloss.cpu().item()):
-                    print("pred, true", z_mask.shape, y.clone()[:,1:2,:,:].float().shape)
-                    logging.warning("nan z-trainloss! dumping file...")
-                    y_dumploc = conf["save_loc"] + "/yclone_test.pt"
-                    torch.save(y.float(), y_dumploc)
-                    x_dumploc = conf["save_loc"] + "/xclone_test.pt"
-                    torch.save(inputs.float(), x_dumploc)
-                    z_dumploc = conf["save_loc"] + "/zclone_test.pt"
-                    torch.save(z_mask.float(), z_dumploc)
-                    sys.exit(1)         
-
-                        
-                        
-                z_test_losses.append(zloss.detach().cpu().numpy())
-                loss += (z_weight * zloss)     
-                """
-
-                batch_test_loss.append(loss.item())
-                # update tqdm
-                # to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f} z_loss {:.6f}".format(epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses), np.mean(z_test_losses))
-                to_print = "Epoch {}.{} test_loss: {:.6f} mask_loss: {:.6f}".format(
-                    epoch, k, np.mean(batch_test_loss), np.mean(mask_test_losses)
-                )
-                batch_group_generator.set_description(to_print)
-                batch_group_generator.update()
-
-                test_niter += 1
-
-                if k >= valid_batches_per_epoch and k > 0:
-                    break
-
-            # Shutdown the progbar
-            batch_group_generator.close()
-
-        # Load the manually labeled data
-        # man_loss = predict_on_manual(epoch, conf, unet, device)  # + np.mean(batch_loss)
-        # manual_loss.append(float(man_loss))
-
-        # Use the supplied metric in the config file as the performance metric to toggle learning rate and early stopping
-        test_loss = np.mean(batch_test_loss)
-        mask_test_loss = np.mean(mask_test_losses)
-        """
-        z_test_loss = np.mean(z_test_losses)
-        """
+        for k, (x_input, z_mask) in enumerate(inf_generator):
+            Nx, Ny = z_mask.shape
+            image_tiles = test_dataset.sequential_tile(x_input)
+            with torch.no_grad():
+                for coords in image_tiles:
+                    image_tiles[coords] = unet(image_tiles[coords].unsqueeze(0).to(device))[:,0:1,:,:].cpu()
+            full_inference_frame = test_dataset.tile_reconstruct(image_tiles, Nx, Ny)[0].squeeze(0)[0:1,:,:].squeeze().float()
+            this_roc = DistributedROC(thresholds=thresholds, obs_threshold=obs_threshold)
+            this_roc.update(full_inference_frame.ravel(), observations=z_mask.ravel())
+            total_roc.merge(this_roc)
+            
+        val_auc = total_roc.auc()
+        val_maxcsi = total_roc.max_csi()
+        best_threh, score = total_roc.max_threshold_score()
+        
+        if not np.isfinite(val_auc):
+            val_auc = 0.0
+        test_loss = val_auc
+        epoch_test_losses.append(val_auc)
+        
         if trial:
             if not np.isfinite(test_loss):
                 raise optuna.TrialPruned()
-
-        epoch_test_losses.append(test_loss)
-
+        
         # clear the cached memory from the gpu
         torch.cuda.empty_cache()
         gc.collect()
@@ -1278,14 +1230,10 @@ def trainer(conf, trial=False):
         # Put things into a results dictionary -> dataframe
         results_dict["epoch"].append(epoch)
         results_dict["train_loss"].append(train_loss)
-        results_dict["valid_loss"].append(test_loss)
-        # results_dict["manual_loss"].append(man_loss)
-        results_dict["mask_train_loss"].append(mask_loss)
-        results_dict["mask_test_loss"].append(mask_test_loss)
-        """
-        results_dict["z_train_loss"].append(z_loss)
-        results_dict["z_test_loss"].append(z_test_loss)
-        """
+        results_dict["val_auc"].append(val_auc)
+        results_dict["val_max_csi"].append(val_maxcsi)
+        results_dict["best_threshold"].append(best_threh)
+        results_dict["best_score"].append(score)
         results_dict["learning_rate"].append(learning_rate)
 
         df = pd.DataFrame.from_dict(results_dict).reset_index()
@@ -1330,14 +1278,14 @@ def trainer(conf, trial=False):
 
             if len(epoch_test_losses) == 0:
                 raise optuna.TrialPruned()
-
+       
     best_epoch = [
         i for i, j in enumerate(epoch_test_losses) if j == min(epoch_test_losses)
     ][0]
 
     result = {
         # "manual_loss": manual_loss[best_epoch],
-        "mask_loss": epoch_test_losses[best_epoch]
+        "auc_loss": epoch_test_losses[best_epoch]
     }
 
     return result
@@ -1378,100 +1326,6 @@ def dice(true, pred, k=1, eps=1e-12):
     dice = intersection / denominator
     return dice
 
-
-def predict_on_manual(epoch, conf, model, device, max_cluster_per_image=10000):
-
-    model.eval()
-
-    n_bins = conf["data"]["n_bins"]
-    tile_size = conf["data"]["tile_size"]
-    step_size = conf["data"]["step_size"]
-    marker_size = conf["data"]["marker_size"]
-    raw_path = conf["data"]["raw_data"]
-    output_path = conf["data"]["output_path"]
-    transform_mode = (
-        "None"
-        if "transform_mode" not in conf["data"]
-        else conf["data"]["transform_mode"]
-    )
-    color_dim = conf["model"]["in_channels"]
-
-    inference_mode = conf["inference"]["mode"]
-    probability_threshold = conf["inference"]["probability_threshold"]
-    valid_batch_size = conf["trainer"]["valid_batch_size"]
-
-    if "Normalize" in conf["transforms"]["training"]:
-        conf["transforms"]["validation"]["Normalize"]["mode"] = conf["transforms"][
-            "training"
-        ]["Normalize"]["mode"]
-        conf["transforms"]["inference"]["Normalize"]["mode"] = conf["transforms"][
-            "training"
-        ]["Normalize"]["mode"]
-
-    tile_transforms = (
-        None
-        if "inference" not in conf["transforms"]
-        else LoadTransformations(conf["transforms"]["inference"])
-    )
-
-    output_path = "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic/"
-    with torch.no_grad():
-        inputs = torch.from_numpy(
-            np.load(os.path.join(output_path, f"manual_images_{transform_mode}.npy"))
-        ).float()
-        labels = torch.from_numpy(
-            np.load(os.path.join(output_path, f"manual_labels_{transform_mode}.npy"))
-        ).float()
-
-        prop = InferencePropagator(
-            raw_path,
-            n_bins=n_bins,
-            color_dim=color_dim,
-            tile_size=tile_size,
-            step_size=step_size,
-            marker_size=marker_size,
-            transform_mode=transform_mode,
-            device=device,
-            model=model,
-            mode=inference_mode,
-            probability_threshold=probability_threshold,
-            transforms=tile_transforms,
-        )
-        # apply transforms
-        inputs = torch.from_numpy(
-            np.expand_dims(
-                np.vstack([prop.apply_transforms(x) for x in inputs.numpy()]), 1
-            )
-        )
-
-        performance = defaultdict(list)
-        batched = zip(
-            np.array_split(inputs, inputs.shape[0] // valid_batch_size),
-            np.array_split(labels, inputs.shape[0] // valid_batch_size),
-        )
-        my_iter = tqdm.tqdm(
-            batched, total=inputs.shape[0] // valid_batch_size, leave=True
-        )
-
-        with torch.no_grad():
-            for (x, y) in my_iter:
-                pred_labels = prop.model(x.to(device)) > probability_threshold
-                for pred_label, true_label in zip(pred_labels, y):
-                    pred_label = torch.sum(pred_label).float().cpu()
-                    pred_label = 1 if pred_label > 0 else 0
-                    performance["pred_label"].append(pred_label)
-                    performance["true_label"].append(int(true_label[0].item()))
-                man_loss = dice(performance["true_label"], performance["pred_label"])
-                to_print = "Epoch {} man_loss: {:.6f}".format(epoch, 1.0 - man_loss)
-                my_iter.set_description(to_print)
-                my_iter.update()
-
-        man_loss = dice(performance["true_label"], performance["pred_label"])
-
-        # Shutdown the progbar
-        my_iter.close()
-
-    return 1.0 - man_loss
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # See also: https://github.com/JunMa11/SegLoss/blob/master/losses_pytorch/dice_loss.py
 
-def load_loss(loss_name, split="training", weights = None, sampleweights = None):
+def load_loss(loss_name, split="training", weights = None):
 
     supported = ["dice", "dice-bce", "iou", "focal", "tyversky",
                  "focal-tyversky", "lovasz-hinge", "combo"]
@@ -50,7 +50,9 @@ class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
+    def forward(self, inputs, targets, **kwargs):
+        smooth = kwargs.get('smooth', 1)
+
 
         # comment out if your model contains a sigmoid or equivalent activation layer
         #inputs = F.sigmoid(inputs)
@@ -70,7 +72,8 @@ class DiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceBCELoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
+    def forward(self, inputs, targets, **kwargs):
+        smooth = kwargs.get('smooth', 1)
 
         # comment out if your model contains a sigmoid or equivalent activation layer
         #inputs = F.sigmoid(inputs)
@@ -92,7 +95,9 @@ class IoULoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(IoULoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
+    def forward(self, inputs, targets, **kwargs):
+        smooth = kwargs.get('smooth', 1)
+        
 
         # comment out if your model contains a sigmoid or equivalent activation layer
         #inputs = F.sigmoid(inputs)
@@ -116,7 +121,10 @@ class FocalLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(FocalLoss, self).__init__()
 
-    def forward(self, inputs, targets, alpha=0.8, gamma=2, smooth=1):
+    def forward(self, inputs, targets, **kwargs):
+        smooth = kwargs.get('smooth', 1)
+        alpha = kwargs.get('alpha', 0.8)
+        gamma = kwargs.get('gamma', 2)
 
         # comment out if your model contains a sigmoid or equivalent activation layer
         #inputs = F.sigmoid(inputs)
@@ -137,7 +145,10 @@ class TverskyLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(TverskyLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1, alpha=0.5, beta=0.5):
+    def forward(self, inputs, targets, **kwargs):
+        smooth = kwargs.get('smooth', 1)
+        alpha = kwargs.get('alpha', 0.5)
+        beta = kwargs.get('beta', 0.5)
 
         # comment out if your model contains a sigmoid or equivalent activation layer
         #inputs = F.sigmoid(inputs)
@@ -160,7 +171,11 @@ class FocalTverskyLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(FocalTverskyLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1, alpha=0.5, beta=0.5, gamma=1):
+    def forward(self, inputs, targets, **kwargs):
+        smooth = kwargs.get('smooth', 1)
+        alpha = kwargs.get('alpha', 0.5)
+        beta = 1 - alpha
+        gamma = kwargs.get('gamma', 1)
 
         # comment out if your model contains a sigmoid or equivalent activation layer
         #inputs = F.sigmoid(inputs)
@@ -184,8 +199,11 @@ class ComboLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(ComboLoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1, alpha=0.5, CE_RATIO=0.5, eps=1e-9):
-
+    def forward(self, inputs, targets, **kwargs):
+        smooth = kwargs.get('smooth', 1)
+        alpha = kwargs.get('alpha', 0.5)
+        CE_RATIO = kwargs.get('CE_RATIO', 0.5)
+        eps = kwargs.get('eps', 1e-9)
         # flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
@@ -208,7 +226,7 @@ class LovaszHingeLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(LovaszHingeLoss, self).__init__()
 
-    def forward(self, inputs, targets):
+    def forward(self, inputs, targets, **kwargs):
         #inputs = F.sigmoid(inputs)
         Lovasz = lovasz_hinge(inputs, targets, per_image=False)
         return Lovasz
