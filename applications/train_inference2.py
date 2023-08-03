@@ -139,7 +139,7 @@ class XarrayReaderBalancer(Dataset):
             elif infocus and label.sum() > 0:
                 break  
             else:
-                idx = random.randint(0, self.__len__())
+                idx = random.randint(0, self.__len__() - 1)
             
         im = {
             "image": image,#, np.expand_dims(image, 0),
@@ -787,7 +787,7 @@ def trainer(conf, trial=False):
         unet.eval()
 
         h_range = [0]
-        z_list = np.array(range(190, 200))
+        z_list = np.array(range(170, 220))
         data_set = "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_validation.nc"
         with torch.no_grad():
             prop = InferencePropagator2(
