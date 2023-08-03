@@ -1,21 +1,26 @@
 seed: 1000
-save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/classic_full_inference2"
+# brought down to 100 to help sampling imbalance
+save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/bestmodel"
+
 data:
-    n_bins: 1000
+    n_bins: 100
     data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
     raw_data: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/real_holograms_CSET_RF07_20150719_200000-210000.nc"
     tile_size: 512
+    # brought up to help sampling imbalance
     step_size: 128
+    # breaks predict_on_manual when 0. why?
     marker_size: 10
-    total_positive: 6
-    total_negative: 6
+    total_positive: 10
+    total_negative: 10
     total_training: 100000
     transform_mode: 'None'
     #prefix: "random"
-    output_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/tiled_synthetic"
+    output_path: "/glade/scratch/hkoutlaw01"
     use_cached: True
     device: "cpu"
-    cores: 0
+    cores: 8
+    lookahead: 0
     
 style:
     weights:
@@ -42,48 +47,54 @@ transforms:
             rate: 0.5
         Normalize:
             mode: 'sym'
-#         GaussianBlur:
-#             rate: 1.0
-#             kernel_size: 1
-#             sigma: 2.1252219359742823
-#         GaussianNoise:
-#             rate: 1.0
-#             noise: 0.3258530643453389
-#         AdjustBrightness:
-#             rate: 1.0
-#             brightness_factor: 1.269735791766263
-        ToTensor: True
+        # GaussianBlur:
+        #     rate: 1.0
+        #     kernel_size: 1
+        #     sigma: 2.1252219359742823
+        # GaussianNoise:
+        #     rate: 1.0
+        #     noise: 0.3258530643453389
+        # AdjustBrightness:
+        #     rate: 1.0
+        #     brightness_factor: 1.269735791766263
+        ToTensor: False      
     validation:
         Normalize:
             mode: 'sym'
-        ToTensor: True
+        ToTensor: False
     inference:
         Normalize:
             mode: 'sym'
             
 model:
-    name: "linknet"
+    name: "pspnet"
     encoder_name: "vgg11"
-    encoder_weights: "imagenet"
-    in_channels: 1
+    #encoder_weights: "imagenet"
+    in_channels: 2
     classes: 1
     activation: "sigmoid"
+    #encoder_depth: 4
+    #out_channels: 2
     
 optimizer:
     learning_rate: 0.00014105651059948075
     weight_decay: 6.043702479460191e-06
     
 trainer:
-    epochs: 100
-    train_batch_size: 16
+    epochs: 1000
+    # 1000
+    train_batch_size: 8
     valid_batch_size: 16
     batches_per_epoch: 250
+    # 250
     valid_batches_per_epoch: 100
-    stopping_patience: 10
+    # 100
+    stopping_patience: 4
     training_loss: "focal-tyversky"
     validation_loss: "dice"
-    ftl_alpha: 0.5
-    upsample: 0.5
+    z_weight: 0.2
+    positive_label_weight: 50
+    loss_alpha: 0.3
     
 inference:
     mode: "mask"

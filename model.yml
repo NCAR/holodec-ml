@@ -1,5 +1,6 @@
 seed: 1000
-save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml/results/classic_full_inference2"
+save_loc: "/glade/work/hkoutlaw01/holorepos/holodec-ml"
+
 data:
     n_bins: 1000
     data_path: "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc"
@@ -79,11 +80,9 @@ trainer:
     valid_batch_size: 16
     batches_per_epoch: 250
     valid_batches_per_epoch: 100
-    stopping_patience: 10
+    stopping_patience: 4
     training_loss: "focal-tyversky"
     validation_loss: "dice"
-    ftl_alpha: 0.5
-    upsample: 0.5
     
 inference:
     mode: "mask"

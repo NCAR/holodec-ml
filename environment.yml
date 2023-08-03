@@ -22,4 +22,5 @@ dependencies:
     - hagelslag
     - psutil
     - git+https://github.com/NCAR/echo-opt
+    - git+https://github.com/katsura-jp/pytorch-cosine-annealing-with-warmup
     - .

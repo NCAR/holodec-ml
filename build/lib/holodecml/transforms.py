@@ -190,19 +190,20 @@ class Normalize(object):
         image = sample['image']  # .astype(np.float32)
 
         if self.mode == "norm":
-            image -= image.min().astype(image.dtype)
-            image /= image.max().astype(image.dtype)
+            image = image - image.min()
+            image = image / image.max()
 
         if self.mode == "stan":
-            image -= image.mean().astype(image.dtype)
-            image /= image.std().astype(image.dtype)
+            image = image - image.mean()
+            image = image / image.std()
 
         if self.mode == "sym":
             image = -1 + 2.0*(image - image.min())/(image.max() - image.min())
 
         if self.mode == "255":
             #image /= 255.0
-            image[0] /= 255.0
+            image[0] = (image[0] / 255.0)
+            
             if image.shape[0] > 1:
                 image[1] = (1.0 + image[1] / np.pi) / 2.0
 
