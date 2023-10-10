@@ -220,22 +220,30 @@ def trainer(rank, world_size, conf, trial=False):
 
     # Load the data class for reading and preparing the data as needed to train the u-net
     # train_dataset = XarrayReader(fn_train, train_transforms, mode="mask")
-    # test_dataset = XarrayReader(fn_valid, valid_transforms, mode="mask")
 
     # train_dataset = LoadHolograms(
     #     "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc", 
     #     shuffle = False, 
-    #     device = device, 
+    #     device = rank, 
     #     n_bins = int(conf["data"]["n_bins"]), 
     #     transform = train_transforms, 
     #     lookahead = 0, 
     #     tile_size = tile_size, 
     #     step_size = step_size
     # )
+    
+    # test_dataset = XarrayReader(fn_valid, valid_transforms, mode="mask")
+
+    train_dataset = UpsamplingReader(
+        conf, 
+        "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc", 
+        train_transforms
+    )
+    
     # test_dataset = LoadHolograms(
     #     "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_validation.nc", 
     #     shuffle = False, 
-    #     device = device, 
+    #     device = rank, 
     #     n_bins = int(conf["data"]["n_bins"]), 
     #     transform = valid_transforms, 
     #     lookahead = 0, 
@@ -243,17 +251,10 @@ def trainer(rank, world_size, conf, trial=False):
     #     step_size = step_size
     # )
 
-    train_dataset = UpsamplingReader(
-        conf, 
-        "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_training.nc", 
-        train_transforms,
-        #device = device
-    )
     test_dataset = UpsamplingReader(
         conf, 
         "/glade/p/cisl/aiml/ai4ess_hackathon/holodec/synthetic_holograms_500particle_gamma_4872x3248_validation.nc",
-        valid_transforms,
-        #device = device
+        valid_transforms
     )
 
     # setup the distributed sampler
@@ -427,7 +428,8 @@ def trainer(rank, world_size, conf, trial=False):
             if k >= batches_per_epoch and k > 0:
                 break
 
-            #lr_scheduler.step()  # epoch + k / batches_per_epoch
+            if isinstance(lr_scheduler, CosineAnnealingWarmupRestarts):
+                lr_scheduler.step()  # epoch + k / batches_per_epoch
 
         # Shutdown the progbar
         batch_group_generator.close()
@@ -438,8 +440,8 @@ def trainer(rank, world_size, conf, trial=False):
         train_loss = batch_loss[0]
 
         # clear the cached memory from the gpu
-        #torch.cuda.empty_cache()
-        #gc.collect()
+        torch.cuda.empty_cache()
+        gc.collect()
 
         # Test the model
         model.eval()
@@ -493,8 +495,8 @@ def trainer(rank, world_size, conf, trial=False):
         epoch_test_losses.append(test_loss)
 
         # clear the cached memory from the gpu
-        #torch.cuda.empty_cache()
-        #gc.collect()
+        torch.cuda.empty_cache()
+        gc.collect()
 
         # Save the model if its the best so far.
         if not trial and (test_loss == min(epoch_test_losses)):
@@ -527,7 +529,8 @@ def trainer(rank, world_size, conf, trial=False):
             df.to_csv(f"{model_loc}/training_log.csv", index=False)
 
         # Lower the learning rate if we are not improving
-        lr_scheduler.step(test_loss)
+        if isinstance(lr_scheduler, ReduceLROnPlateau):
+            lr_scheduler.step(test_loss)
 
         # Report result to the trial
         if trial:
