@@ -16,11 +16,12 @@ class LoadHolograms(Dataset):
         shuffle=False,
         device="cpu",
         transform=False,
-        lookahead=0,
+        lookahead=2,  # this is really the number of planes
         step_size=32,
         tile_size=32,
         balance=True,
         output_lst=None,  # output functions to apply to complex field (abs, real, imag)
+        deweight=1e-3,  # deweighting applied to nonparticle pixels in weight mask
     ):
 
         # num of waveprop windows
@@ -29,7 +30,9 @@ class LoadHolograms(Dataset):
         self.device = device
         # shuffle frames
         self.shuffle = shuffle
-        # num of frames to look ahead
+        # number of planes to reconstruct around the z position
+        # for this class lookahead must be 2 or more
+        assert lookahead > 1
         self.lookahead = lookahead
         self.z_bck_idx = int(np.floor((self.lookahead-1)/2)) # planes back from indexed plane
         self.z_fwd_idx = int(np.ceil((self.lookahead-1)/2))+1  # planes in front of indexed plane
@@ -54,6 +57,8 @@ class LoadHolograms(Dataset):
             self.output_lst = [torch.abs, torch.angle]
         else:
             self.output_lst = output_lst
+
+        self.deweight = deweight
 
     def __len__(self):
         return len(self.indices)
@@ -82,8 +87,6 @@ class LoadHolograms(Dataset):
             torch.FloatTensor([self.propagator.z_centers[z_slc,np.newaxis,np.newaxis]*1e-6]).to(self.device)
         ) # image now has dims (z-planes, x, y)
 
-        # TODO
-        # phase normalization to avoid edge effeccts
         ch_lst = []
         for fnc in self.output_lst:
             ch_lst.append(fnc(image))
@@ -91,15 +94,13 @@ class LoadHolograms(Dataset):
 
         # image = torch.abs(image).cpu().numpy() ### the transforms all need to be done with torch and not numpy in a future version.
         # image, hflip, vflip = self.apply_transforms(image)
-        num_particles, part_mask, depth_mask = self.create_mask(h_idx, z_idx)
+        num_particles, part_mask, depth_mask, weight_mask = self.create_mask(h_idx, z_idx)
         # mask = torch.flip(mask, [0]) if hflip else mask
         # mask = torch.flip(mask, [1]) if vflip else mask
-        return self.pad_images_and_mask(in_channels, part_mask, depth_mask)
+        return self.pad_images_and_mask(in_channels, part_mask, depth_mask, weight_mask)
 
     
     def create_mask(self, h_idx, z_idx):
-        # TODO 
-        # weight mask to deweight empty pixels
 
         hid = h_idx + 1
         hid_mask = self.propagator.h_ds["hid"] == hid
@@ -114,6 +115,7 @@ class LoadHolograms(Dataset):
         # Initialize the UNET mask
         unet_mask = np.zeros((self.propagator.x_arr.shape[0], self.propagator.y_arr.shape[0]))
         depth_mask = np.zeros((self.propagator.x_arr.shape[0], self.propagator.y_arr.shape[0]))
+        weight_mask = np.zeros((self.propagator.x_arr.shape[0], self.propagator.y_arr.shape[0]))+self.deweight
         
         num_particles = 0 
 
@@ -135,15 +137,19 @@ class LoadHolograms(Dataset):
                 y_diff = (self.propagator.y_arr[None, :] * 1e6 - y_part[part_idx])
                 x_diff = (self.propagator.x_arr[:, None] * 1e6 - x_part[part_idx])
                 d_squared = (d_part[part_idx] / 2)**2
-                unet_mask += ((y_diff**2 + x_diff**2) < d_squared).astype(float)
-                depth_mask[np.where((y_diff**2 + x_diff**2) < d_squared)] = z_diff
+                part_pxl_idx = np.where((y_diff**2 + x_diff**2) < d_squared)
+                unet_mask[part_pxl_idx] = 1.0
+                # unet_mask += ((y_diff**2 + x_diff**2) < d_squared).astype(float)
+                depth_mask[part_pxl_idx] = z_diff
+                weight_pxl_idx = np.where((y_diff**2 + x_diff**2) < 4*d_squared)
+                weight_mask[weight_pxl_idx] = 1.0
                 num_particles += 1
                 
             xp = np.digitize(x_part[part_idx], 1e6 * self.propagator.x_arr, right=True)
             yp = np.digitize(y_part[part_idx], 1e6 * self.propagator.y_arr, right=True)
             #print(xp, yp)
 
-        return num_particles, torch.from_numpy(unet_mask), torch.from_numpy(depth_mask)
+        return num_particles, torch.from_numpy(unet_mask), torch.from_numpy(depth_mask), torch.from_numpy(weight_mask)
     
     
     def get_particle(self, h_idx):
@@ -174,7 +180,7 @@ class LoadHolograms(Dataset):
         return im["image"], im["horizontal_flip"], im["vertical_flip"]
         
     
-    def pad_images_and_mask(self, image_stack, mask1, mask2, target_height = 4896, target_width = 3264):
+    def pad_images_and_mask(self, image_stack, mask1, mask2, mask3, target_height = 4896, target_width = 3264):
         """
         Pad the image_stack and mask with zeros to sizes (num_images, channels, 4896, 3264) and (4896, 3264) respectively using PyTorch.
 
@@ -196,8 +202,9 @@ class LoadHolograms(Dataset):
         # Pad the mask
         padded_mask1 = torch.nn.functional.pad(mask1, (0, pad_width, 0, pad_height), mode='constant', value=0)
         padded_mask2 = torch.nn.functional.pad(mask2, (0, pad_width, 0, pad_height), mode='constant', value=0)
+        padded_mask3 = torch.nn.functional.pad(mask3, (0, pad_width, 0, pad_height), mode='constant', value=0)
 
-        return padded_image_stack, padded_mask1, padded_mask2
+        return padded_image_stack, padded_mask1, padded_mask2, padded_mask3
     
     
 class UpsamplingReader(Dataset):
