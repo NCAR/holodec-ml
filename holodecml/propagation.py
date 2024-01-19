@@ -118,7 +118,10 @@ class WavePropagator(object):
 
         Etfft = torch.fft.fft2(Ein)
         Eofft = Etfft*torch.exp(1j*2*np.pi*z_tnsr/self.lam *
-                                torch.sqrt(1-self.lam**2*(self.fx**2+self.fy**2)))
+                                (torch.sqrt(1-self.lam**2*(self.fx**2+self.fy**2))-1))
+        # the -1 term at the end of the line above is not coventional.  I added it to remove the
+        # accumulation of linear phase with z propagation.  This keeps the overall phase from
+        # changing between planes and should make it easier for the ML architecture to process.
 
         # It might be helpful if we could omit this step.  It would save an inverse fft.
         Eout = torch.fft.ifft2(Eofft)
