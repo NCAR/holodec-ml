@@ -1,4 +1,4 @@
-from holodecml.metrics import DistributedROC
+# from holodecml.metrics import DistributedROC
 from scipy.signal import convolve2d
 from functools import partial
 import xarray as xr
